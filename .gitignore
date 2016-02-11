@@ -4,9 +4,6 @@
 
 *.Rproj
 
-data
-data-raw
-
 *.aux
 *.bbl
 *.blg

@@ -1,0 +1,592 @@
+\documentclass[fleqn]{article}
+
+\usepackage{geometry}
+\geometry{letterpaper, top=1.5cm, left=2cm, right=2cm}
+
+\usepackage{amssymb, amsmath, amsfonts}
+
+
+\include{GrandMacros}
+\newcommand{\cdf}{{c.d.f.} }
+\newcommand{\pdf}{{p.d.f.} }
+\newcommand{\ind}{\mathbb{I}}
+
+\begin{document}
+
+\thispagestyle{empty}
+\begin{center}
+{\LARGE{\bf Infectious Disease Prediction with Kernel Conditional Density
+Estimation}}
+\end{center}
+\baselineskip=12pt
+
+
+\section{Introduction}
+\label{sec:Intro}
+
+Accurate prediction of infectious disease incidence is important for public
+health officials planning resource allocations such as the use of vector control
+measures, assignments of medical personnel, and implementation of
+potentially costly personal protective equipment policies for those personnel. 
+Predictive distributions are preferred to point predictions because they
+communicate uncertainty in the predictions and give decision makers more
+information in cases where the predictive distribution may be skewed or have
+multiple modes.  In this work, we obtain predictive distributions of disease
+incidence using kernel conditional density estimation (KCDE), a non-parametric
+approach that has not been applied to predicting infectious disease incidence
+previously.  Our contributions include a novel kernel function that handles both
+continuous and discrete count data by partially discretizing an underlying
+Gaussian kernel, and consideration of several candidate specifications of
+conditioning variables:
+periodic functions of the observation time that allow us to capture seasonality
+in disease incidence, and smoothed observations of past incidence that mitigate
+the effects of noise that can obscure short to medium term trends in incidence.
+
+KCDE is a method for estimating the conditional distribution of
+a random vector $Y$ given observations of another vector $X$.  In our work, $Y$
+is a measure of disease incidence at some future date or dates (the prediction
+target) and $X$ is a vector of predictive variables that we condition
+on in order to make our prediction.  For example, $X$ may include
+observations of incidence over the most recent few time
+points, weather covariates, or variables indicating the time of year at which we are
+making a prediction.  KCDE has not previously been applied to obtain predictive
+distributions in the context of infectious disease, but it has been successfully
+used for prediction in other settings such as survival time of lung cancer
+patients [\cite{hall2004crossvalidationKCDE}], female labor force participation
+[\cite{hall2004crossvalidationKCDE}], bond yields and value at risk in financial
+markets [\cite{fan2004crossvalidationKCDE}], and wind power
+[cite{jeon2012KCDEWindPower}] among others.
+
+Although KCDE has not previously been applied to predicting infectious disease,
+closely related methods for obtaining point predictions have been employed for
+diseases such as measles [\cite{sugihara1990nonlinearForecasting}] and influenza
+[\cite{viboud2003predictionInfluenzaMoA}].  In the infectious disease
+literature these methods have been referred to as state space reconstruction and
+the method of analogues, but they amount to an application of nearest neighbors
+regression methods.  The point predictions obtained from nearest neighbors
+regression are equal to the expected value of the predictive distribution that
+are obtained from KCDE if a particular data-dependent kernel function is
+used in the formulation of KCDE [\cite{HastieTibshiraniESL}].  However, KCDE
+offers the advantage of providing a complete predictive distribution rather than
+only a point prediction.  There is also a long history of using other modeling
+approaches, such as compartmental models, for infectious disease prediction.  A
+full discussion of those methods is beyond the scope of this article; see ***
+for a recent review.
+
+\lboxit{Double check citation for sugihara -- right paper??}
+
+\lboxit{Need to find a review of prediction methods for infectious disease.}
+
+There is an extensive literature on KCDE, focusing mainly on estimation of
+continuous conditional densities.  Here we offer a brief overview focusing on
+multivariate density estimation, possibly with mixed continuous and discrete
+variables.  \cite{li2007nonparametricEconometrics} offer a detailed discussion
+of this case.  Throughout this article we use the term density to refer to
+the Radon-Nikodym derivative of the cumulative distribution function with
+respect to an appropriately defined measure.  In the case of random vectors
+where some components are continuous random variables and other are discrete,
+we take this measure to be a product of Lebesgue and counting measures for the
+corresponding random variables.
+
+Given observations $\{(\bx_t, \by_t), t = 1, \ldots, T\}$
+the KCDE estimate of the conditional density of $\bY | \bX$ is given by
+\begin{equation}
+\widehat{f}_{\bY|\bX}(\by | \bx) = \frac{\sum_{t \in \btau} K^{\bX, \bY}\left\{(\bx', \by')', (\bx'_t, \by'_t)'; \bH^{\bX,\bY}\right\}}{\sum_{t \in \btau}K^{\bX}(\bx, \bx_t ; \bH^{\bX})}. \label{eqn:KCDEDefinition}
+\end{equation}
+Here, $'$ is the transpose operator and $\btau \subseteq \{1, \ldots, T\}$ indexes the subset of observations used
+in obtaining the conditional density estimate.  In the final density estimate,
+$\btau$ is typically equal to $\{1, \ldots, T\}$, but proper subsets may be
+used in the estimation procedures we discuss later.
+
+We will work with a slightly restricted specification of
+Equation~\eqref{eqn:KCDEDefinition} in which the kernel function $K^{\bX,\bY}$
+can be written as the product of $K^{\bX}$ and a
+``conditional kernel'' $K^{\bY|\bX}$:
+\begin{equation}
+K^{\bX,\bY}\left\{(\bx', \by')', (\bx'_t, \by'_t)'; \bH^{\bX,\bY}\right\} = K^{\bX}\left\{\bx, \bx_t; \bH^{\bX}\right\} K^{\bY | \bX}\left\{\by, \by_t | \bx, \bx_t; \bH^{\bX,\bY}\right\}.
+\end{equation}
+With this restriction, we can rearrange Equation~\eqref{eqn:KCDEDefinition} to
+obtain
+\begin{align}
+\widehat{f}_{\bY|\bX}(\by | \bx) &= \sum_{t \in \btau} w_t K^{\bY | \bX}\left\{\by, \by_t | \bx, \bx_t; \bH^{\bX,\bY}\right\}, \text{ where} \label{eqn:KCDEDefinition} \\
+w_t &= \frac{K^{\bX}\left\{\bx, \bx_t; \bH^{\bX}\right\}}{\sum_{t^* \in \btau} K^{\bX}\left\{\bx, \bx_{t^*}; \bH^{\bX}\right\}}.
+\end{align}
+
+We can now interpret $K^{\bX}$ as a weighting function determining how much each
+observation contributes to our final density estimate according to how similar
+$\bx_t$ is to the value $\bx$ that we are conditioning on.
+$K^{\bY | \bX}$ is a density function that contributes
+mass to the final density estimate near the observed value $\by_t$; we require
+that for any values of $\by_t$, $\bx_t$, and $\bx$, the integral of $K^{\bY |
+\bX}$ with respect to $\by$ must equal $1$.
+The bandwidth parameters $\bH^{\bX, \bY}$ control the locality and orientation of
+the weighting function and the contributions to the density estimate from each observation.
+
+In order to complete the formulation of the estimator given in
+Equation~\eqref{eqn:KCDEDefinition}, we must specify the kernel functions and
+describe the procedure that is used to estimate the bandwidth parameters.  To
+our knowledge, all previous authors using kernel methods to estimate either
+conditional or marginal densities with one or more discrete variables have
+employed a kernel function that is a
+product of univariate kernel functions
+[\cite{aitchison1976multivariateBinaryKernel},
+\cite{wang1981SmoothEstDiscreteDistn},
+\cite{li2003nonparametricEstDistnsCategoricalContinuous},
+\cite{ouyang2006crossvalidationEstDistnCategorical},
+].
+For the continuous variables, there are several options for the functional form;
+one common choice is the Gaussian kernel.  Several alternatives have also been
+proposed for use with discrete variables.  For ordered discrete variables,
+symmetric univariate kernel functions that decrease with the distance between
+$x$ and $x_t$ are often used; several specific functional forms that achieve
+this have been used in the literature [e.g.,
+\cite{aitchison1976multivariateBinaryKernel},
+\cite{wang1981SmoothEstDiscreteDistn},
+\cite{li2008nonparametricConditionalCDFQuantile}].
+
+use a kernel function
+of the form $K(x, x_t ; \lambda) \varpropto \lambda^{\vert x - x_t \vert}$. For unordered variables with a finite number of categories, they use the form
+$K(x, x_t ; \lambda) \varpropto \begin{cases} 1 \text{ if $x = x_t$} \\ \lambda
+\text{ otherwise} \end{cases}$; similar forms were used by
+\cite{aitchison1976multivariateBinaryKernel} and
+\cite{li2003nonparametricEstDistnsCategoricalContinuous},
+\cite{ouyang2006crossvalidationEstDistnCategorical}.
+
+Using a product kernel simplifies the mathemetical formulation of the kernel
+function when both continuous and discrete variables are present, but has the
+effect of forcing the kernel function to be orientied in line with the
+coordinate axes.  In settings with only continuous variables, it is common to
+use a multivariate kernel function with a bandwidth parameterization that allows
+for orientations in directions other than along the coordinate axes.  Asymptotic
+analysis and experience with applications have shown that this can result in
+improved density estimates in many cases (cite ***).  One possibility for
+introducing orientation to the kernel function is to use a fully parameterized
+bandwidth matrix, allowing the kernel to be oriented in any direction.  Another
+common alternative is to fix the orientation to be in the directions of the
+eigenvectors of the sample covariance matrix.
+
+
+Estimation.  Two main strategies:  cross validation and rule-based.  Targets for
+optimization in cross-validation.  For
+estimating joint densities without
+conditioning, \cite{hart1990bandwidthEstDependentData} have shown that with
+dependent data, but small gains in the mean integrated square error of the density estimate relative to the true conditional density can be achieved by leaving out observations adjacent to the time point whose density is being estimated.
+
+
+
+%We make several contributions in this article.  First, we apply KCDE to
+%prediction of infectious disease (specifically, Dengue fever and Influenza), a
+%novel application of the method which gives rise to several challenges and
+%opportunities.  Among these challenges is the fact that infectious disease
+%incidence can be quite noisy, with a lot of variation around a longer term
+%trend; we will illustrate this in two real data sets in Section ***.  As we will
+%see, this noise can cause difficulty for the method when applied to prediction
+%of future incidence directly from recent observations of incidence.  Our
+%solution is to introduce an initial low-pass filtering step on the observed
+%incidence counts that are used as inputs to the predictions.
+
+%Another challenge is in capturing seasonality in disease incidence.  In order
+%to address this, we consider the use of periodic functions of the observation
+%time as conditioning variables.  Effectively, this means that we can base our
+%predictive density on previous observations that have been recorded at the time
+%of year we are interested in.
+
+%A third challenge is that for some applications, observations of disease
+%incidence may take the form of discrete counts (i.e., the number of new cases
+%in the last week).  If these incidence counts span a large range, it may be
+%reasonable to approximate their predictive distribution with a continuous
+%density function.  However, in our data for Dengue fever, the number of cases
+%often falls within a limited range so that this continuous approximation is not
+%reasonable.  We address this by discretizing an underlying continuous density
+%function.  To our knowledge, this approach is novel in the KCDE literature.
+
+The remainder of this article is organized as follows.  We:
+ - describe how kernel density estimation with a non-diagonal bandwidth can be
+ achieved using a partially discretized multivariate normal distribution for the
+ kernel functions.
+ 
+ - prove asymptotic efficiency for marginal and conditional
+ density estimation for a non-product kernel function
+ 
+ - simulation study comparing product and non-product formulations for marginal
+ and conditional density estimation
+ 
+ - applications
+
+\section{Method Description}
+\label{sec:MethodDescription}
+
+Suppose we observe $\bz_t = \{z_{t,1}, \ldots, z_{t,D}\} \in \mathbb{R}^D$ at
+each point in time $t = 1, \ldots, T$.  Our goal is to obtain a predictive
+distribution for one of the observed variables, with index $d_{pred} \in \{1,
+\ldots, D\}$, over a range of prediction horizons contained in the set
+$\mathcal{P}$.  For example, if we have weekly data and we are interested in
+obtaining predictions for a range between 4 and 6 weeks after the most recent
+observation then $\mathcal{P} = \{4, 5, 6\}$.  Let $P$ be the largest element of
+the set $\mathcal{P}$ of prediction horizons.
+
+For each time $t \in \btau$, we form the vectors $\by_t$ and $\bx_t$
+representing the prediction target and predictive variables respectively.  
+
+In order to perform prediction, we will use lagged observations.  Let $\bl^{max} = (l^{max}_1, \ldots, l^{max}_D)$ specify the maximum number of lags for each observed variable that may be used for prediction, and let $L = \max{d} l^{max}_d$ be the overall largest lag that may be used across all variables.  In the estimation procedure we describe in Section~\ref{sec:Estimation}, we will select a subset of these lags to actually use in the predictions.  We capture which lags are actually used in the vector 
+\begin{align*}
+&\bu = (u_{1,0}, \ldots, u_{1, l^{max}_1}, \ldots, u_{D,0}, \ldots, u_{D, l^{max}_D}) \text{, where} \\
+&u_{d, l} = \begin{cases} 0 \text{ if lag $l$ of variable $d$ is not used in forming predictions} \\ 1 \text{ if lag $l$ of variable $d$ is used in forming predictions.} \end{cases}
+\end{align*}
+
+By analogy with the standard notation in autoregressive models, we define
+\begin{align*}
+&\by_t = (z_{t, d_{pred}}, \ldots, B^{(P - 1)} z_{t, d_{pred}}) \text{ and} \\
+&\bx_t = (B^{(P)} z_{t, 1}, \ldots, B^{(P + l^{max}_1 - 1)} z_{t, 1}, \ldots, B^{(P)} z_{t, D}, \ldots, B^{(P + l^{max}_D - 1)} z_{t, D})
+\end{align*}
+Here, $B^{(a)}$ is the backshift operator defined by $B^{(a)} z_{t, d} = z_{t - a, d}$.  Note that the lengths of $\by_t$ and $\bx_t$, as well as exactly which lags are used to form them, depend on $\mathcal{P}$ and $\bl^{max}$; we suppress this dependence in the notation for the sake of clarity.  The vector $\by_t$ represents the prediction target when our most recent observation was made at time $t - P$: the vector of observed values at each prediction horizon $p \in \mathcal{P}$.  The variable $\bx_t$ represents the vector of all lagged covariates that are available for use in performing prediction.
+
+To make the notation concrete, suppose that $\bz_t$ contains the observed case count for week $t$ in San Juan, the observed case count for week $t$ in Iquitos, and the date on Monday of week $t$, and our goal is to predict the weekly case count in San Juan.  Then $D = 3$ and $d_{pred} = 1$.  If we want to predict the weekly case counts for the two weeks after the most recently observation, then $p = 2$.  If we specify that the model may include the two most recent observations for the case counts in San Juan and Iquitos, but only the time index at the most recent observation then $\bl^{max} = (1, 1, 0)$.  If our current model uses only the most recently observed case counts for San Juan and Iquitos then $\bu = (1, 0, 1, 0, 0)$, where the 1's are in the positions of the $\bu$ vector representing lag 0 of the counts for San Juan and lag 0 of the counts for Iquitos.  The variable $y_t^{(P)}$ is a vector containing the observed case counts for San Juan in weeks $t + 1$ and $t + 2$; $\bx_t^{(\bl^{max})}$ contains the observed case counts for San Juan and Iquitos in weeks $t$ and $t - 1$ as well as the time index variable in week $t$.
+
+In order to perform prediction, we regard $\{(\by_t, \bx_t), t = 1 + P + L, \ldots, T\}$ as a sample from the joint distribution of $(\bY, \bX)$.  We wish to estimate the conditional distribution of $\bY | \bX$.  In order to do this, we employ kernel density estimation.  Let $K^{\bY}(\by, \by^*, H^{\bY})$ and $K^{\bX}(\bx, \bx^*, H^{\bX})$ be kernel functions centered at $\by^*$ and $\bx^*$ respectively and with bandwidth matrices $H^{\bY}$ and $H^{\bX}$.  We estimate the conditional distribution of $\bY | \bX$ as follows:
+\begin{align}
+&\widehat{f}_{\bY|\bX}(\by | \bX = \bx) = \frac{\widehat{f}_{\bY, \bX}(\by, \bx)}{\widehat{f}_{\bX}(\bx)} \label{eqn:KDECondDef} \\
+&\qquad = \frac{\sum_{t \in \tau} K^{\bY, \bX}\{(\by, \bx), (\by_t, \bx_t), H^{\bY, \bX}\}}{\sum_{t \in \tau} K^{\bX}(\bx, \bx_t, H^{\bX}) } \label{eqn:KDESubKDEJtMarginal} \\
+&\qquad = \frac{\sum_{t \in \tau} K^{\bY | \bX}(\by, \by_t | \bx, \bx_t, H^{\bY, \bX}) K^{\bX}(\bx, \bx_t, H^{\bX})}{\sum_{t \in \tau} K^{\bX}(\bx, \bx_t, H^{\bX}) } \label{eqn:KDESubKDEJtMarginal} \\
+&\qquad = \sum_{t \in \tau} w_t K^{\bY | \bX}(\by, \by_t | \bx, \bx_t, H^{\bY, \bX}) \text{, where} \label{eqn:KDEwt} \\
+&w_t = \frac{ K^{\bX}(\bx, \bx_t, H^{\bX}) }{\sum_{t^* \in \tau} K^{\bX}(\bx, \bx_{t^*}, H^{\bX}) } \label{eqn:KDEWeightsDef}
+\end{align}
+
+In Equation~\eqref{eqn:KDECondDef}, we are making use of the fact that the conditional density for $\bY | \bX$ can be written as the quotient of the joint density for $(\bY, \bX)$ and the marginal density for $\bX$.  In Equation~\eqref{eqn:KDESubKDEJtMarginal}, we obtain separate kernel density estimates for the joint and marginal densities in this quotient.  In Equation~\eqref{eqn:KDEwt}, we rewrite this quotient by passing the denominator of Equation~\eqref{eqn:KDESubKDEJtMarginal} into the summation in the numerator.  We can interpret the result as a weighted kernel density estimate, where each observation $t \in \tau$ contributes a different amount to the final conditional density estimate.  The amount of the contribution from observation $t$ is given by the weight $w_t$, which effectively measures how similar $\bx_t$ is to the point $\bx$ at which we are estimating the conditional density.  If $\bx_t^{(\bl^{max})}$ is similar to $\bx_{t^*}^{(\bl^{max})}$, a large weight is assigned to $t$; if $\bx_t^{(\bl^{max})}$ is different from $\bx_{t^*}^{(\bl^{max})}$, a small weight is assigned to $t$.
+
+In kernel density estimation, it is generally required that the kernel functions integrate to $1$ in order to obtain valid density estimates.  However, after conditioning on $\bX$, it is no longer necessary that $K^{\bX}(\bx, \bx_t, H^{\bX})$ integrate to $1$.  In fact, as can be seen from Equation~\eqref{eqn:KDEWeightsDef}, any multiplicative constants of proportionality will cancel out when we form the observation weights.  We can therefore regard $K^{\bX}(\bx, \bx_t, H^{\bX})$ as a more general weighting function that measures the similarity between $\bx$ and $\bx_t$.  As we will see, eliminating the constraint that $K^{\bX}$ integrates to $1$ is a useful expansion the space of functions that can be used in calculating the observation weights.  However, we still require that $K^{\bY}$ integrates to $1$.
+
+In Equations \eqref{eqn:KDECondDef} through \eqref{eqn:KDEWeightsDef}, $\tau$ is an index set of time points used in obtaining the density estimate.  In most settings, we can take $\tau = \{1 + P + L, \ldots, T\}$.  These are the time points for which we can form the lagged observation vector $\bx_t$ and the prediction target vector $\by_t$.  However, we will place additional restrictions on the time points included in $\tau$ in the cross-validation procedure discussed in Section \ref{sec:Estimation}.
+
+If we wish to obtain point predictions, we can use a summary of the predictive density.  For example, if we take the expected value, we obtain kernel regression:
+\begin{align}
+&(\widehat{\bY} | \bX = \bx) = \mathbb{E}_{\widehat{f}_{\bY|\bX}}\{\bY | \bX = \bx\} \label{eqn:PtPredDef} \\
+&\qquad = \int \sum_{t \in \tau} w_t K^{\bY}(\by, \by_t, H^{\bY}) \by \, d \by  \label{eqn:PtPredKDE} \\
+&\qquad = \sum_{t \in \tau} w_t \by_t  \label{eqn:PtPredFinal}
+\end{align}
+The equality in Equation~\eqref{eqn:PtPredFinal} holds if the kernel function $K^{\bY}(\by, \by_t, H^{\bY})$ is symmetric about $\by_t$, or more generally if it is the pdf of a random variable with expected value $\by_t$.
+
+
+Another alternative that we pursue is the use of smoothed observations in forming the lagged observation vectors.  We use smoothed case counts on a log scale for the weighting kernels, and the unsmoothed case counts on the original scale for the prediction kernels.
+
+\section{Parameter Estimation}
+\label{sec:Estimation}
+
+We use cross-validation to select the variables that are used in the model and estimate the corresponding bandwidth parameters by (approximately) minimizing a cross-validation measure of the quality of the predictions obtained from the model.  Formally,
+\begin{align}
+&(\widehat{\bu}, \widehat{H}^{\bX}, \widehat{H}^{\bY}) \approx \argmin{(\bu, H^{\bX}, H^{\bY})} \sum_{t^* = 1 + P + L}^T Q[ \by_{t^*}, \widehat{f}(\by | \bX = \bx_{t^*} ; \bu, H^{\bX}, H^{\bY}, \{ (\by_t, \bx_t): t \in \tau_{t^*} \}) ] \label{eqn:ParamEst}
+\end{align}
+Here, $Q$ is a loss function that measures the quality of the estimated density $\widehat{f}$ given an observation $\by_{t^*}$.  We have made the dependence of this estimated density on the the parameters $\bu$, $H^{\bx}$, and $H^{\bY}$, as well as on the data $\{ (\by_t, \bx_t): t \in \tau_{t^*} \}$, explicit in the notation.  In order to reduce the potential for our parameter estimates to be affected by local correlation in the time series, we eliminate all time points that fall within one year of $t^*$ from the index set $\tau_{t^*}$ used to form the conditional density estimate $\widehat{f}(\by | \bX = \bx_{t^*} ; \bu, H^{\bX}, H^{\bY}, \{ (\by_t, \bx_t): t \in \tau_{t^*} \})$.
+
+\lboxit{Talk about proper scoring rules and our particular choice of $Q$.}
+
+We use a forward/backward stagewise procedure to obtain the set of combinations of variables and lags that are included in the final model (represented by $\bu$).  For each candidate model, we use the limited memory box constrained optimization procedure of \cite{byrd1995limitedmemoryoptim} to estimate the bandwidth parameters.  The approximation in Equation~\eqref{eqn:ParamEst} is due to the fact that this optimization procedure may not find a global minimum.
+
+
+\section{Examples}
+\label{sec:Examples}
+
+In this Section, we illustrate the methods through applications to prediction in
+examples with several real time series data sets.
+
+\subsection{Example 1: Influenza Prediction}
+
+In our first and simplest example, we apply the method for prediction of
+influenza with prediction horizons of 1 through 4 weeks.  Data on influenza
+incidence are available through {\tt R}'s {\tt cdcfluview} package.  Here we
+create a data set with a nationally aggregated measure of flu incidence
+
+<<FluDataLoadData, echo = TRUE>>=
+library(cdcfluview)
+library(plyr)
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(grid)
+library(kcde)
+
+usflu<-get_flu_data("national", "ilinet", years=1997:2015)
+ili_national <- transmute(usflu,
+    region.type = REGION.TYPE,
+    region = REGION,
+    year = YEAR,
+    week = WEEK,
+    weighted_ili = as.numeric(X..WEIGHTED.ILI))
+ili_national$time <- ymd(paste(ili_national$year, "01", "01", sep = "-"))
+week(ili_national$time) <- ili_national$week
+ili_national$time_index <- seq_len(nrow(ili_national))
+
+str(ili_national)
+@
+
+We plot the {\tt total\_cases} measure over time, representing missing values
+with vertical grey lines.  The low season was not measured in the first few
+years.
+
+<<FluDataInitialPlotTotalCases, echo = TRUE>>=
+ggplot() +
+    geom_line(aes(x = as.Date(time), y = weighted_ili), data =
+ili_national) +
+    geom_vline(aes(xintercept = as.numeric(as.Date(time))),
+        colour = "grey",
+        data = ili_national[is.na(ili_national$weighted_ili), ]) +
+    scale_x_date() +
+    xlab("Time") +
+    ylab("Weighted ILI") +
+    theme_bw()
+@
+
+There are several methods that we could employ to handle these missing data:
+\begin{enumerate}
+\item Impute the missing values.  They are all in the low season, so this should be relatively easy to do.
+\item Drop all data up through the last NA.
+\item Use the data that are available.
+\end{enumerate}
+Of these approaches, the first is probably preferred.  The concern with the second
+is that we are not making use of all of the available data.  The potential concern with the
+third is that in the data used in estimation, there will be more examples of prediction of values in the high season
+using values in the high season and middle of the season than of prediction of values in the high season using values in the low season.
+This could potentially affect our inference.  However, we do not expect this effect to be large,
+so we proceed with this option for the purposes of this example.
+
+We also plot histograms of the observed total cases on the original scale and on the log scale.
+
+<<FluDataHistogramPlotTotalCases, echo = TRUE>>=
+hist_df <- rbind(
+	data.frame(value = ili_national$weighted_ili,
+    	variable = "Weighted ILI"),
+    data.frame(value = log(ili_national$weighted_ili),
+    	variable = "log(Weighted ILI)")
+)
+
+ggplot(aes(x = value), data = hist_df) +
+    geom_histogram() +
+    facet_wrap( ~ variable, ncol = 2) +
+    xlab("Weighted ILI") +
+    theme_bw()
+@
+
+These plots demonstrate that total cases follows an approximately log-normal
+distribution.  In the application below, we will consider modeling these data on
+both the original scale and the log scale.  Intuitively, since we are using a
+kernel that is obtained from a Gaussian, modeling the data on the log scale
+should yield better performance.  On the other hand, the performance gain may be
+negligible if we have enough data.
+
+Finally, we plot the autocorrelation function:
+
+<<FluDataACFPlotTotalCases, echo = TRUE>>=
+last_na_ind <- max(which(is.na(ili_national$weighted_ili)))
+non_na_inds <- seq(from = last_na_ind + 1, to=nrow(ili_national))
+acf(ili_national$weighted_ili[non_na_inds],
+  lag.max = 52 * 4)
+@
+
+This plot illustrates the annual periodicity that was also visible in the
+initial data plot above.  There is no apparent evidence of longer term annual
+cycles.  We therefore include a periodic kernel acting on the time index with a
+period of 52.2 weeks (the length of the period is motivated by the fact that
+in our data, there is a year with 53 weeks once every 5 or 6 years).
+
+We now do some set up for estimation and prediction with kcde.  First, we 
+create a list with parameters that specify the kernel function components.
+
+%<<FluDataKernelComponentsSetup, echo = TRUE>>=
+%## Definitions of kernel components.  A couple of notes:
+%##   1) In the current implementation, it is required that separate kernel
+%##      components be used for lagged (predictive) variables and for leading
+%##      (prediction target) variables.
+%##   2) The current syntax is verbose; in a future version of the package,
+%##      convenience functions may be provided.
+%
+%## Define kernel components -- 3 pieces:
+%##   1) Periodic kernel acting on time index
+%##   2) pdtmvn kernel acting on lagged total cases (predictive) -- all continuous
+%##   3) pdtmvn kernel acting on lead total cases (prediction target) -- all continuous
+%kernel_components <- list(
+%    list(
+%        vars_and_offsets = data.frame(var_name = "time_index",
+%            offset_value = 0L,
+%            offset_type = "lag",
+%            combined_name = "time_index_lag0",
+%            stringsAsFactors = FALSE),
+%        kernel_fn = periodic_kernel,
+%        theta_fixed = list(period=pi / 52.2),
+%        theta_est = list("bw"),
+%        initialize_kernel_params_fn = initialize_params_periodic_kernel,
+%        initialize_kernel_params_args = NULL,
+%        vectorize_kernel_params_fn = vectorize_params_periodic_kernel,
+%        vectorize_kernel_params_args = NULL,
+%        update_theta_from_vectorized_theta_est_fn = update_theta_from_vectorized_theta_est_periodic_kernel,
+%        update_theta_from_vectorized_theta_est_args = NULL
+%    ),
+%    list(
+%        vars_and_offsets = data.frame(var_name = "weighted_ili",
+%            offset_value = 1L,
+%            offset_type = "horizon",
+%            combined_name = "time_index_horizon1",
+%            stringsAsFactors = FALSE),
+%        kernel_fn = pdtmvn_kernel,
+%        rkernel_fn = rpdtmvn_kernel,
+%        theta_fixed = list(
+%            parameterization = "bw-diagonalized-est-eigenvalues",
+%            continuous_vars = "weighted_ili_horizon1",
+%            discrete_vars = NULL,
+%            discrete_var_range_fns = NULL,
+%            lower = -Inf,
+%            upper = Inf
+%        ),
+%        theta_est = list("bw"),
+%        initialize_kernel_params_fn = initialize_params_pdtmvn_kernel,
+%        initialize_kernel_params_args = NULL,
+%        vectorize_kernel_params_fn = vectorize_params_pdtmvn_kernel,
+%        vectorize_kernel_params_args = NULL,
+%        update_theta_from_vectorized_theta_est_fn = update_theta_from_vectorized_theta_est_pdtmvn_kernel,
+%        update_theta_from_vectorized_theta_est_args = NULL
+%    ))#,
+%    list(
+%        vars_and_lags = vars_and_lags[3:5, ],
+%        kernel_fn = pdtmvn_kernel,
+%        rkernel_fn = rpdtmvn_kernel,
+%        theta_fixed = NULL,
+%        theta_est = list("bw"),
+%        initialize_kernel_params_fn = initialize_params_pdtmvn_kernel,
+%        initialize_kernel_params_args = list(
+%            continuous_vars = vars_and_lags$combined_name[3:4],
+%            discrete_vars = vars_and_lags$combined_name[5],
+%            discrete_var_range_fns = list(
+%                c_lag2 = list(a = pdtmvn::floor_x_minus_1, b = floor, in_range = pdtmvn::equals_integer, discretizer = round_up_.5))
+%        ),
+%        vectorize_theta_est_fn = vectorize_params_pdtmvn_kernel,
+%        vectorize_theta_est_args = NULL,
+%        update_theta_from_vectorized_theta_est_fn = update_theta_from_vectorized_theta_est_pdtmvn_kernel,
+%        update_theta_from_vectorized_theta_est_args = list(
+%            parameterization = "bw-diagonalized-est-eigenvalues"
+%        )
+%    ))
+%@
+
+<<FluDataMergePredictionResults, echo = FALSE>>=
+ili_prediction_results_sarima <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/results/ili_national/prediction-results/sarima-predictions.rds")
+ili_prediction_results_kcde <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/results/ili_national/prediction-results/kcde-predictions.rds")
+ili_prediction_results <- rbind.fill(ili_prediction_results_sarima[!is.na(ili_prediction_results_sarima$log_score), ],
+    ili_prediction_results_kcde)
+ili_prediction_results$AE <- unlist(ili_prediction_results$AE)
+
+full_model_descriptor <- ili_prediction_results$model
+@
+
+<<FluDataRibbonsPredictionPlot, echo = FALSE>>=
+ribbons_df <- ili_prediction_results %>%
+    select(prediction_time,
+        prediction_horizon,
+        model,
+        interval_pred_lb_95:interval_pred_ub_50) %>%
+    gather("bound_type", "predictive_value", interval_pred_lb_95:interval_pred_ub_50) %>%
+    mutate(interval_type = ifelse(grepl("50", bound_type), "50", "95"),
+        bound_type = ifelse(grepl("lb", bound_type), "lower", "upper")) %>%
+    spread(bound_type, predictive_value)
+
+phs_used <- c(1)
+
+ggplot() +
+    geom_ribbon(aes(x = prediction_time, ymin = lower, ymax = upper, colour = model, fill = model, alpha = interval_type),
+        size = 0,
+        data = ribbons_df[ribbons_df$prediction_horizon %in% phs_used, ]) +
+    geom_line(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
+    geom_point(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
+    geom_line(aes(x = prediction_time, y = pt_pred, colour = model),
+        data = ili_prediction_results[ili_prediction_results$prediction_horizon == 1, ]) +
+    scale_alpha_discrete("Prediction\nInterval\nCoverage",
+        labels = c("50 Percent", "95 Percent"),
+        limits = c("50", "95"),
+        range = c(0.4, 0.2)) +
+#    facet_wrap( ~ ph) +
+    theme_bw()
+
+
+ggplot() +
+    geom_ribbon(aes(x = prediction_time, ymin = lower, ymax = upper, colour = model, fill = model, alpha = interval_type),
+        size = 0,
+        data = ribbons_df[ribbons_df$prediction_horizon %in% phs_used & ribbons_df$interval_type == "50", ]) +
+    geom_line(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
+    geom_point(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
+    geom_line(aes(x = prediction_time, y = pt_pred, colour = model),
+        data = ili_prediction_results[ili_prediction_results$prediction_horizon == 1, ]) +
+    scale_alpha_discrete("Prediction\nInterval\nCoverage",
+        labels = c("50 Percent", "95 Percent"),
+        limits = c("50", "95"),
+        range = c(0.4, 0.2)) +
+#    facet_wrap( ~ ph) +
+    theme_bw()
+
+
+ggplot() +
+    geom_ribbon(aes(x = prediction_time, ymin = lower, ymax = upper, colour = model, fill = model), alpha = 0.4,
+        size = 0,
+        data = ribbons_df[ribbons_df$prediction_horizon %in% phs_used & ribbons_df$interval_type == "95", ]) +
+    geom_line(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
+    geom_point(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
+    geom_line(aes(x = prediction_time, y = pt_pred, colour = model),
+        data = ili_prediction_results[ili_prediction_results$prediction_horizon == 1, ]) +
+#    facet_wrap( ~ ph) +
+    theme_bw()
+@
+
+
+
+<<FluDataAEPlot, echo = FALSE>>=
+mae_sarima <- mean(ili_prediction_results$AE[which(ili_prediction_results$prediction_horizon == 1 & ili_prediction_results$model == "SARIMA")])
+mae_kcde <- mean(ili_prediction_results$AE[which(ili_prediction_results$prediction_horizon == 1 & ili_prediction_results$model == "kcde")])
+
+#ae_diff_df <- 
+@
+
+<<FluDataLogScorePlot, echo = FALSE>>=
+inds_sarima <- which(ili_prediction_results$prediction_horizon == 1 & ili_prediction_results$model == "SARIMA")
+inds_sarima_order <- order(ili_prediction_results$prediction_time[inds_sarima])
+inds_sarima <- inds_sarima[inds_sarima_order]
+
+inds_kcde <- which(ili_prediction_results$prediction_horizon == 1 & ili_prediction_results$model == "kcde")
+inds_kcde_order <- order(ili_prediction_results$prediction_time[inds_kcde])
+inds_kcde <- inds_kcde[inds_kcde_order]
+
+log_score_diff <- ili_prediction_results$log_score[inds_kcde] - ili_prediction_results$log_score[inds_sarima]
+
+plot(ili_prediction_results$prediction_time[inds_kcde], log_score_diff)
+
+subinds_52 <- which(week(ili_prediction_results$prediction_time[inds_kcde]) == 52)
+points((ili_prediction_results$prediction_time[inds_kcde])[subinds_52], log_score_diff[subinds_52], pch = 18, col = "red")
+
+subinds_53 <- which(week(ili_prediction_results$prediction_time[inds_kcde]) == 53)
+points((ili_prediction_results$prediction_time[inds_kcde])[subinds_53], log_score_diff[subinds_53], pch = 18, col = "blue")
+
+subinds_1 <- which(week(ili_prediction_results$prediction_time[inds_kcde]) == 1)
+points((ili_prediction_results$prediction_time[inds_kcde])[subinds_1], log_score_diff[subinds_1], pch = 18, col = "green")
+
+inds_below_neg4 <- which(log_score_diff < -4)
+(ili_prediction_results$prediction_time[inds_kcde])[inds_below_neg4]
+
+ili_national$log_score_diff <- NA
+ili_national$log_score_diff[ili_national$year %in% 2011:2014] <- log_score_diff
+ggplot() +
+    geom_line(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
+    geom_point(aes(x = time, y = weighted_ili, alpha = log_score_diff), colour = "black", data = ili_national[ili_national$year %in% 2010:2014, ]) +
+    geom_line(aes(x = prediction_time, y = pt_pred, colour = model),
+        data = ili_prediction_results[ili_prediction_results$prediction_horizon == 1, ]) +
+    geom_point(aes(x = prediction_time, y = pt_pred, colour = model),
+        data = ili_prediction_results[ili_prediction_results$prediction_horizon == 1, ]) +
+    #    facet_wrap( ~ ph) +
+    theme_bw()
+@
+
+\section{References}
+\label{sec:References}
+
+\begingroup
+\renewcommand{\section}[2]{}
+\bibliographystyle{plainnat}
+\bibliography{kde-bib}
+\endgroup
+
+\end{document}
