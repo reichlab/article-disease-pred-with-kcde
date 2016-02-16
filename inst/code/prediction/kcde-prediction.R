@@ -25,7 +25,7 @@ all_bw_parameterizations <- c("diagonal", "full")
 for(data_set in all_data_sets) {
     ## Set path where fit object is stored
     results_path <- file.path(
-        "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/results",
+        "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results",
         data_set,
         "estimation-results")
     
@@ -185,7 +185,7 @@ for(data_set in all_data_sets) {
     
     ## Save results for the given data set
     saveRDS(data_set_results, file = file.path(
-        "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/results",
+        "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results",
         data_set,
         "prediction-results/kcde-predictions.rds"))
 } # data_set

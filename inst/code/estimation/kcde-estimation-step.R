@@ -30,20 +30,25 @@ bw_parameterization <- args[6]
 save_path <- args[7]
 
 ## Manually set values for testing purposes
-data_set <- "ili_national"
-prediction_horizon <- 25L
-max_lag <- 1L
-filtering <- TRUE
-seasonality <- TRUE
-bw_parameterization <- "full"
-save_path <- "/home/er71a/kcde-applied-paper/R/application-influenza/estimation-results"
-#data_set <- "dengue_sj"
-#prediction_horizon <- 1L
+#data_set <- "ili_national"
+#prediction_horizon <- 25L
 #max_lag <- 1L
 #filtering <- TRUE
 #seasonality <- TRUE
-#bw_parameterization <- "diagonal"
-#save_path <- "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/results/dengue_sj/estimation-results"
+#bw_parameterization <- "full"
+#save_path <- "/home/er71a/kcde-applied-paper/R/application-influenza/estimation-results"
+#data_set <- "dengue_sj"
+
+data_set <- "sim_10"
+prediction_horizon <- 0L
+max_lag <- 0L
+filtering <- FALSE
+seasonality <- FALSE
+bw_parameterization <- "full"
+save_path <- "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/results/dengue_sj/estimation-results"
+args <- c(rep("", 7), "100", "bivariate-B-discretized")
+#args <- c(rep("", 7), "1000", "bivariate-C-discretized")
+#args <- c(rep("", 7), "1000", "multivariate-4d-discretized")
 
 
 ### Load data set and set variables describing how the fit is performed
@@ -78,6 +83,14 @@ if(identical(data_set, "ili_national")) {
         paste0(c("weighted_ili", "filtered_weighted_ili"), "_lag", rep(seq(from = 0, to = max_lag), each=2))
     )
     discrete_var_names <- NULL
+    predictive_vars <- paste0(c("weighted_ili", "filtered_weighted_ili"), "_lag", rep(seq(from = 0, to = max_lag), each=2))
+    time_var <- "time"
+    
+    kernel_fn <- log_pdtmvn_kernel
+    rkernel_fn <- rlog_pdtmvn_kernel
+    
+    variable_selection_method <- "stepwise"
+    crossval_buffer <- ymd("2010-01-01") - ymd("2009-01-01")
 } else if(identical(data_set, "dengue_sj")) {
     ## Load data for Dengue fever in San Juan
     data <- read.csv("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/data/San_Juan_Training_Data.csv")
@@ -100,9 +113,86 @@ if(identical(data_set, "ili_national")) {
     discrete_var_names <- c(
         paste0(c("total_cases_plus_1", "filtered_total_cases_plus_1"), "_horizon", rep(1:52, each=2))
     )
+    predictive_vars <- paste0(c("total_cases_plus_1", "filtered_total_cases_plus_1"), "_lag", rep(seq(from = 0, to = max_lag), each=2))
+    time_var <- "time"
+    
+    kernel_fn <- log_pdtmvn_kernel
+    rkernel_fn <- rlog_pdtmvn_kernel
+    
+    variable_selection_method <- "stepwise"
+    crossval_buffer <- ymd("2010-01-01") - ymd("2009-01-01")
 } else if(identical(substr(data_set, 1, 3), "sim")) {
-    ## Generate data for simulation study
+    ## Load functions for generating simulated data
+    source("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/code/sim-densities-sim-study-discretized-Duong-Hazelton.R")
+#    source("/home/er71a/kcde-applied-paper/R/sim-densities-sim-study-discretized-Duong-Hazelton.R")
+    
+    ## Get arguments determining size of simulation and simulation family
+    sim_n <- as.integer(args[8])
+    sim_family <- args[9]
     sim_ind <- as.integer(substr(data_set, 5, nchar(data_set)))
+    cat(sim_n)
+    cat(sim_family)
+    cat(sim_ind)
+    cat("\n\n")
+    cat(data_set)
+    cat("\n")
+    cat(substr(data_set, 5, nchar(data_set)))
+    cat("\n")
+    
+    ## Set up random number generation
+    ## We use the rstream package for RNG, with
+    ## a separate stream of random numbers used for each combination of
+    ## simulation index, simulation family, and observed sample size
+    ## We allow for up to 10000 simulations for each combinatio nof
+    ## simulation family and sample size
+    rng_ind <- sim_ind
+    cat(rng_ind)
+    rng_ind <- rng_ind + switch(sim_family,
+        "bivariate-A-discretized" = 0,
+        "bivariate-B-discretized" = 20000,
+        "bivariate-C-discretized" = 40000,
+        "bivariate-D-discretized" = 60000,
+        "multivariate-2d-discretized" = 80000,
+        "multivariate-4d-discretized" = 100000,
+        "multivariate-6d-discretized" = 120000,
+        stop("Invalid simulation family.")
+    )
+    cat(rng_ind)
+    rng_ind <- rng_ind + switch(as.character(sim_n),
+        "100" = 0,
+        "1000" = 10000,
+        stop("Invalid simulation sample size.")
+    )
+    cat(rng_ind)
+    
+    set.seed(51158) # this was randomly generated
+    
+    library(rstream)
+    rngstream <- new("rstream.mrg32k3a", seed = sample(1:10000, 6, rep = FALSE))
+    for(i in seq_len(rng_ind)) {
+        rstream.nextsubstream(rngstream)
+    }
+    
+    rstream.RNG(rngstream)
+    
+    ## Generate data
+    data <- sim_from_pdtmvn_mixt(n = sim_n, sim_family = sim_family)
+    
+    prediction_target_var <- paste0("X", ncol(data))
+    predictive_vars <- paste0("X", seq_len(ncol(data) - 1))
+    
+    continuous_var_names <- NULL
+    discrete_var_names <- paste0(colnames(data), c(rep("_lag", ncol(data) - 1), "_horizon"), 0)
+    
+    time_var <- NULL
+    
+    kernel_fn <- pdtmvn_kernel
+    rkernel_fn <- rpdtmvn_kernel
+    
+    variable_selection_method <- "all_included"
+    crossval_buffer <- 0L
+} else {
+    stop("Invalid data set argument.")
 }
 
 
@@ -160,28 +250,13 @@ if(identical(bw_parameterization, "diagonal")) {
     vars_and_offsets_groups <- c(vars_and_offsets_groups,
         list(new_vars_and_offsets_group))
     
-    ## Groups of variable names and offsets for lagged prediction target
+    ## Groups of variable names and offsets for lagged predictive variables
+    
     for(lag_value in seq(from = 0, to = max_lag)) {
-        ## Group for lagged "raw"/unfiltered observed incidence
-        new_vars_and_offsets_group <- data.frame(
-            var_name = prediction_target_var,
-            offset_value = lag_value,
-            offset_type = "lag",
-            stringsAsFactors = FALSE
-        )
-        new_vars_and_offsets_group$combined_name <- paste0(
-            new_vars_and_offsets_group$var_name,
-            "_",
-            new_vars_and_offsets_group$offset_type,
-            new_vars_and_offsets_group$offset_value
-        )
-        vars_and_offsets_groups <- c(vars_and_offsets_groups,
-            list(new_vars_and_offsets_group))
-        
-        ## If requested, group for lagged filtered observed incidence
-        if(filtering) {
+        for(predictive_var in predictive_vars) {
+            ## Group for lagged "raw"/unfiltered observed incidence
             new_vars_and_offsets_group <- data.frame(
-                var_name = paste0("filtered_", prediction_target_var),
+                var_name = predictive_var,
                 offset_value = lag_value,
                 offset_type = "lag",
                 stringsAsFactors = FALSE
@@ -194,6 +269,24 @@ if(identical(bw_parameterization, "diagonal")) {
             )
             vars_and_offsets_groups <- c(vars_and_offsets_groups,
                 list(new_vars_and_offsets_group))
+            
+            ## If requested, group for lagged filtered observed incidence
+            if(filtering) {
+                new_vars_and_offsets_group <- data.frame(
+                    var_name = paste0("filtered_", predictive_var),
+                    offset_value = lag_value,
+                    offset_type = "lag",
+                    stringsAsFactors = FALSE
+                )
+                new_vars_and_offsets_group$combined_name <- paste0(
+                    new_vars_and_offsets_group$var_name,
+                    "_",
+                    new_vars_and_offsets_group$offset_type,
+                    new_vars_and_offsets_group$offset_value
+                )
+                vars_and_offsets_groups <- c(vars_and_offsets_groups,
+                    list(new_vars_and_offsets_group))
+            }
         }
     }
 } else if(identical(bw_parameterization, "full")) {
@@ -210,28 +303,30 @@ if(identical(bw_parameterization, "diagonal")) {
     
     ## Lagged prediction target == predictive variables
     for(lag_value in seq(from = 0, to = max_lag)) {
-        ## Lagged "raw"/unfiltered observed incidence
-        new_vars_and_offsets_group <- rbind(
-            new_vars_and_offsets_group,
-            data.frame(
-                var_name = prediction_target_var,
-                offset_value = lag_value,
-                offset_type = "lag",
-                stringsAsFactors = FALSE
-            )
-        )
-        
-        ## If requested, lagged filtered incidence
-        if(filtering) {
+        for(predictive_var in predictive_vars) {
+            ## Lagged "raw"/unfiltered observed incidence
             new_vars_and_offsets_group <- rbind(
                 new_vars_and_offsets_group,
                 data.frame(
-                    var_name = paste0("filtered_", prediction_target_var),
+                    var_name = predictive_var,
                     offset_value = lag_value,
                     offset_type = "lag",
                     stringsAsFactors = FALSE
                 )
             )
+            
+            ## If requested, lagged filtered incidence
+            if(filtering) {
+                new_vars_and_offsets_group <- rbind(
+                    new_vars_and_offsets_group,
+                    data.frame(
+                        var_name = paste0("filtered_", predictive_var),
+                        offset_value = lag_value,
+                        offset_type = "lag",
+                        stringsAsFactors = FALSE
+                    )
+                )
+            }
         }
     }
     
@@ -250,54 +345,67 @@ if(identical(bw_parameterization, "diagonal")) {
 ## Second step is to actually append the kernel component descriptions to the
 ## kernel_components list
 
-#' Compute whether each element of x is equal to the log of an integer,
-#' up to a specified tolerance level.
-#' 
-#' @param x numeric
-#' @param tolerance numeric tolerance for comparison of integer values
-#' 
-#' @return logical vector of same length as x; entry i is TRUE if
-#'     x[i] is within tol of as.integer(x[i])
-equals_log_integer <- function(x, tolerance = .Machine$double.eps ^ 0.5) {
-    return(sapply(x, function(x_i) {
-        return(isTRUE(all.equal(x_i, log(as.integer(exp(x_i))))))
-    }))
-}
-
-#' Compute log(exp(x) - 0.5)
-#' Used as default "a" function
-#' 
-#' @param x numeric
-#' 
-#' @return floor(x) - 1
-log_exp_x_minus_0.5 <- function(x) {
-    return(log(exp(x) - 0.5))
-}
-
-#' Compute log(exp(x) + 0.5)
-#' Used as default "a" function
-#' 
-#' @param x numeric
-#' 
-#' @return floor(x) - 1
-log_exp_x_plus_0.5 <- function(x) {
-    return(log(exp(x) + 0.5))
-}
-
-#' Compute log(round(exp(x))) in such a way that the rounding function always rounds up _.5
-#' 
-#' @param x numeric
-#' 
-#' @return floor(x) - 1
-log_round_up_0.5_exp <- function(x) {
-    exp_x <- exp(x)
+if(data_set %in% c("ili_national", "dengue_sj")) {
+    #' Compute whether each element of x is equal to the log of an integer,
+    #' up to a specified tolerance level.
+    #' 
+    #' @param x numeric
+    #' @param tolerance numeric tolerance for comparison of integer values
+    #' 
+    #' @return logical vector of same length as x; entry i is TRUE if
+    #'     x[i] is within tol of as.integer(x[i])
+    equals_log_integer <- function(x, tolerance = .Machine$double.eps ^ 0.5) {
+        return(sapply(x, function(x_i) {
+                    return(isTRUE(all.equal(x_i, log(as.integer(exp(x_i))))))
+                }))
+    }
     
-    inds_ceil <- exp_x - floor(exp_x) >= 0.5
+    #' Compute log(exp(x) - 0.5)
+    #' Used as default "a" function
+    #' 
+    #' @param x numeric
+    #' 
+    #' @return floor(x) - 1
+    log_exp_x_minus_0.5 <- function(x) {
+        return(log(exp(x) - 0.5))
+    }
     
-    exp_x[inds_ceil] <- ceiling(exp_x[inds_ceil])
-    exp_x[!inds_ceil] <- floor(exp_x[!inds_ceil])
+    #' Compute log(exp(x) + 0.5)
+    #' Used as default "a" function
+    #' 
+    #' @param x numeric
+    #' 
+    #' @return floor(x) - 1
+    log_exp_x_plus_0.5 <- function(x) {
+        return(log(exp(x) + 0.5))
+    }
     
-    return(log(exp_x))
+    #' Compute log(round(exp(x))) in such a way that the rounding function always rounds up _.5
+    #' 
+    #' @param x numeric
+    #' 
+    #' @return floor(x) - 1
+    log_round_up_0.5_exp <- function(x) {
+        exp_x <- exp(x)
+        
+        inds_ceil <- exp_x - floor(exp_x) >= 0.5
+        
+        exp_x[inds_ceil] <- ceiling(exp_x[inds_ceil])
+        exp_x[!inds_ceil] <- floor(exp_x[!inds_ceil])
+        
+        return(log(exp_x))
+    }
+    
+    
+    a_fn <- log_exp_x_minus_0.5
+    b_fn <- log_exp_x_plus_0.5
+    in_range_fn <- equals_log_integer
+    discretizer_fn <- log_round_up_0.5_exp
+} else {
+    a_fn <- x_minus_0.25
+    b_fn <- x_plus_0.25
+    in_range_fn <- equals_half_integer
+    discretizer_fn <- round_to_half_integer
 }
 
 kernel_components <- c(kernel_components,
@@ -307,22 +415,25 @@ kernel_components <- c(kernel_components,
         upper_trunc_bds <- rep(Inf, nrow(vars_and_offsets))
         names(upper_trunc_bds) <- vars_and_offsets$combined_name
         
-        if("horizon" %in% vars_and_offsets$offset_type) {
-            discrete_var_range_fns <- list(
-                 list(a = log_exp_x_minus_0.5,
-                     b = log_exp_x_plus_0.5,
-                     in_range = equals_log_integer,
-                     discretizer = log_round_up_0.5_exp)
+        if("horizon" %in% vars_and_offsets$offset_type || identical(substr(data_set, 1, 3), "sim")) {
+            discrete_var_range_fns <- lapply(
+                 discrete_var_names,
+                 function(discrete_var_name) {
+                     list(a = a_fn,
+                         b = b_fn,
+                         in_range = in_range_fn,
+                         discretizer = discretizer_fn)
+                 }
             ) %>%
-                `names<-`(vars_and_offsets$combined_name[vars_and_offsets$offset_type == "horizon"])
+                `names<-`(discrete_var_names)
         } else {
             discrete_var_range_fns <- NULL
         }
         
         return(list(
             vars_and_offsets = vars_and_offsets,
-            kernel_fn = log_pdtmvn_kernel,
-            rkernel_fn = rlog_pdtmvn_kernel,
+            kernel_fn = kernel_fn,
+            rkernel_fn = rkernel_fn,
             theta_fixed = list(
                 parameterization = "bw-chol-decomp",
                 continuous_vars = vars_and_offsets$combined_name[
@@ -383,16 +494,17 @@ if(filtering) {
 ## along with other parameters controling KCDE definition and estimation
 kcde_control <- create_kcde_control(X_names = "time_index",
     y_names = prediction_target_var,
-    time_name = "time",
+    time_name = time_var,
     prediction_horizons = prediction_horizon,
     filter_control = filter_control,
     kernel_components = kernel_components,
-    crossval_buffer = ymd("2010-01-01") - ymd("2009-01-01"),
+    crossval_buffer = crossval_buffer,
     loss_fn = neg_log_score_loss,
     loss_fn_prediction_args = list(
         prediction_type = "distribution",
         log = TRUE),
-    loss_args = NULL)
+    loss_args = NULL,
+    variable_selection_method = variable_selection_method)
 
 
 
@@ -415,6 +527,13 @@ case_descriptor <- paste0(
     "-seasonality_", seasonality,
     "-bw_parameterization_", bw_parameterization
 )
+
+if(identical(substr(data_set, 1, 3), "sim")) {
+    case_descriptor <- paste0(
+        case_descriptor,
+        "-sim_n_", sim_n,
+        "-sim_ind_", sim_ind)
+}
 
 saveRDS(kcde_fit,
     file = file.path(save_path,

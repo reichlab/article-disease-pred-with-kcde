@@ -374,7 +374,7 @@ get_dist_component_params_for_sim_family <- function(sim_family) {
             ))
     } else if(identical(sim_family, "bivariate-D-discretized")) {
         x_names <- paste0("X", seq_len(2))
-        sigma1 <- matrix(c(25/64, 4/5, 4/5, 25/64), nrow = 2, ncol = 2) %>%
+        sigma1 <- matrix(c(25/64, 1/5, 1/5, 25/64), nrow = 2, ncol = 2) %>%
             `rownames<-`(x_names) %>%
             `colnames<-`(x_names)
         sigma2 <- matrix(c(25/64, -1/4, -1/4, 25/64), nrow = 2, ncol = 2) %>%
@@ -436,7 +436,7 @@ get_dist_component_params_for_sim_family <- function(sim_family) {
             ))
     } else if(identical(sim_family, "bivariate-D")) {
         x_names <- paste0("X", seq_len(2))
-        sigma1 <- matrix(c(25/64, 4/5, 4/5, 25/64), nrow = 2, ncol = 2) %>%
+        sigma1 <- matrix(c(25/64, 1/5, 1/5, 25/64), nrow = 2, ncol = 2) %>%
             `rownames<-`(x_names) %>%
             `colnames<-`(x_names)
         sigma2 <- matrix(c(25/64, -1/4, -1/4, 25/64), nrow = 2, ncol = 2) %>%
@@ -490,21 +490,309 @@ get_dist_component_params_for_sim_family <- function(sim_family) {
                 discrete_var_col_inds = NULL
             ))
         
-    } else if(identical(sim_family, "multivariate-2")) {
+    } else if(identical(sim_family, "multivariate-2d-discretized")) {
+        dimension <- 2L
+        x_names <- paste0("X", seq_len(dimension))
+        sigma <- matrix(0.9, nrow = dimension, ncol = dimension) %>%
+            `rownames<-`(x_names) %>%
+            `colnames<-`(x_names)
+        diag(sigma) <- 1
+        lower_trunc_bds <- rep(-Inf, length(x_names)) %>%
+            `names<-`(x_names)
+        upper_trunc_bds <- rep(Inf, length(x_names)) %>%
+            `names<-`(x_names)
+        
+        discrete_var_range_fns <- lapply(seq_len(dimension), function(var_ind) {
+                    list(a = x_minus_0.25,
+                        b = x_plus_0.25,
+                        in_range = equals_half_integer,
+                        discretizer = round_to_half_integer
+                    )
+                }) %>%
+            `names<-`(x_names)
+        
         dist_component_params$weights <- 1
-        dist_component_params$centers <- "blah"
-        dist_component_params$kernel_components <- "blah"
-        dist_component_params$theta <- "blah"
-    } else if(identical(sim_family, "multivariate-4")) {
+        
+        dist_component_params$centers <- matrix(rep(0, dimension), nrow = 1, ncol = dimension) %>%
+            `colnames<-`(x_names)
+        
+        dist_component_params$bws <- list(sigma, sigma)
+        
+        dist_component_params$kernel_components <- list(list(
+                kernel_fn = pdtmvn_kernel,
+                rkernel_fn = rpdtmvn_kernel,
+                theta_fixed = list(
+                    parameterization = "bw-chol-decomp",
+                    continuous_vars = NULL,
+                    discrete_vars = x_names,
+                    discrete_var_range_fns = discrete_var_range_fns,
+                    lower = lower_trunc_bds,
+                    upper = upper_trunc_bds
+                ),
+                vars_and_offsets = data.frame(combined_name = x_names)
+            ))
+        
+        dist_component_params$theta <- list(list(
+                parameterization = "bw-chol-decomp",
+                continuous_vars = NULL,
+                discrete_vars = x_names,
+                discrete_var_range_fns = discrete_var_range_fns,
+                lower = lower_trunc_bds,
+                upper = upper_trunc_bds,
+                x_names = x_names,
+                bw = sigma,
+                continuous_var_col_inds = NULL,
+                discrete_var_col_inds = seq_along(x_names)
+            ))
+    } else if(identical(sim_family, "multivariate-2d")) {
+        dimension <- 2L
+        x_names <- paste0("X", seq_len(dimension))
+        sigma <- matrix(0.9, nrow = dimension, ncol = dimension) %>%
+            `rownames<-`(x_names) %>%
+            `colnames<-`(x_names)
+        diag(sigma) <- 1
+        lower_trunc_bds <- rep(-Inf, length(x_names)) %>%
+            `names<-`(x_names)
+        upper_trunc_bds <- rep(Inf, length(x_names)) %>%
+            `names<-`(x_names)
+        
+        discrete_var_range_fns <- NULL
+        
         dist_component_params$weights <- 1
-        dist_component_params$centers <- "blah"
-        dist_component_params$kernel_components <- "blah"
-        dist_component_params$theta <- "blah"
-    } else if(identical(sim_family, "multivariate-6")) {
+        
+        dist_component_params$bws <- list(sigma, sigma)
+        
+        dist_component_params$centers <- matrix(rep(0, dimension), nrow = 1, ncol = dimension) %>%
+            `colnames<-`(x_names)
+        
+        dist_component_params$kernel_components <- list(list(
+                kernel_fn = pdtmvn_kernel,
+                rkernel_fn = rpdtmvn_kernel,
+                theta_fixed = list(
+                    parameterization = "bw-chol-decomp",
+                    continuous_vars = x_names,
+                    discrete_vars = NULL,
+                    discrete_var_range_fns = discrete_var_range_fns,
+                    lower = lower_trunc_bds,
+                    upper = upper_trunc_bds
+                ),
+                vars_and_offsets = data.frame(combined_name = x_names)
+            ))
+        
+        dist_component_params$theta <- list(list(
+                parameterization = "bw-chol-decomp",
+                continuous_vars = x_names,
+                discrete_vars = NULL,
+                discrete_var_range_fns = discrete_var_range_fns,
+                lower = lower_trunc_bds,
+                upper = upper_trunc_bds,
+                x_names = x_names,
+                bw = sigma,
+                continuous_var_col_inds = seq_along(x_names),
+                discrete_var_col_inds = NULL
+            ))
+    } else if(identical(sim_family, "multivariate-4d-discretized")) {
+        dimension <- 4L
+        x_names <- paste0("X", seq_len(dimension))
+        sigma <- matrix(0.9, nrow = dimension, ncol = dimension) %>%
+            `rownames<-`(x_names) %>%
+            `colnames<-`(x_names)
+        diag(sigma) <- 1
+        lower_trunc_bds <- rep(-Inf, length(x_names)) %>%
+            `names<-`(x_names)
+        upper_trunc_bds <- rep(Inf, length(x_names)) %>%
+            `names<-`(x_names)
+        
+        discrete_var_range_fns <- lapply(seq_len(dimension), function(var_ind) {
+                    list(a = x_minus_0.25,
+                        b = x_plus_0.25,
+                        in_range = equals_half_integer,
+                        discretizer = round_to_half_integer
+                    )
+                }) %>%
+            `names<-`(x_names)
+        
         dist_component_params$weights <- 1
-        dist_component_params$centers <- "blah"
-        dist_component_params$kernel_components <- "blah"
-        dist_component_params$theta <- "blah"
+        
+        dist_component_params$centers <- matrix(rep(0, dimension), nrow = 1, ncol = dimension) %>%
+            `colnames<-`(x_names)
+        
+        dist_component_params$bws <- list(sigma, sigma)
+        
+        dist_component_params$kernel_components <- list(list(
+                kernel_fn = pdtmvn_kernel,
+                rkernel_fn = rpdtmvn_kernel,
+                theta_fixed = list(
+                    parameterization = "bw-chol-decomp",
+                    continuous_vars = NULL,
+                    discrete_vars = x_names,
+                    discrete_var_range_fns = discrete_var_range_fns,
+                    lower = lower_trunc_bds,
+                    upper = upper_trunc_bds
+                ),
+                vars_and_offsets = data.frame(combined_name = x_names)
+            ))
+        
+        dist_component_params$theta <- list(list(
+                parameterization = "bw-chol-decomp",
+                continuous_vars = NULL,
+                discrete_vars = x_names,
+                discrete_var_range_fns = discrete_var_range_fns,
+                lower = lower_trunc_bds,
+                upper = upper_trunc_bds,
+                x_names = x_names,
+                bw = sigma,
+                continuous_var_col_inds = NULL,
+                discrete_var_col_inds = seq_along(x_names)
+            ))
+    } else if(identical(sim_family, "multivariate-4d")) {
+        dimension <- 4L
+        x_names <- paste0("X", seq_len(dimension))
+        sigma <- matrix(0.9, nrow = dimension, ncol = dimension) %>%
+            `rownames<-`(x_names) %>%
+            `colnames<-`(x_names)
+        diag(sigma) <- 1
+        lower_trunc_bds <- rep(-Inf, length(x_names)) %>%
+            `names<-`(x_names)
+        upper_trunc_bds <- rep(Inf, length(x_names)) %>%
+            `names<-`(x_names)
+        
+        discrete_var_range_fns <- NULL
+        
+        dist_component_params$weights <- 1
+        
+        dist_component_params$bws <- list(sigma, sigma)
+        
+        dist_component_params$centers <- matrix(rep(0, dimension), nrow = 1, ncol = dimension) %>%
+            `colnames<-`(x_names)
+        
+        dist_component_params$kernel_components <- list(list(
+                kernel_fn = pdtmvn_kernel,
+                rkernel_fn = rpdtmvn_kernel,
+                theta_fixed = list(
+                    parameterization = "bw-chol-decomp",
+                    continuous_vars = x_names,
+                    discrete_vars = NULL,
+                    discrete_var_range_fns = discrete_var_range_fns,
+                    lower = lower_trunc_bds,
+                    upper = upper_trunc_bds
+                ),
+                vars_and_offsets = data.frame(combined_name = x_names)
+            ))
+        
+        dist_component_params$theta <- list(list(
+                parameterization = "bw-chol-decomp",
+                continuous_vars = x_names,
+                discrete_vars = NULL,
+                discrete_var_range_fns = discrete_var_range_fns,
+                lower = lower_trunc_bds,
+                upper = upper_trunc_bds,
+                x_names = x_names,
+                bw = sigma,
+                continuous_var_col_inds = seq_along(x_names),
+                discrete_var_col_inds = NULL
+            ))
+    } else if(identical(sim_family, "multivariate-6d-discretized")) {
+        dimension <- 6L
+        x_names <- paste0("X", seq_len(dimension))
+        sigma <- matrix(0.9, nrow = dimension, ncol = dimension) %>%
+            `rownames<-`(x_names) %>%
+            `colnames<-`(x_names)
+        diag(sigma) <- 1
+        lower_trunc_bds <- rep(-Inf, length(x_names)) %>%
+            `names<-`(x_names)
+        upper_trunc_bds <- rep(Inf, length(x_names)) %>%
+            `names<-`(x_names)
+        
+        discrete_var_range_fns <- lapply(seq_len(dimension), function(var_ind) {
+                    list(a = x_minus_0.25,
+                        b = x_plus_0.25,
+                        in_range = equals_half_integer,
+                        discretizer = round_to_half_integer
+                    )
+                }) %>%
+            `names<-`(x_names)
+        
+        dist_component_params$weights <- 1
+        
+        dist_component_params$centers <- matrix(rep(0, dimension), nrow = 1, ncol = dimension) %>%
+            `colnames<-`(x_names)
+        
+        dist_component_params$bws <- list(sigma, sigma)
+        
+        dist_component_params$kernel_components <- list(list(
+                kernel_fn = pdtmvn_kernel,
+                rkernel_fn = rpdtmvn_kernel,
+                theta_fixed = list(
+                    parameterization = "bw-chol-decomp",
+                    continuous_vars = NULL,
+                    discrete_vars = x_names,
+                    discrete_var_range_fns = discrete_var_range_fns,
+                    lower = lower_trunc_bds,
+                    upper = upper_trunc_bds
+                ),
+                vars_and_offsets = data.frame(combined_name = x_names)
+            ))
+        
+        dist_component_params$theta <- list(list(
+                parameterization = "bw-chol-decomp",
+                continuous_vars = NULL,
+                discrete_vars = x_names,
+                discrete_var_range_fns = discrete_var_range_fns,
+                lower = lower_trunc_bds,
+                upper = upper_trunc_bds,
+                x_names = x_names,
+                bw = sigma,
+                continuous_var_col_inds = NULL,
+                discrete_var_col_inds = seq_along(x_names)
+            ))
+    } else if(identical(sim_family, "multivariate-6d")) {
+        dimension <- 6L
+        x_names <- paste0("X", seq_len(dimension))
+        sigma <- matrix(0.9, nrow = dimension, ncol = dimension) %>%
+            `rownames<-`(x_names) %>%
+            `colnames<-`(x_names)
+        diag(sigma) <- 1
+        lower_trunc_bds <- rep(-Inf, length(x_names)) %>%
+            `names<-`(x_names)
+        upper_trunc_bds <- rep(Inf, length(x_names)) %>%
+            `names<-`(x_names)
+        
+        discrete_var_range_fns <- NULL
+        
+        dist_component_params$weights <- 1
+        
+        dist_component_params$bws <- list(sigma, sigma)
+        
+        dist_component_params$centers <- matrix(rep(0, dimension), nrow = 1, ncol = dimension) %>%
+            `colnames<-`(x_names)
+        
+        dist_component_params$kernel_components <- list(list(
+                kernel_fn = pdtmvn_kernel,
+                rkernel_fn = rpdtmvn_kernel,
+                theta_fixed = list(
+                    parameterization = "bw-chol-decomp",
+                    continuous_vars = x_names,
+                    discrete_vars = NULL,
+                    discrete_var_range_fns = discrete_var_range_fns,
+                    lower = lower_trunc_bds,
+                    upper = upper_trunc_bds
+                ),
+                vars_and_offsets = data.frame(combined_name = x_names)
+            ))
+        
+        dist_component_params$theta <- list(list(
+                parameterization = "bw-chol-decomp",
+                continuous_vars = x_names,
+                discrete_vars = NULL,
+                discrete_var_range_fns = discrete_var_range_fns,
+                lower = lower_trunc_bds,
+                upper = upper_trunc_bds,
+                x_names = x_names,
+                bw = sigma,
+                continuous_var_col_inds = seq_along(x_names),
+                discrete_var_col_inds = NULL
+            ))
     } else {
         stop("Invalid sim_family")
     }
@@ -518,6 +806,8 @@ sim_from_pdtmvn_mixt <- function(n, sim_family) {
     dist_component_params <- get_dist_component_params_for_sim_family(sim_family)
     
     result <- matrix(NA, nrow = n, ncol = ncol(dist_component_params$theta[[1]]$bw))
+    colnames(result) <- paste0("X", seq_len(ncol(result)))
+    
     sampled_kernel_inds <- sample(length(dist_component_params$weights),
         size = n,
         replace = TRUE,
