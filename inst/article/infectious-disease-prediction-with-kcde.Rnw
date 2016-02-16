@@ -204,10 +204,7 @@ The remainder of this article is organized as follows.  We:
  - describe how kernel density estimation with a non-diagonal bandwidth can be
  achieved using a partially discretized multivariate normal distribution for the
  kernel functions.
- 
- - prove asymptotic efficiency for marginal and conditional
- density estimation for a non-product kernel function
- 
+
  - simulation study comparing product and non-product formulations for marginal
  and conditional density estimation
  
@@ -283,6 +280,120 @@ Here, $Q$ is a loss function that measures the quality of the estimated density 
 We use a forward/backward stagewise procedure to obtain the set of combinations of variables and lags that are included in the final model (represented by $\bu$).  For each candidate model, we use the limited memory box constrained optimization procedure of \cite{byrd1995limitedmemoryoptim} to estimate the bandwidth parameters.  The approximation in Equation~\eqref{eqn:ParamEst} is due to the fact that this optimization procedure may not find a global minimum.
 
 
+\section{Simulation Studies}
+\label{sec:SimStudies}
+
+In this Section, we conduct two sets of simulation studies designed to answer
+two separate questions:
+\begin{enumerate}
+\item How much does using a kernel function with a non-diagonal bandwidth matrix
+contribute to the quality of conditional density estimates relative to density
+estimates obtained through KCDE using diagonal bandwidth matrices?
+\item How does our method perform in the context of seasonal time series data? 
+Specifically, how does the method perform relative to common alternatives, and
+how much do each of our three contributions (non-diagonal bandwidth matrices for
+discrete data, using a periodic function of time as predictive variable, and
+use of low band-pass filtered observatiosn as predictive variables) contribute
+to predictive performance?
+\end{enumerate}
+
+\subsection{Comparison of KCDE approaches}
+\label{sec:SimStudiesKCDEComparison}
+
+Our first set of simulation studies is based closely on those conducted in
+\cite{duong2005crossvalidationBandwidthMultivariateKDE}; their examples
+demonstrate the utility of using a fully parameterized bandwidth matrix in
+kernel density estimation of continuous distributions.  We modify their
+simulation study to examine the benefits of fully parameterized bandwidth
+matrices in the context of conditional density estimation with discrete
+variables.
+
+We simulate observations from each of seven distributions.  The first five of
+these are plotted in Figure ***.
+
+
+<<SimStudyDistributionsDiscretizedDuongHazelton>>=
+library(ggplot2)
+library(grid)
+library(plyr)
+library(dplyr)
+library(tidyr)
+library(pdtmvn)
+library(kcde)
+source("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/code/sim-densities-sim-study-discretized-Duong-Hazelton.R")
+
+## Density family bivariate-A
+n_sim <- 10000
+discrete_sample <- sim_from_pdtmvn_mixt(n = n_sim, sim_family = "bivariate-A-discretized") %>%
+    as.data.frame()
+continuous_sample <- sim_from_pdtmvn_mixt(n = n_sim, sim_family = "bivariate-A") %>%
+    as.data.frame()
+discrete_sample_counts <- discrete_sample %>%
+    count(X1, X2)
+
+pa <- ggplot() +
+    geom_density_2d(aes(x = X1, y = X2), data = continuous_sample) +
+    geom_point(aes(x = X1, y = X2, colour = n), data = discrete_sample_counts)
+pa
+
+## Density family bivariate-B
+n_sim <- 10000
+discrete_sample <- sim_from_pdtmvn_mixt(n = n_sim, sim_family = "bivariate-B-discretized") %>%
+    as.data.frame()
+continuous_sample <- sim_from_pdtmvn_mixt(n = n_sim, sim_family = "bivariate-B") %>%
+    as.data.frame()
+discrete_sample_counts <- discrete_sample %>%
+    count(X1, X2)
+
+pb <- ggplot() +
+    geom_density_2d(aes(x = X1, y = X2), data = continuous_sample) +
+    geom_point(aes(x = X1, y = X2, colour = n), data = discrete_sample_counts)
+pb
+
+## Density family bivariate-C
+n_sim <- 10000
+discrete_sample <- sim_from_pdtmvn_mixt(n = n_sim, sim_family = "bivariate-C-discretized") %>%
+    as.data.frame()
+continuous_sample <- sim_from_pdtmvn_mixt(n = n_sim, sim_family = "bivariate-C") %>%
+    as.data.frame()
+discrete_sample_counts <- discrete_sample %>%
+    count(X1, X2)
+
+pc <- ggplot() +
+    geom_density_2d(aes(x = X1, y = X2), data = continuous_sample) +
+    geom_point(aes(x = X1, y = X2, colour = n), data = discrete_sample_counts)
+pc
+
+## Density family bivariate-D
+n_sim <- 10000
+discrete_sample <- sim_from_pdtmvn_mixt(n = n_sim, sim_family = "bivariate-D-discretized") %>%
+    as.data.frame()
+continuous_sample <- sim_from_pdtmvn_mixt(n = n_sim, sim_family = "bivariate-D") %>%
+    as.data.frame()
+discrete_sample_counts <- discrete_sample %>%
+    count(X1, X2)
+
+pd <- ggplot() +
+    geom_density_2d(aes(x = X1, y = X2), data = continuous_sample) +
+    geom_point(aes(x = X1, y = X2, colour = n), data = discrete_sample_counts)
+pd
+
+## Density family multivariate-2d
+n_sim <- 10000
+discrete_sample <- sim_from_pdtmvn_mixt(n = n_sim, sim_family = "multivariate-2d-discretized") %>%
+    as.data.frame()
+continuous_sample <- sim_from_pdtmvn_mixt(n = n_sim, sim_family = "multivariate-2d") %>%
+    as.data.frame()
+discrete_sample_counts <- discrete_sample %>%
+    count(X1, X2)
+
+pd <- ggplot() +
+    geom_density_2d(aes(x = X1, y = X2), data = continuous_sample) +
+    geom_point(aes(x = X1, y = X2, colour = n), data = discrete_sample_counts)
+pd
+
+@
+
 \section{Examples}
 \label{sec:Examples}
 
@@ -296,7 +407,7 @@ influenza with prediction horizons of 1 through 4 weeks.  Data on influenza
 incidence are available through {\tt R}'s {\tt cdcfluview} package.  Here we
 create a data set with a nationally aggregated measure of flu incidence
 
-<<FluDataLoadData, echo = TRUE>>=
+<<FluDataLoadData, echo = FALSE>>=
 library(cdcfluview)
 library(plyr)
 library(dplyr)
@@ -323,7 +434,7 @@ We plot the {\tt total\_cases} measure over time, representing missing values
 with vertical grey lines.  The low season was not measured in the first few
 years.
 
-<<FluDataInitialPlotTotalCases, echo = TRUE>>=
+<<FluDataInitialPlotTotalCases, echo = FALSE>>=
 ggplot() +
     geom_line(aes(x = as.Date(time), y = weighted_ili), data =
 ili_national) +
@@ -351,7 +462,7 @@ so we proceed with this option for the purposes of this example.
 
 We also plot histograms of the observed total cases on the original scale and on the log scale.
 
-<<FluDataHistogramPlotTotalCases, echo = TRUE>>=
+<<FluDataHistogramPlotTotalCases, echo = FALSE>>=
 hist_df <- rbind(
 	data.frame(value = ili_national$weighted_ili,
     	variable = "Weighted ILI"),
@@ -375,7 +486,7 @@ negligible if we have enough data.
 
 Finally, we plot the autocorrelation function:
 
-<<FluDataACFPlotTotalCases, echo = TRUE>>=
+<<FluDataACFPlotTotalCases, echo = FALSE>>=
 last_na_ind <- max(which(is.na(ili_national$weighted_ili)))
 non_na_inds <- seq(from = last_na_ind + 1, to=nrow(ili_national))
 acf(ili_national$weighted_ili[non_na_inds],
@@ -467,19 +578,27 @@ create a list with parameters that specify the kernel function components.
 %@
 
 <<FluDataMergePredictionResults, echo = FALSE>>=
-ili_prediction_results_sarima <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/results/ili_national/prediction-results/sarima-predictions.rds")
-ili_prediction_results_kcde <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/results/ili_national/prediction-results/kcde-predictions.rds")
+library(plyr)
+library(dplyr)
+library(tidyr)
+
+ili_prediction_results_sarima <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/ili_national/prediction-results/sarima-predictions.rds")
+ili_prediction_results_kcde <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/ili_national/prediction-results/kcde-predictions.rds")
 ili_prediction_results <- rbind.fill(ili_prediction_results_sarima[!is.na(ili_prediction_results_sarima$log_score), ],
     ili_prediction_results_kcde)
 ili_prediction_results$AE <- unlist(ili_prediction_results$AE)
 
-full_model_descriptor <- ili_prediction_results$model
+ili_prediction_results$full_model_descriptor <- paste0(ili_prediction_results$model,
+    "-filtering_", ili_prediction_results$filtering,
+    "-periodic_", ili_prediction_results$seasonality,
+    "-bw_", ili_prediction_results$bw_parameterization)
 @
 
-<<FluDataRibbonsPredictionPlot, echo = FALSE>>=
+<<FluDataRibbonsPredictionPlot50Intervals, echo = FALSE>>=
 ribbons_df <- ili_prediction_results %>%
     select(prediction_time,
         prediction_horizon,
+        full_model_descriptor,
         model,
         interval_pred_lb_95:interval_pred_ub_50) %>%
     gather("bound_type", "predictive_value", interval_pred_lb_95:interval_pred_ub_50) %>%
@@ -487,98 +606,173 @@ ribbons_df <- ili_prediction_results %>%
         bound_type = ifelse(grepl("lb", bound_type), "lower", "upper")) %>%
     spread(bound_type, predictive_value)
 
-phs_used <- c(1)
+phs_used <- c(1, 6, 13, 26, 52)
+models_used <- c("SARIMA-filtering_NA-periodic_NA-bw_NA", "kcde-filtering_FALSE-periodic_TRUE-bw_full")
 
 ggplot() +
-    geom_ribbon(aes(x = prediction_time, ymin = lower, ymax = upper, colour = model, fill = model, alpha = interval_type),
+    geom_ribbon(aes(x = prediction_time, ymin = lower, ymax = upper, colour = model, fill = model),
+        alpha = 0.4,
         size = 0,
-        data = ribbons_df[ribbons_df$prediction_horizon %in% phs_used, ]) +
+        data = ribbons_df[ribbons_df$prediction_horizon %in% phs_used &
+                ribbons_df$full_model_descriptor %in% models_used &
+                ribbons_df$interval_type == "50", ]) +
     geom_line(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
-    geom_point(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
+#    geom_point(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
     geom_line(aes(x = prediction_time, y = pt_pred, colour = model),
-        data = ili_prediction_results[ili_prediction_results$prediction_horizon == 1, ]) +
-    scale_alpha_discrete("Prediction\nInterval\nCoverage",
-        labels = c("50 Percent", "95 Percent"),
-        limits = c("50", "95"),
-        range = c(0.4, 0.2)) +
-#    facet_wrap( ~ ph) +
+        data = ili_prediction_results[ili_prediction_results$prediction_horizon %in% phs_used &
+                ili_prediction_results$full_model_descriptor %in% models_used, ]) +
+#    scale_alpha_discrete("Prediction\nInterval\nCoverage",
+#        labels = c("50 Percent", "95 Percent"),
+#        limits = c("50", "95"),
+#        range = c(0.4, 0.2)) +
+    facet_wrap( ~ prediction_horizon, ncol = 1) +
+    ggtitle("Point and 50% Interval Predictions") +
     theme_bw()
+@
 
 
+<<FluDataRibbonsPredictionPlot95Intervals, echo = FALSE>>=
 ggplot() +
-    geom_ribbon(aes(x = prediction_time, ymin = lower, ymax = upper, colour = model, fill = model, alpha = interval_type),
+    geom_ribbon(aes(x = prediction_time, ymin = lower, ymax = upper, colour = model, fill = model),
+        alpha = 0.4,
         size = 0,
-        data = ribbons_df[ribbons_df$prediction_horizon %in% phs_used & ribbons_df$interval_type == "50", ]) +
+        data = ribbons_df[ribbons_df$prediction_horizon %in% phs_used &
+                ribbons_df$full_model_descriptor %in% models_used &
+                ribbons_df$interval_type == "95", ]) +
     geom_line(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
-    geom_point(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
+#    geom_point(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
     geom_line(aes(x = prediction_time, y = pt_pred, colour = model),
-        data = ili_prediction_results[ili_prediction_results$prediction_horizon == 1, ]) +
-    scale_alpha_discrete("Prediction\nInterval\nCoverage",
-        labels = c("50 Percent", "95 Percent"),
-        limits = c("50", "95"),
-        range = c(0.4, 0.2)) +
-#    facet_wrap( ~ ph) +
+        data = ili_prediction_results[ili_prediction_results$prediction_horizon %in% phs_used &
+                ili_prediction_results$full_model_descriptor %in% models_used, ]) +
+#    scale_alpha_discrete("Prediction\nInterval\nCoverage",
+#        labels = c("50 Percent", "95 Percent"),
+#        limits = c("50", "95"),
+#        range = c(0.4, 0.2)) +
+    facet_wrap( ~ prediction_horizon, ncol = 1) +
+    ggtitle("Point and 95% Interval Predictions") +
     theme_bw()
+@
 
+
+%<<FluDataPredictionsPlotViolinLogScore>>=
+%library(ggplot2)
+%
+%ggplot() +
+%    geom_violin(aes(x = factor(full_model_descriptor), y = log_score), data =
+%     ili_prediction_results) + theme_bw()
+%@
+
+<<FluDataPredictionsPlotViolinLogScoreDifference, echo = FALSE>>=
+ili_prediction_log_score_diffs_wide <- ili_prediction_results %>%
+    select(full_model_descriptor, prediction_time, prediction_horizon, log_score) %>%
+    spread(full_model_descriptor, log_score)
+
+ili_prediction_log_score_diffs_wide[, unique(ili_prediction_results$full_model_descriptor)] <-
+    ili_prediction_log_score_diffs_wide[, unique(ili_prediction_results$full_model_descriptor)] -
+    ili_prediction_log_score_diffs_wide[, "SARIMA-filtering_NA-periodic_NA-bw_NA"]
+
+ili_prediction_log_score_diffs_long <- ili_prediction_log_score_diffs_wide %>%
+    gather_("model", "log_score_difference", unique(ili_prediction_results$full_model_descriptor))
 
 ggplot() +
-    geom_ribbon(aes(x = prediction_time, ymin = lower, ymax = upper, colour = model, fill = model), alpha = 0.4,
-        size = 0,
-        data = ribbons_df[ribbons_df$prediction_horizon %in% phs_used & ribbons_df$interval_type == "95", ]) +
-    geom_line(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
-    geom_point(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
-    geom_line(aes(x = prediction_time, y = pt_pred, colour = model),
-        data = ili_prediction_results[ili_prediction_results$prediction_horizon == 1, ]) +
-#    facet_wrap( ~ ph) +
+    geom_violin(aes(x = factor(model), y = log_score_difference), data = ili_prediction_log_score_diffs) +
+    theme_bw() +
+    theme(axis.text.x=element_text(angle = -60, hjust = 0))
+@
+
+
+<<FluDataPredictionsPlotViolinLogScoreDifferenceOnlyModelsWithoutFiltering, echo = FALSE>>=
+models_used <- c("kcde-filtering_FALSE-periodic_FALSE-bw_diagonal",
+    "kcde-filtering_FALSE-periodic_FALSE-bw_full",
+    "kcde-filtering_FALSE-periodic_TRUE-bw_diagonal",
+    "kcde-filtering_FALSE-periodic_TRUE-bw_full")
+
+central_stat_log_score_diff_by_model <- ili_prediction_log_score_diffs_long %>%
+    group_by(model) %>%
+    summarize(median = median(log_score_difference),
+        mean = mean(log_score_difference)) %>%
+    gather_("statistic", "value", c("median", "mean"))
+
+ggplot() +
+    geom_violin(aes(x = factor(model), y = log_score_difference),
+        data = ili_prediction_log_score_diffs[ili_prediction_log_score_diffs$model %in% models_used, ]) +
+    geom_hline(aes(yintercept = 0), colour = "red") +
+    geom_point(aes(x = factor(model), y = value, colour = statistic),
+        data = central_stat_log_score_diff_by_model[central_stat_log_score_diff_by_model$model %in% models_used, ]) +
+    theme_bw() +
+    theme(axis.text.x=element_text(angle = -60, hjust = 0))
+@
+
+
+<<FluDataPredictionsPlotViolinLogScoreDifferenceByHorizon, echo = FALSE>>=
+#ggplot(data = ili_prediction_log_score_diffs_long[ili_prediction_log_score_diffs_long$model %in% unique(ili_prediction_results$full_model_descriptor)[2:5], ]) +
+##    geom_violin(aes(x = prediction_horizon, y = log_score_difference)) +
+#    geom_point(aes(x = prediction_horizon, y = log_score_difference)) +
+#    facet_wrap( ~ model, ncol = 1) +
+#    theme_bw() +
+#    theme(axis.text.x=element_text(angle = -60, hjust = 0))
+
+models_used <- c("kcde-filtering_FALSE-periodic_TRUE-bw_full")
+
+
+median_log_score_diff_by_model_and_horizon <- ili_prediction_log_score_diffs_long %>%
+    group_by(model, prediction_horizon) %>%
+    summarize(median = median(log_score_difference))
+
+ggplot(data = ili_prediction_log_score_diffs_long[ili_prediction_log_score_diffs_long$model %in% models_used, ]) +
+#    geom_violin(aes(x = prediction_horizon, y = log_score_difference)) +
+    geom_violin(aes(x = factor(prediction_horizon), y = log_score_difference)) +
+    geom_hline(aes(yintercept = 0), colour = "red") +
+    geom_point(aes(x = factor(prediction_horizon), y = median), colour = "blue", data = median_log_score_diff_by_model_and_horizon[median_log_score_diff_by_model_and_horizon$model %in% models_used, ]) +
+    facet_wrap( ~ model, ncol = 1) +
+    theme_bw() +
+    theme(axis.text.x=element_text(angle = -60, hjust = 0))
+@
+
+
+<<FluDataLogScoreDiffVsTimePlot, echo = FALSE>>=
+phs_used <- c(1, 6, 13, 26, 52)
+models_used <- c("kcde-filtering_FALSE-periodic_TRUE-bw_full")
+
+ggplot(data = ili_prediction_log_score_diffs_long[ili_prediction_log_score_diffs_long$model %in% models_used &
+                ili_prediction_log_score_diffs_long$prediction_horizon %in% phs_used, ]) +
+    geom_line(aes(x = prediction_time, y = log_score_difference)) +
+    geom_point(aes(x = prediction_time, y = log_score_difference)) +
+    geom_hline(aes(yintercept = 0), colour = "red") +
+    facet_wrap( ~ prediction_horizon, ncol = 1) +
+    ylim(c(-4, 4)) +
+    theme_bw()
+    
+@
+
+<<FluDataLogScoreDiffVsObsIncidencePlot, echo = FALSE>>=
+ili_prediction_log_score_diffs_long_with_obs_incidence <- ili_prediction_log_score_diffs_long %>%
+    left_join(ili_national, by = c("prediction_time" = "time"))
+
+ggplot(data = ili_prediction_log_score_diffs_long_with_obs_incidence[
+            ili_prediction_log_score_diffs_long_with_obs_incidence$model %in% models_used &
+                ili_prediction_log_score_diffs_long_with_obs_incidence$prediction_horizon %in% phs_used, ]) +
+    geom_line(aes(x = weighted_ili, y = log_score_difference)) +
+    geom_point(aes(x = weighted_ili, y = log_score_difference)) +
+    geom_hline(aes(yintercept = 0), colour = "red") +
+    facet_wrap( ~ prediction_horizon, ncol = 1) +
+    ylim(c(-4, 4)) +
     theme_bw()
 @
 
 
 
-<<FluDataAEPlot, echo = FALSE>>=
-mae_sarima <- mean(ili_prediction_results$AE[which(ili_prediction_results$prediction_horizon == 1 & ili_prediction_results$model == "SARIMA")])
-mae_kcde <- mean(ili_prediction_results$AE[which(ili_prediction_results$prediction_horizon == 1 & ili_prediction_results$model == "kcde")])
 
-#ae_diff_df <- 
-@
 
-<<FluDataLogScorePlot, echo = FALSE>>=
-inds_sarima <- which(ili_prediction_results$prediction_horizon == 1 & ili_prediction_results$model == "SARIMA")
-inds_sarima_order <- order(ili_prediction_results$prediction_time[inds_sarima])
-inds_sarima <- inds_sarima[inds_sarima_order]
 
-inds_kcde <- which(ili_prediction_results$prediction_horizon == 1 & ili_prediction_results$model == "kcde")
-inds_kcde_order <- order(ili_prediction_results$prediction_time[inds_kcde])
-inds_kcde <- inds_kcde[inds_kcde_order]
+\section{Future Work}
 
-log_score_diff <- ili_prediction_results$log_score[inds_kcde] - ili_prediction_results$log_score[inds_sarima]
+Copulas to get joint conditional distributions
 
-plot(ili_prediction_results$prediction_time[inds_kcde], log_score_diff)
+Ensembles -- either ensembles of KCDE and/or include as a component in an
+ensemble
 
-subinds_52 <- which(week(ili_prediction_results$prediction_time[inds_kcde]) == 52)
-points((ili_prediction_results$prediction_time[inds_kcde])[subinds_52], log_score_diff[subinds_52], pch = 18, col = "red")
-
-subinds_53 <- which(week(ili_prediction_results$prediction_time[inds_kcde]) == 53)
-points((ili_prediction_results$prediction_time[inds_kcde])[subinds_53], log_score_diff[subinds_53], pch = 18, col = "blue")
-
-subinds_1 <- which(week(ili_prediction_results$prediction_time[inds_kcde]) == 1)
-points((ili_prediction_results$prediction_time[inds_kcde])[subinds_1], log_score_diff[subinds_1], pch = 18, col = "green")
-
-inds_below_neg4 <- which(log_score_diff < -4)
-(ili_prediction_results$prediction_time[inds_kcde])[inds_below_neg4]
-
-ili_national$log_score_diff <- NA
-ili_national$log_score_diff[ili_national$year %in% 2011:2014] <- log_score_diff
-ggplot() +
-    geom_line(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
-    geom_point(aes(x = time, y = weighted_ili, alpha = log_score_diff), colour = "black", data = ili_national[ili_national$year %in% 2010:2014, ]) +
-    geom_line(aes(x = prediction_time, y = pt_pred, colour = model),
-        data = ili_prediction_results[ili_prediction_results$prediction_horizon == 1, ]) +
-    geom_point(aes(x = prediction_time, y = pt_pred, colour = model),
-        data = ili_prediction_results[ili_prediction_results$prediction_horizon == 1, ]) +
-    #    facet_wrap( ~ ph) +
-    theme_bw()
-@
+Bayesianize?
 
 \section{References}
 \label{sec:References}
