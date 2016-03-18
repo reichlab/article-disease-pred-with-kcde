@@ -1,51 +1,79 @@
+library(lubridate)
 library(forecast)
-library(cdcfluview)
 
+all_data_sets <- c("ili_national", "dengue_sj")
+all_data_sets <- "dengue_sj"
 
-### Load data set and set variables describing how the fit is performed
-if(identical(data_set, "ili_national")) {
-    ## Load data for nationally reported influenza like illness
-    library(cdcfluview)
+for(data_set in all_data_sets) {
+    ### Load data set and set variables describing how the fit is performed
+    if(identical(data_set, "ili_national")) {
+        ## Load data for nationally reported influenza like illness
+        library(cdcfluview)
+        
+        usflu <- get_flu_data("national", "ilinet", years=1997:2014)
+        data <- transmute(usflu,
+            region.type = REGION.TYPE,
+            region = REGION,
+            year = YEAR,
+            week = WEEK,
+            weighted_ili = as.numeric(X..WEIGHTED.ILI))
+        
+        ## Subset data to do estimation using only data up through 2010
+        ## 2011 - 2014 are held out for evaluating performance.
+        data <- data[data$year <= 2010, , drop = FALSE]
+        
+        ## Add time column.  This is used for calculating times to drop in cross-validation
+        data$time <- ymd(paste(data$year, "01", "01", sep = "-"))
+        week(data$time) <- data$week
+        
+        ## Add time_index column.  This is used for calculating the periodic kernel.
+        ## Here, this is calculated as the number of days since some origin date (1970-1-1 in this case).
+        ## The origin is arbitrary.
+        data$time_index <- as.integer(data$time -  ymd(paste("1970", "01", "01", sep = "-")))
+        
+        prediction_target_var <- "weighted_ili"
+        
+        log_prediction_target <- log(data[, prediction_target_var])
+    } else if(identical(data_set, "dengue_sj")) {
+        ## Load data for Dengue fever in San Juan
+        data <- read.csv("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/data-raw/San_Juan_Training_Data.csv")
+        
+        ## Restrict to data from 1990/1991 through 2008/2009 seasons
+        train_seasons <- paste0(1990:2008, "/", 1991:2009)
+        data <- data[data$season %in% train_seasons, ]
+        
+        ## Form variable with total cases + 1 which can be logged
+        data$total_cases_plus_1 <- data$total_cases + 1
+        
+        ## convert dates
+        data$time <- ymd(data$week_start_date)
+        
+        ## Add time_index column.  This is used for calculating the periodic kernel.
+        ## Here, this is calculated as the number of days since some origin date (1970-1-1 in this case).
+        ## The origin is arbitrary.
+        data$time_index <- as.integer(data$time -  ymd(paste("1970", "01", "01", sep = "-")))
+        
+        prediction_target_var <- "total_cases_plus_1"
+        
+        log_prediction_target <- log(data[, prediction_target_var])
+    }
     
-    usflu <- get_flu_data("national", "ilinet", years=1997:2014)
-    data <- transmute(usflu,
-        region.type = REGION.TYPE,
-        region = REGION,
-        year = YEAR,
-        week = WEEK,
-        weighted_ili = as.numeric(X..WEIGHTED.ILI))
     
-    ## Subset data to do estimation using only data up through 2010
-    ## 2011 - 2014 are held out for evaluating performance.
-    data <- data[data$year <= 2010, , drop = FALSE]
+    seasonally_differenced_log_prediction_target <-
+        ts(log_prediction_target[seq(from = 53, to = length(log_prediction_target))] -
+                log_prediction_target[seq(from = 1, to = length(log_prediction_target) - 52)],
+            frequency = 52)
     
-    ## Add time column.  This is used for calculating times to drop in cross-validation
-    data$time <- ymd(paste(data$year, "01", "01", sep = "-"))
-    week(data$time) <- data$week
+    seasonally_differenced_log_sarima_fit <-
+        auto.arima(seasonally_differenced_log_prediction_target)
     
-    ## Add time_index column.  This is used for calculating the periodic kernel.
-    ## Here, this is calculated as the number of days since some origin date (1970-1-1 in this case).
-    ## The origin is arbitrary.
-    data$time_index <- as.integer(data$time -  ymd(paste("1970", "01", "01", sep = "-")))
-    
-    prediction_target_var <- "weighted_ili"
-    
-    log_prediction_target <- log(data[, prediction_target_var])
+    saveRDS(seasonally_differenced_log_sarima_fit,
+        file = file.path(
+            "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results",
+            data_set,
+            "estimation-results/sarima-fit.rds"))
 }
 
-seasonally_differenced_log_prediction_target <-
-    ts(log_prediction_target[seq(from = 53, to = length(log_prediction_target))] -
-        log_prediction_target[seq(from = 1, to = length(log_prediction_target) - 52)],
-    frequency = 52)
-
-seasonally_differenced_log_sarima_fit <-
-    auto.arima(seasonally_differenced_log_prediction_target)
-
-saveRDS(seasonally_differenced_log_sarima_fit,
-    file = file.path(
-        "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/results",
-        data_set,
-        "estimation-results/sarima-fit.rds"))
 
 predictions_df <- data.frame(ph=rep(seq_len(52), times = 5 * 52),
 	last_obs_season=rep(c("2008/2009", "2009/2010", "2010/2011", "2011/2012", "2012/2013"), each = 52, times = 52),

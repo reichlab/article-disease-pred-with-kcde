@@ -14,41 +14,58 @@ data_set <- args[1]
 ## Prediction horizon -- integer number of steps ahead to predict
 prediction_horizon <- as.integer(args[2])
 
-## Maximum number of lagged observations to explore using for prediction
+## Maximum number of non-seasonal lagged observations to explore using for prediction
 max_lag <- as.integer(args[3])
 
+## Maximum number of seasonally lagged observations to explore using for prediction
+max_seasonal_lag <- as.integer(args[4])
+
 ## Include filtered cases as predictive variables?
-filtering <- as.logical(args[4])
+filtering <- as.logical(args[5])
+
+## Perform seasonal differencing?
+differencing <- as.logical(args[6])
 
 ## Include terms capturing seasonality?
-seasonality <- as.logical(args[5])
+seasonality <- as.logical(args[7])
 
 ## Parameterization of bandwidth -- "diagonal" or "full"
-bw_parameterization <- args[6]
+bw_parameterization <- args[8]
 
 ## Path to save results in
-save_path <- args[7]
+save_path <- args[9]
+
+## Sample size for simulation study
+sim_n <- as.integer(args[10])
+
+## Family to sample from for simulation study
+sim_family <- args[11]
+
+
 
 ## Manually set values for testing purposes
-#data_set <- "ili_national"
-#prediction_horizon <- 25L
-#max_lag <- 1L
-#filtering <- TRUE
-#seasonality <- TRUE
-#bw_parameterization <- "full"
-#save_path <- "/home/er71a/kcde-applied-paper/R/application-influenza/estimation-results"
-#data_set <- "dengue_sj"
-
-data_set <- "sim_10"
-prediction_horizon <- 0L
-max_lag <- 0L
+data_set <- "ili_national"
+prediction_horizon <- 24L
+max_lag <- 1L
+max_seasonal_lag <- 0L
 filtering <- FALSE
-seasonality <- FALSE
+differencing <- TRUE
+seasonality <- TRUE
 bw_parameterization <- "full"
-save_path <- "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/results/dengue_sj/estimation-results"
-args <- c(rep("", 7), "100", "bivariate-B-discretized")
-#args <- c(rep("", 7), "1000", "bivariate-C-discretized")
-#args <- c(rep("", 7), "1000", "multivariate-4d-discretized")
+save_path <- "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/ili_national/estimation-results"
+#save_path <- "/home/er71a/kcde-applied-paper/R/application-influenza/estimation-results"
+
+#data_set <- "sim_10"
+#prediction_horizon <- 0L
+#max_lag <- 0L
+#max_seasonal_lag <- 0L
+#filtering <- FALSE
+#seasonality <- FALSE
+#bw_parameterization <- "full"
+#save_path <- "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/results/dengue_sj/estimation-results"
+#args <- c(rep("", 8), "100", "bivariate-B-discretized")
+#args <- c(rep("", 8), "1000", "bivariate-C-discretized")
+#args <- c(rep("", 8), "1000", "multivariate-4d-discretized")
 
 
 ### Load data set and set variables describing how the fit is performed
@@ -77,23 +94,38 @@ if(identical(data_set, "ili_national")) {
     ## The origin is arbitrary.
     data$time_index <- as.integer(data$time -  ymd(paste("1970", "01", "01", sep = "-")))
     
-    prediction_target_var <- "weighted_ili"
-    continuous_var_names <- c(
-        paste0(c("weighted_ili", "filtered_weighted_ili"), "_horizon", rep(1:52, each=2)),
-        paste0(c("weighted_ili", "filtered_weighted_ili"), "_lag", rep(seq(from = 0, to = max_lag), each=2))
-    )
-    discrete_var_names <- NULL
-    predictive_vars <- paste0(c("weighted_ili", "filtered_weighted_ili"), "_lag", rep(seq(from = 0, to = max_lag), each=2))
+    if(differencing) {
+        data$weighted_ili_ratio <- data$weighted_ili / lag(data$weighted_ili, 52) 
+        prediction_target_var <- "weighted_ili_ratio"
+        continuous_var_names <- c(
+            paste0(c("weighted_ili_ratio", "filtered_weighted_ili_ratio"), "_horizon", rep(1:52, each=2)),
+            paste0(c("weighted_ili_ratio", "filtered_weighted_ili_ratio"), "_lag", rep(seq(from = 0, to = max_lag + 52 * max_seasonal_lag), each=2))
+        )
+        discrete_var_names <- NULL
+        predictive_vars <- c("weighted_ili_ratio")
+    } else {
+        prediction_target_var <- "weighted_ili"
+        continuous_var_names <- c(
+            paste0(c("weighted_ili", "filtered_weighted_ili"), "_horizon", rep(1:52, each=2)),
+            paste0(c("weighted_ili", "filtered_weighted_ili"), "_lag", rep(seq(from = 0, to = max_lag + 52 * max_seasonal_lag), each=2))
+        )
+        discrete_var_names <- NULL
+        predictive_vars <- c("weighted_ili")
+    }
     time_var <- "time"
     
     kernel_fn <- log_pdtmvn_kernel
     rkernel_fn <- rlog_pdtmvn_kernel
     
-    variable_selection_method <- "stepwise"
+    variable_selection_method <- "all_included"
     crossval_buffer <- ymd("2010-01-01") - ymd("2009-01-01")
 } else if(identical(data_set, "dengue_sj")) {
     ## Load data for Dengue fever in San Juan
     data <- read.csv("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/data/San_Juan_Training_Data.csv")
+    
+    ## Restrict to data from 1990/1991 through 2008/2009 seasons
+    train_seasons <- paste0(1990:2008, "/", 1991:2009)
+    data <- data[data$season %in% train_seasons, ]
     
     ## Form variable with total cases + 1 which can be logged
     data$total_cases_plus_1 <- data$total_cases + 1
@@ -108,27 +140,27 @@ if(identical(data_set, "ili_national")) {
     
     prediction_target_var <- "total_cases_plus_1"
     continuous_var_names <- c(
-        paste0(c("total_cases_plus_1", "filtered_total_cases_plus_1"), "_lag", rep(seq(from = 0, to = max_lag), each=2))
+        paste0(c("total_cases_plus_1", "filtered_total_cases_plus_1"), "_lag", rep(seq(from = 0, to = max_lag + 52 * max_seasonal_lag), each=2))
     )
     discrete_var_names <- c(
         paste0(c("total_cases_plus_1", "filtered_total_cases_plus_1"), "_horizon", rep(1:52, each=2))
     )
-    predictive_vars <- paste0(c("total_cases_plus_1", "filtered_total_cases_plus_1"), "_lag", rep(seq(from = 0, to = max_lag), each=2))
+    predictive_vars <- "total_cases_plus_1"
     time_var <- "time"
     
     kernel_fn <- log_pdtmvn_kernel
     rkernel_fn <- rlog_pdtmvn_kernel
     
-    variable_selection_method <- "stepwise"
+    variable_selection_method <- "all_included"
     crossval_buffer <- ymd("2010-01-01") - ymd("2009-01-01")
 } else if(identical(substr(data_set, 1, 3), "sim")) {
     ## Load functions for generating simulated data
-    source("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/code/sim-densities-sim-study-discretized-Duong-Hazelton.R")
-#    source("/home/er71a/kcde-applied-paper/R/sim-densities-sim-study-discretized-Duong-Hazelton.R")
+#    source("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/code/sim-densities-sim-study-discretized-Duong-Hazelton.R")
+    source("/home/er71a/kcde-applied-paper/R/sim-densities-sim-study-discretized-Duong-Hazelton.R")
     
     ## Get arguments determining size of simulation and simulation family
-    sim_n <- as.integer(args[8])
-    sim_family <- args[9]
+#    sim_n <- as.integer(args[9])
+#    sim_family <- args[10]
     sim_ind <- as.integer(substr(data_set, 5, nchar(data_set)))
     cat(sim_n)
     cat(sim_family)
@@ -217,6 +249,8 @@ if(seasonality) {
             theta_est = list("bw"),
             initialize_kernel_params_fn = initialize_params_periodic_kernel,
             initialize_kernel_params_args = NULL,
+            get_theta_optim_bounds_fn = get_theta_optim_bounds_periodic_kernel,
+            get_theta_optim_bounds_args = NULL,
             vectorize_kernel_params_fn = vectorize_params_periodic_kernel,
             vectorize_kernel_params_args = NULL,
             update_theta_from_vectorized_theta_est_fn =
@@ -228,6 +262,12 @@ if(seasonality) {
 ## Kernel components for observed values of incidence
 ## First step is setup: create list of data frames specifying groups of
 ## variables and offsets included in each kernel component
+lag_values <- NULL
+for(seasonal_lag in seq(from = 0, to = max_seasonal_lag)) {
+    lag_values <- c(lag_values,
+        seq(from = 0, to = max_lag) + 52 * seasonal_lag)
+}
+
 if(identical(bw_parameterization, "diagonal")) {
     ## Separate kernel components for each prediction target variable and
     ## predictive variable
@@ -252,28 +292,28 @@ if(identical(bw_parameterization, "diagonal")) {
     
     ## Groups of variable names and offsets for lagged predictive variables
     
-    for(lag_value in seq(from = 0, to = max_lag)) {
+    for(lag_value in lag_values) {
         for(predictive_var in predictive_vars) {
-            ## Group for lagged "raw"/unfiltered observed incidence
-            new_vars_and_offsets_group <- data.frame(
-                var_name = predictive_var,
-                offset_value = lag_value,
-                offset_type = "lag",
-                stringsAsFactors = FALSE
-            )
-            new_vars_and_offsets_group$combined_name <- paste0(
-                new_vars_and_offsets_group$var_name,
-                "_",
-                new_vars_and_offsets_group$offset_type,
-                new_vars_and_offsets_group$offset_value
-            )
-            vars_and_offsets_groups <- c(vars_and_offsets_groups,
-                list(new_vars_and_offsets_group))
-            
-            ## If requested, group for lagged filtered observed incidence
             if(filtering) {
+                ## If requested, group for lagged filtered observed incidence
                 new_vars_and_offsets_group <- data.frame(
                     var_name = paste0("filtered_", predictive_var),
+                    offset_value = lag_value,
+                    offset_type = "lag",
+                    stringsAsFactors = FALSE
+                )
+                new_vars_and_offsets_group$combined_name <- paste0(
+                    new_vars_and_offsets_group$var_name,
+                    "_",
+                    new_vars_and_offsets_group$offset_type,
+                    new_vars_and_offsets_group$offset_value
+                )
+                vars_and_offsets_groups <- c(vars_and_offsets_groups,
+                    list(new_vars_and_offsets_group))
+            } else {
+                ## Else, group for lagged "raw"/unfiltered observed incidence
+                new_vars_and_offsets_group <- data.frame(
+                    var_name = predictive_var,
                     offset_value = lag_value,
                     offset_type = "lag",
                     stringsAsFactors = FALSE
@@ -302,25 +342,25 @@ if(identical(bw_parameterization, "diagonal")) {
     )
     
     ## Lagged prediction target == predictive variables
-    for(lag_value in seq(from = 0, to = max_lag)) {
+    for(lag_value in lag_values) {
         for(predictive_var in predictive_vars) {
-            ## Lagged "raw"/unfiltered observed incidence
-            new_vars_and_offsets_group <- rbind(
-                new_vars_and_offsets_group,
-                data.frame(
-                    var_name = predictive_var,
-                    offset_value = lag_value,
-                    offset_type = "lag",
-                    stringsAsFactors = FALSE
-                )
-            )
-            
-            ## If requested, lagged filtered incidence
             if(filtering) {
+                ## If requested, lagged filtered incidence
                 new_vars_and_offsets_group <- rbind(
                     new_vars_and_offsets_group,
                     data.frame(
                         var_name = paste0("filtered_", predictive_var),
+                        offset_value = lag_value,
+                        offset_type = "lag",
+                        stringsAsFactors = FALSE
+                    )
+                )
+            } else {
+                ## Else, lagged "raw"/unfiltered observed incidence
+                new_vars_and_offsets_group <- rbind(
+                    new_vars_and_offsets_group,
+                    data.frame(
+                        var_name = predictive_var,
                         offset_value = lag_value,
                         offset_type = "lag",
                         stringsAsFactors = FALSE
@@ -447,6 +487,8 @@ kernel_components <- c(kernel_components,
             theta_est = list("bw"),
             initialize_kernel_params_fn = initialize_params_pdtmvn_kernel,
             initialize_kernel_params_args = NULL,
+            get_theta_optim_bounds_fn = get_theta_optim_bounds_pdtmvn_kernel,
+            get_theta_optim_bounds_args = NULL,
             vectorize_kernel_params_fn = vectorize_params_pdtmvn_kernel,
             vectorize_kernel_params_args = NULL,
             update_theta_from_vectorized_theta_est_fn = update_theta_from_vectorized_theta_est_pdtmvn_kernel,
@@ -509,7 +551,8 @@ kcde_control <- create_kcde_control(X_names = "time_index",
 
 
 ### Do estimation
-num_cores <- (max_lag + 1) * (filtering + 1) + seasonality
+#num_cores <- (max_lag + 1) * (filtering + 1) + seasonality
+num_cores <- 1L
 registerDoMC(cores = num_cores)
 fit_time <- system.time({
     kcde_fit <- kcde(data = data,
@@ -523,7 +566,9 @@ case_descriptor <- paste0(
     data_set,
     "-prediction_horizon_", prediction_horizon,
     "-max_lag_", max_lag,
+    "-max_seasonal_lag_", max_seasonal_lag,
     "-filtering_", filtering,
+    "-differencing_", differencing,
     "-seasonality_", seasonality,
     "-bw_parameterization_", bw_parameterization
 )

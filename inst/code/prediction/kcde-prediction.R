@@ -3,24 +3,34 @@ library(pdtmvn)
 library(plyr)
 library(dplyr)
 library(lubridate)
+library(doMC)
 
 options(error = recover)
 
 all_data_sets <- c("ili_national")
 all_prediction_horizons <- seq_len(52)
 all_max_lags <- 1L
-all_filtering_values <- c(FALSE, TRUE)
+all_max_seasonal_lags <- c(0L, 1L)
+#all_filtering_values <- c(FALSE, TRUE)
+all_filtering_values <- FALSE
+#all_differencing_values <- c(FALSE, TRUE)
+all_differencing_values <- TRUE
+#all_differencing_values <- c(FALSE)
 all_seasonality_values <- c(FALSE, TRUE)
 all_bw_parameterizations <- c("diagonal", "full")
 
 ## Test values for debugging
 #all_data_sets <- c("ili_national")
-#all_prediction_horizons <- 1L
+#all_prediction_horizons <- seq_len(2)
 #all_max_lags <- 1L
-#all_filtering_values <- c(TRUE)
+#all_max_seasonal_lags <- c(0L, 1L)
+#all_filtering_values <- c(FALSE)
+#all_differencing_values <- c(FALSE)
 #all_seasonality_values <- c(TRUE)
 #all_bw_parameterizations <- c("full")
 
+num_cores <- 2L
+registerDoMC(cores = num_cores)
 
 for(data_set in all_data_sets) {
     ## Set path where fit object is stored
@@ -28,7 +38,6 @@ for(data_set in all_data_sets) {
         "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results",
         data_set,
         "estimation-results")
-    
     
     if(identical(data_set, "ili_national")) {
         ## Load data for nationally reported influenza like illness
@@ -41,6 +50,7 @@ for(data_set in all_data_sets) {
             year = YEAR,
             week = WEEK,
             weighted_ili = as.numeric(X..WEIGHTED.ILI))
+        data$weighted_ili_ratio <- data$weighted_ili / lag(data$weighted_ili, 52) 
         
         ## Subset data to do prediction using only data up through 2014
         data <- data[data$year <= 2014, , drop = FALSE]
@@ -56,132 +66,172 @@ for(data_set in all_data_sets) {
         ## Here, this is calculated as the number of days since some origin date (1970-1-1 in this case).
         ## The origin is arbitrary.
         data$time_index <- as.integer(data$time - ymd(paste("1970", "01", "01", sep = "-")))
-        
-        ## Set prediction target var
-        prediction_target_var <- "weighted_ili"
     }
     
     
-    ## Allocate data frame to store results for this data set
-    num_rows <- length(all_prediction_horizons) *
-        length(all_max_lags) *
-        length(all_filtering_values) *
-        length(all_seasonality_values) *
-        length(all_bw_parameterizations) *
-        length(prediction_time_inds)
-    
-    data_set_results <- data.frame(data_set = data_set,
-        prediction_horizon = rep(NA_integer_, num_rows),
-        max_lag = rep(NA_integer_, num_rows),
-        filtering = rep(NA, num_rows),
-        seasonality = rep(NA, num_rows),
-        bw_parameterization = rep(NA_character_, num_rows),
-        model = "kcde",
-        prediction_time = rep(NA, num_rows),
-        log_score = rep(NA_real_, num_rows),
-        pt_pred = rep(NA_real_, num_rows),
-        AE = rep(NA_real_, num_rows),
-        interval_pred_lb_95 = rep(NA_real_, num_rows),
-        interval_pred_ub_95 = rep(NA_real_, num_rows),
-        interval_pred_lb_50 = rep(NA_real_, num_rows),
-        interval_pred_ub_50 = rep(NA_real_, num_rows),
-        stringsAsFactors = FALSE
-    )
-    class(data_set_results$prediction_time) <- class(data$time)
-    
-    results_row_ind <- 1L
-    for(prediction_horizon in all_prediction_horizons) {
+    data_set_results <- foreach(prediction_horizon=all_prediction_horizons,
+        .packages=c("kcde", "pdtmvn", "plyr", "dplyr", "lubridate"),
+        .combine="rbind") %dopar% {
+#    for(prediction_horizon in all_prediction_horizons) {
+        results_row_ind <- 1L
+        
+        ## Allocate data frame to store results for this prediction horizon
+        num_rows <- length(all_max_lags) *
+            length(all_max_seasonal_lags) *
+            length(all_filtering_values) *
+            length(all_differencing_values) *
+            length(all_seasonality_values) *
+            length(all_bw_parameterizations) *
+            length(prediction_time_inds)
+        
+        ph_results <- data.frame(data_set = data_set,
+            prediction_horizon = rep(NA_integer_, num_rows),
+            max_lag = rep(NA_integer_, num_rows),
+            max_seasonal_lag = rep(NA_integer_, num_rows),
+            filtering = rep(NA, num_rows),
+            differencing = rep(NA, num_rows),
+            seasonality = rep(NA, num_rows),
+            bw_parameterization = rep(NA_character_, num_rows),
+            model = "kcde",
+            prediction_time = rep(NA, num_rows),
+            log_score = rep(NA_real_, num_rows),
+            pt_pred = rep(NA_real_, num_rows),
+            AE = rep(NA_real_, num_rows),
+            interval_pred_lb_95 = rep(NA_real_, num_rows),
+            interval_pred_ub_95 = rep(NA_real_, num_rows),
+            interval_pred_lb_50 = rep(NA_real_, num_rows),
+            interval_pred_ub_50 = rep(NA_real_, num_rows),
+            stringsAsFactors = FALSE
+        )
+        class(ph_results$prediction_time) <- class(data$time)
+        
         for(max_lag in all_max_lags) {
-            for(filtering in all_filtering_values) {
-                for(seasonality in all_seasonality_values) {
-                    for(bw_parameterization in all_bw_parameterizations) {
-                        for(prediction_time_ind in prediction_time_inds) {
-                            ## Set values describing case in data_set_results
-                            data_set_results$prediction_horizon[results_row_ind] <-
-                                prediction_horizon
-                            data_set_results$max_lag[results_row_ind] <-
-                                max_lag
-                            data_set_results$filtering[results_row_ind] <-
-                                filtering
-                            data_set_results$seasonality[results_row_ind] <-
-                                seasonality
-                            data_set_results$bw_parameterization[results_row_ind] <-
-                                bw_parameterization
-                            data_set_results$prediction_time[results_row_ind] <-
-                                data$time[prediction_time_ind]
-                            
-                            ## Load kcde_fit object.  Estimation was performed previously.
-                            case_descriptor <- paste0(
-                                data_set,
-                                "-prediction_horizon_", prediction_horizon,
-                                "-max_lag_", max_lag,
-                                "-filtering_", filtering,
-                                "-seasonality_", seasonality,
-                                "-bw_parameterization_", bw_parameterization
-                            )
-                            
-                            kcde_fit <- readRDS(file.path(results_path,
-                                    paste0("kcde_fit-", case_descriptor, ".rds")))
-                            
-                            ## Get index of analysis time in data set
-                            ## (time from which we predict forward)
-                            analysis_time_ind <- prediction_time_ind - prediction_horizon
-                            
-                            ## Compute log score
-                            observed_prediction_target <-
-                                data[prediction_time_ind, prediction_target_var, drop = FALSE]
-                            colnames(observed_prediction_target) <-
-                                paste0(prediction_target_var, "_horizon", prediction_horizon)
-                            data_set_results$log_score[results_row_ind] <-
-                                kcde_predict(
-                                    kcde_fit = kcde_fit,
-                                    prediction_data =
-                                        data[seq_len(analysis_time_ind), , drop = FALSE],
-                                    leading_rows_to_drop = 0L,
-                                    trailing_rows_to_drop = 0L,
-                                    additional_training_rows_to_drop = NULL,
-                                    prediction_type = "distribution",
-                                    prediction_test_lead_obs = observed_prediction_target,
-                                    log = TRUE
-                                )
-                            
-                            ## Compute point prediction and interval predictions -- quantiles
-                            data_set_results[results_row_ind,
-                                c("pt_pred", "interval_pred_lb_95", "interval_pred_ub_95", "interval_pred_lb_50", "interval_pred_ub_50")] <-
-                                kcde_predict(
-                                    p = c(0.5, 0.025, 0.975, 0.25, 0.75),
-                                    n = 100000,
-                                    kcde_fit = kcde_fit,
-                                    prediction_data =
-                                        data[seq_len(analysis_time_ind), , drop = FALSE],
-                                    leading_rows_to_drop = 0L,
-                                    trailing_rows_to_drop = 0L,
-                                    additional_training_rows_to_drop = NULL,
-                                    prediction_type = "quantile",
-                                    log = TRUE
-                                )
-                            
-                            ## Correction by subtracting 1 for Dengue data set
-                            if(identical(data_set, "dengue_sj")) {
-                                data_set_results[results_row_ind,
-                                    c("pt_pred", "interval_pred_lb_95", "interval_pred_ub_95", "interval_pred_lb_50", "interval_pred_ub_50")] <-
-                                    data_set_results[results_row_ind,
-                                        c("pt_pred", "interval_pred_lb_95", "interval_pred_ub_95", "interval_pred_lb_50", "interval_pred_ub_50")] - 1L
+            for(max_seasonal_lag in all_max_seasonal_lags) {
+                for(filtering in all_filtering_values) {
+                    for(differencing in all_differencing_values) {
+                        ## Set prediction target var
+                        if(identical(data_set, "ili_national")) {
+                            if(differencing) {
+                                prediction_target_var <- "weighted_ili_ratio"
+                                orig_prediction_target_var <- "weighted_ili"
+                            } else {
+                                prediction_target_var <- "weighted_ili"
                             }
-                            
-                            ## Compute absolute error of point prediction
-                            data_set_results$AE[results_row_ind] <-
-                                abs(data_set_results$pt_pred[results_row_ind] -
-                                    observed_prediction_target)
-                            
-                            ## Increment results row
-                            results_row_ind <- results_row_ind + 1L
-                        } # prediction_time_ind
-                    } # bw_parameterization
-                } # seasonality
-            } # filtering
+                        }
+                        
+                        for(seasonality in all_seasonality_values) {
+                            for(bw_parameterization in all_bw_parameterizations) {
+                                for(prediction_time_ind in prediction_time_inds) {
+                                    ## Set values describing case in ph_results
+                                    ph_results$prediction_horizon[results_row_ind] <-
+                                        prediction_horizon
+                                    ph_results$max_lag[results_row_ind] <-
+                                        max_lag
+                                    ph_results$max_seasonal_lag[results_row_ind] <-
+                                        max_seasonal_lag
+                                    ph_results$filtering[results_row_ind] <-
+                                        filtering
+                                    ph_results$differencing[results_row_ind] <-
+                                        differencing
+                                    ph_results$seasonality[results_row_ind] <-
+                                        seasonality
+                                    ph_results$bw_parameterization[results_row_ind] <-
+                                        bw_parameterization
+                                    ph_results$prediction_time[results_row_ind] <-
+                                        data$time[prediction_time_ind]
+                                    
+                                    ## Load kcde_fit object.  Estimation was performed previously.
+                                    case_descriptor <- paste0(
+                                        data_set,
+                                        "-prediction_horizon_", prediction_horizon,
+                                        "-max_lag_", max_lag,
+                                        "-max_seasonal_lag_", max_seasonal_lag,
+                                        "-filtering_", filtering,
+                                        "-differencing_", differencing,
+                                        "-seasonality_", seasonality,
+                                        "-bw_parameterization_", bw_parameterization
+                                    )
+                                    
+                                    kcde_fit <- readRDS(file.path(results_path,
+                                        paste0("kcde_fit-", case_descriptor, ".rds")))
+                                    
+                                    ## Get index of analysis time in data set
+                                    ## (time from which we predict forward)
+                                    analysis_time_ind <- prediction_time_ind - prediction_horizon
+                                    
+                                    ## Compute log score
+                                    observed_prediction_target <-
+                                        data[prediction_time_ind, prediction_target_var, drop = FALSE]
+                                    colnames(observed_prediction_target) <-
+                                        paste0(prediction_target_var, "_horizon", prediction_horizon)
+                                    ph_results$log_score[results_row_ind] <-
+                                        kcde_predict(
+                                            kcde_fit = kcde_fit,
+                                            prediction_data =
+                                                data[seq_len(analysis_time_ind), , drop = FALSE],
+                                            leading_rows_to_drop = 0L,
+                                            trailing_rows_to_drop = 0L,
+                                            additional_training_rows_to_drop = NULL,
+                                            prediction_type = "distribution",
+                                            prediction_test_lead_obs = observed_prediction_target,
+                                            log = TRUE
+                                        )
+                                    
+                                    if(differencing) {
+                                        ph_results$log_score[results_row_ind] <-
+                                            ph_results$log_score[results_row_ind] /
+                                            (abs(data[analysis_time_ind - 52, orig_prediction_target_var]))
+                                    }
+                                    
+                                    ## Compute point prediction and interval predictions -- quantiles
+                                    ph_results[results_row_ind,
+                                        c("pt_pred", "interval_pred_lb_95", "interval_pred_ub_95", "interval_pred_lb_50", "interval_pred_ub_50")] <-
+                                        kcde_predict(
+                                            p = c(0.5, 0.025, 0.975, 0.25, 0.75),
+                                            n = 100000,
+                                            kcde_fit = kcde_fit,
+                                            prediction_data =
+                                                data[seq_len(analysis_time_ind), , drop = FALSE],
+                                            leading_rows_to_drop = 0L,
+                                            trailing_rows_to_drop = 0L,
+                                            additional_training_rows_to_drop = NULL,
+                                            prediction_type = "quantile",
+                                            log = TRUE
+                                        )
+                                    
+                                    if(differencing) {
+                                        ph_results[results_row_ind,
+                                            c("pt_pred", "interval_pred_lb_95", "interval_pred_ub_95", "interval_pred_lb_50", "interval_pred_ub_50")] <-
+                                            ph_results[results_row_ind,
+                                                c("pt_pred", "interval_pred_lb_95", "interval_pred_ub_95", "interval_pred_lb_50", "interval_pred_ub_50")] * 
+                                            data[prediction_time_ind - 52, prediction_target_var]
+                                    }
+                                    
+                                    ## Correction by subtracting 1 for Dengue data set
+                                    if(identical(data_set, "dengue_sj")) {
+                                        ph_results[results_row_ind,
+                                            c("pt_pred", "interval_pred_lb_95", "interval_pred_ub_95", "interval_pred_lb_50", "interval_pred_ub_50")] <-
+                                            ph_results[results_row_ind,
+                                                c("pt_pred", "interval_pred_lb_95", "interval_pred_ub_95", "interval_pred_lb_50", "interval_pred_ub_50")] - 1L
+                                    }
+                                    
+                                    ## Compute absolute error of point prediction
+                                    ph_results$AE[results_row_ind] <-
+                                        abs(ph_results$pt_pred[results_row_ind] -
+                                                observed_prediction_target)
+                                    
+                                    ## Increment results row
+                                    results_row_ind <- results_row_ind + 1L
+                                } # prediction_time_ind
+                            } # bw_parameterization
+                        } # seasonality
+                    } # differencing
+                } # filtering
+            } # max_seasonal_lag
         } # max_lag
-    } # prediction_horizon
+        
+        return(ph_results)
+    } # prediction_horizon -- in foreach/dopar statement
     
     ## Save results for the given data set
     saveRDS(data_set_results, file = file.path(

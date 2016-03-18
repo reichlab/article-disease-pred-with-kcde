@@ -373,6 +373,7 @@ get_dist_component_params_for_sim_family <- function(sim_family) {
                 discrete_var_col_inds = NULL
             ))
     } else if(identical(sim_family, "bivariate-D-discretized")) {
+        stop("Invalid sim_family") # The parameters given in the text of Duong and Hazelton are incorrect.
         x_names <- paste0("X", seq_len(2))
         sigma1 <- matrix(c(25/64, 1/5, 1/5, 25/64), nrow = 2, ncol = 2) %>%
             `rownames<-`(x_names) %>%
@@ -435,6 +436,7 @@ get_dist_component_params_for_sim_family <- function(sim_family) {
                 discrete_var_col_inds = seq_along(x_names)
             ))
     } else if(identical(sim_family, "bivariate-D")) {
+        stop("Invalid sim_family") # The parameters given in the text of Duong and Hazelton are incorrect.
         x_names <- paste0("X", seq_len(2))
         sigma1 <- matrix(c(25/64, 1/5, 1/5, 25/64), nrow = 2, ncol = 2) %>%
             `rownames<-`(x_names) %>%
@@ -825,4 +827,42 @@ sim_from_pdtmvn_mixt <- function(n, sim_family) {
     }
     
     return(result)
+}
+
+
+
+d_pdtmvn_mixt_conditional <- function(X, sim_family, conditional = TRUE, log = FALSE) {
+    dist_component_params <- get_dist_component_params_for_sim_family(sim_family)
+    
+    log_kernel_component_values <- matrix(NA, nrow = nrow(X), ncol = length(dist_component_params$weights))
+    
+    kernel_fn_args <- dist_component_params$theta[[1]]
+    for(ind in seq_len(ncol(log_kernel_component_values))) {
+        kernel_fn_args$bw <- dist_component_params$bws[[ind]]
+        kernel_fn_args$x <- dist_component_params$centers[ind, , drop = FALSE]
+        kernel_fn_args$center <- X
+        kernel_fn_args$log <- TRUE
+        
+        log_kernel_component_values[, ind] <-
+            do.call(dist_component_params$kernel_components[[1]]$kernel_fn,
+                kernel_fn_args)
+        
+        if(conditional) {
+            conditioning_var_inds <- seq_len(ncol(kernel_fn_args$bw) - 1)
+        
+#            kernel_fn_args$bw <- dist_component_params$bws[[ind]][conditioning_var_inds, conditioning_var_inds, drop = FALSE]
+            kernel_fn_args$x <- dist_component_params$centers[ind, conditioning_var_inds, drop = FALSE]
+            kernel_fn_args$center <- X[, conditioning_var_inds, drop = FALSE]
+            
+            log_kernel_component_values[, ind] <- log_kernel_component_values[, ind] -
+                do.call(dist_component_params$kernel_components[[1]]$kernel_fn,
+                    kernel_fn_args)
+        }
+    }
+    
+    if(log) {
+        return(apply(log_kernel_component_values, 1, sum))
+    } else {
+        return(exp(apply(log_kernel_component_values, 1, sum)))
+    }
 }
