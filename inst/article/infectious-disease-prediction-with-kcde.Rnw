@@ -30,13 +30,16 @@ University of Massachusetts, Amherst\\
 \begin{abstract}
 Abstract
 \end{abstract}
-\keywords{Keywords, Keywords}
+\keywords{copula, infectious disease, kernel conditional density estimation,
+prediction}
 
 \maketitle
 
 <<knitrGlobalSetup, echo = FALSE>>=
-#opts_chunk$set(cache = TRUE, autodep = TRUE)
-opts_chunk$set(cache = FALSE)
+library(reshape2)
+
+opts_chunk$set(cache = TRUE, autodep = TRUE)
+#opts_chunk$set(cache = FALSE)
 @
 
 \section{Introduction}
@@ -44,36 +47,44 @@ opts_chunk$set(cache = FALSE)
 
 Accurate prediction of infectious disease incidence is important for public
 health officials planning disease prevention and control measures such as vector
-control and assignments of medical personnel.  Predictive distributions
-are preferred to point predictions because they communicate uncertainty in the
-predictions and give decision makers more information in cases where the
-predictive distribution is skewed or has multiple modes.  In this work, we
-employ a non-parametric approach referred to as kernel conditional density
-estimation (KCDE) to obtain predictive distributions of disease incidence.  When
-predictions for the trajectory of disease incidence over multiple time horizons
-are required, our strategy is to use KCDE to obtain marginal predictive
-distributions for each of those horizons and then combine them using copulas to obtain a joint predictive distribution.  In addition to the novel application of these methods to
-predicting disease incidence, our contributions include a new kernel function
-that handles both continuous and discrete count data while allowing for a fully
-parameterized bandwidth matrix and the use of a periodic kernel specification to
-capture seasonality in disease incidence.
+control and increased use of personal protective equipment by medical
+personnel during periods of high disease incidence (cite ***).  Several
+quantities have emerged as being of particular utility in making these planning decisions (cite ***); in this article we focus
+on measures of weekly incidence, the timing of the season peak, and incidence
+in the peak week.  Predictive distributions for these quantities are preferred
+to point predictions because they communicate uncertainty in the predictions and
+give decision makers more information in cases where the predictive distribution
+is skewed or has multiple modes.
+In this work, we employ a non-parametric approach referred to as kernel
+conditional density estimation (KCDE) to obtain separate predictive
+distributions for disease incidence in each week of the season, and then combine
+those marginal distributions using copulas to obtain joint predictive distributions for the
+trajectory of incidence over the course of multiple weeks.  Predictive
+distributions relating to the timing of and incidence at the peak week can be
+obtained from this joint predictive distribution for the trajectory of
+disease incidence.
+In addition to the novel application of these methods to predicting disease incidence, our contributions include the use of a periodic kernel specification to capture
+seasonality in disease incidence and a method for obtaining multivariate
+kernel functions that handle discrete data while allowing for a fully
+parameterized bandwidth matrix.
 
 KCDE is a method for estimating the conditional distribution of
 a random vector $\bY$ given observations of another vector $\bX$.  In our work,
-$\bY$ is a measure of disease incidence at some future date or dates (the prediction
+$\bY$ is a measure of disease incidence at some future date (the prediction
 target) and $\bX$ is a vector of predictive variables that we condition
-on in order to make our prediction.  For example, $\bX$ may include
-observations of incidence over the most recent few time
-points, weather covariates, or variables indicating the time of year at which we are
-making a prediction.  KCDE has not previously been applied to obtain predictive
-distributions in the context of infectious disease, but it has been successfully
-used for prediction in other settings such as survival time of lung cancer
-patients\cite{hall2004crossvalidationKCDE}, female labor force participation\cite{hall2004crossvalidationKCDE}, bond yields and value at risk in financial
-markets\cite{fan2004crossvalidationKCDE}, and wind
-power\cite{jeon2012KCDEWindPower} among others.
+on in order to make our prediction.  In our example applications,
+$\bX$ includes observations of incidence over several recent time
+points and variables indicating the time of year at which we are
+making a prediction; in general, it would be possible to include other
+variables such as weather covariates.
 
-Although KCDE has not previously been applied to predicting infectious disease,
-closely related methods for obtaining point predictions have been employed for
+KCDE has not previously been applied to obtain predictive distributions in the
+context of infectious disease, but it has been successfully used for prediction in other settings such as survival time of
+lung cancer patients\cite{hall2004crossvalidationKCDE}, female labor force
+participation\cite{hall2004crossvalidationKCDE}, bond yields and value at risk
+in financial markets\cite{fan2004crossvalidationKCDE}, and wind
+power\cite{jeon2012KCDEWindPower} among others.  Although KCDE has not
+previously been applied to predicting infectious disease, closely related methods for obtaining point predictions have been employed for
 diseases such as measles\cite{sugihara1990nonlinearForecasting} and
 influenza\cite{viboud2003predictionInfluenzaMoA}.  In the infectious disease
 literature these methods have been referred to as state space reconstruction and
@@ -82,116 +93,77 @@ regression methods.  The point prediction obtained from nearest neighbors
 regression is equal to the expected value of the predictive distribution
 obtained from KCDE if a particular kernel function is used in the formulation of
 KCDE\cite{HastieTibshiraniESL}.  However, KCDE offers the advantage of providing
-a complete predictive distribution rather than only a point prediction.  There
-is also a long history of using other modeling approaches, such as compartmental
-models, for infectious disease prediction.  A full discussion of those methods
-is beyond the scope of this article; see *** for a recent review.
+a complete predictive distribution rather than only a point prediction.  Methods
+similar to those we explore in this article can also be formulated in the
+Bayesian framework.  One example along these lines is Zhou et
+{al.}\cite{zhou2015DirichletProcessCopulaAmphibianDiseaseArrival}, who model the
+time to arrival of a disease in amphibian populations using Dirichlet
+processes and copulas.
 
-\lboxit{Double check citation for sugihara -- right paper??}
+There is also a long history of using other modeling approaches such as
+compartmental models for infectious disease prediction.  A full discussion of
+those methods is beyond the scope of this article; see *** for a recent review. 
+KCDE is distinguished from these alternative approaches in that it makes
+minimal assumptions about the data generating process.  This can be
+either an advantage and a disadvantage of KCDE.
+In general, flexible non-parametric methods such as KCDE exhibit low
+bias but high variance.  If they are correctly specified, parametric
+approaches may achieve reduced variance without introducing bias.  
+On the other hand, because non-parametric approaches such as KCDE make fewer
+assumptions they may outperform incorrectly specified parametric models.  An
+evaluation of the benefits of an approach such as KCDE is therefore dependent on
+the particular characteristics of the system being modeled, the data that are
+available, and the quality of the more structured parametric models that are
+considered as alternatives.  We will return to this point in our conclusions.
 
 \lboxit{Need to find a review of prediction methods for infectious disease.}
 
-There is an extensive literature on KCDE, focusing mainly on estimation of
-continuous conditional densities.  Here we offer a brief overview emphasizing
-the case with mixed continuous and discrete variables; Li and
-Racine\cite{li2007nonparametricEconometrics} offer a detailed discussion of this
-case.  Throughout this article we use the term density to refer to the
-Radon-Nikodym derivative of the cumulative distribution function with respect to an
-appropriately defined measure.  In the case of random vectors where some
-components are continuous random variables and other are discrete, we take this
-measure to be a product of Lebesgue and counting measures for the corresponding
-random variables.  We use bold letters to indicate column vectors; capital
-letters are random variables and lower case letters are observations of those
-random variables.
+%There is an extensive literature on KCDE, focusing mainly on estimation of
+%continuous conditional densities.  Here we offer a brief overview emphasizing
+%the case with mixed continuous and discrete variables; Li and
+%Racine\cite{li2007nonparametricEconometrics} offer a detailed discussion of this
+%case.
 
-Given observations $\{(\bx_t, \by_t), t = 1, \ldots, T\}$,
-KCDE estimates the conditional density of $\bY | \bX$ by
-\begin{equation}
-\widehat{f}_{\bY|\bX}(\by | \bx) = \frac{\sum_{t \in \btau} K^{\bX, \bY}\left\{(\bx', \by')', (\bx'_t, \by'_t)'; \bH^{\bX,\bY}\right\}}{\sum_{t \in \btau}K^{\bX}(\bx, \bx_t ; \bH^{\bX})}. \label{eqn:KCDEDefinition}
-\end{equation}
-Here, $'$ is the transpose operator and $\btau \subseteq \{1, \ldots, T\}$ indexes the subset of observations used
-in obtaining the conditional density estimate.  In the final density estimate,
-$\btau$ is typically equal to $\{1, \ldots, T\}$, but proper subsets may be
-used in the estimation procedures we discuss later.  In
-Equation~\eqref{eqn:KCDEDefinition}, the numerator is a kernel density estimate
-of the joint density of $\bX$ and $\bY$ and the denominator is a kernel density
-estimate of the marginal density of $\bX$; forming the quotient yields an
-estimate of the conditional density of $\bY | \bX$.
-
-We will work with a slightly restricted specification of
-Equation~\eqref{eqn:KCDEDefinition} in which the kernel function $K^{\bX,\bY}$
-can be written as the product of $K^{\bX}$ and a
-``conditional kernel'' $K^{\bY|\bX}$:
-\begin{equation}
-K^{\bX,\bY}\left\{(\bx', \by')', (\bx'_t, \by'_t)'; \bH^{\bX,\bY}\right\} = K^{\bX}\left\{\bx, \bx_t; \bH^{\bX}\right\} K^{\bY | \bX}\left\{\by, \by_t | \bx, \bx_t; \bH^{\bX,\bY}\right\}.
-\end{equation}
-With this restriction, we can rearrange Equation~\eqref{eqn:KCDEDefinition} to
-obtain
-\begin{align}
-\widehat{f}_{\bY|\bX}(\by | \bx) &= \sum_{t \in \btau} w_t K^{\bY | \bX}\left\{\by, \by_t | \bx, \bx_t; \bH^{\bX,\bY}\right\}, \text{ where} \label{eqn:KCDEDefinitionWeighted} \\
-w_t &= \frac{K^{\bX}\left\{\bx, \bx_t; \bH^{\bX}\right\}}{\sum_{t^* \in \btau} K^{\bX}\left\{\bx, \bx_{t^*}; \bH^{\bX}\right\}}.
-\end{align}
-
-We can now interpret $K^{\bX}$ as a weighting function determining how much each
-observation contributes to our final density estimate according to how similar
-$\bx_t$ is to the value $\bx$ that we are conditioning on.
-$K^{\bY | \bX}$ is a density function that contributes
-mass to the final density estimate near the observed value $\by_t$; we require
-that for any values of $\by_t$, $\bx_t$, and $\bx$, the integral of $K^{\bY |
-\bX}$ with respect to $\by$ must equal $1$.
-The bandwidth parameters $\bH^{\bX}$ and $\bH^{\bX, \bY}$ control the locality
-and orientation of the weighting function and the contributions to the density
-estimate from each observation.
-
-In order to complete the formulation of the estimator given in
-Equation~\eqref{eqn:KCDEDefinition}, we must specify the kernel functions and
-describe the procedure that is used to estimate the bandwidth parameters.  To
-our knowledge, all previous authors using kernel methods to estimate either
-conditional or marginal densities with one or more discrete variables have
-employed a kernel function that is a
-product of univariate kernel functions
-[\cite{aitchison1976multivariateBinaryKernel},
-\cite{wang1981SmoothEstDiscreteDistn},
-\cite{li2003nonparametricEstDistnsCategoricalContinuous},
-\cite{ouyang2006crossvalidationEstDistnCategorical},
-].
-For the continuous variables, there are several options for the functional form;
-one common choice is the Gaussian kernel.  Several alternatives have also been
-proposed for use with discrete variables.  For ordered discrete variables,
-symmetric univariate kernel functions that decrease with the distance between
-$x$ and $x_t$ are often used; several specific functional forms that achieve
-this have been used in the literature \cite{aitchison1976multivariateBinaryKernel,
+To our knowledge, all previous authors using kernel methods to estimate
+multivariate densities involving discrete variables have employed a kernel
+function that is a product of univariate kernel functions \cite{aitchison1976multivariateBinaryKernel,
 wang1981SmoothEstDiscreteDistn,
-li2008nonparametricConditionalCDFQuantile,
 li2003nonparametricEstDistnsCategoricalContinuous,
-ouyang2006crossvalidationEstDistnCategorical}.  For count data, alternatives
-that have been proposed include.
+ouyang2006crossvalidationEstDistnCategorical}.
+A variety of functional forms have been proposed for this purpose, ranging from
+blah to blah to blah \cite{aitchison1976multivariateBinaryKernel,
+wang1981SmoothEstDiscreteDistn, li2008nonparametricConditionalCDFQuantile,
+li2003nonparametricEstDistnsCategoricalContinuous,
+ouyang2006crossvalidationEstDistnCategorical}.
 
 %\cite{wang1981SmoothEstDiscreteDistn},
 %\cite{li2008nonparametricConditionalCDFQuantile}\cite{li2003nonparametricEstDistnsCategoricalContinuous},
 % \cite{ouyang2006crossvalidationEstDistnCategorical}].
 
-
 Using a product kernel simplifies the mathemetical formulation of the kernel
-function when both continuous and discrete variables are present, but has the
+function when discrete variables are present, but has the
 effect of forcing the kernel function to be orientied in line with the
-coordinate axes.  In settings with only continuous variables, it is common to
-use a multivariate kernel function with a bandwidth parameterization that allows
-for orientations in directions other than along the coordinate axes.  Asymptotic
-analysis and experience with applications have shown that this can result in
-improved density estimates in many cases (cite ***).  One possibility for
-introducing orientation to the kernel function is to use a fully parameterized
-bandwidth matrix, allowing the kernel to be oriented in any direction.  Another
-common alternative is to fix the orientation to be in the directions of the
-eigenvectors of the sample covariance matrix.
+coordinate axes.  In settings with only continuous variables, asymptotic
+analysis and experience with applications have shown that using a multivariate
+kernel function with a bandwidth parameterization that allows for
+other orientations can result in improved density estimates
+in many cases (cite ***).  We introduce an approach to allowing for discrete
+kernels with orientation by discretizing an underlying continuous kernel
+function.
+%One possibility for introducing orientation
+%to the kernel function is to use a fully parameterized
+%bandwidth matrix, allowing the kernel to be oriented in any direction.  Another
+%common alternative is to fix the orientation to be in the directions of the
+%eigenvectors of the sample covariance matrix.
 
-
-Estimation.  Two main strategies:  cross validation and rule-based.  Targets for
-optimization in cross-validation.  For
-estimating joint densities without
-conditioning, \cite{hart1990bandwidthEstDependentData} have shown that with
-dependent data, but small gains in the mean integrated square error of the density estimate relative to the true conditional density can be achieved by leaving out observations adjacent to the time point whose density is being estimated.
-
+%Estimation.  Two main strategies:  cross validation and rule-based.  Targets
+% for optimization in cross-validation.  For
+%estimating joint densities without
+%conditioning, \cite{hart1990bandwidthEstDependentData} have shown that with
+%dependent data, but small gains in the mean integrated square error of the
+%density estimate relative to the true conditional density can be achieved by
+%leaving out observations adjacent to the time point whose density is being
+%estimated.
 
 A limitation of kernel-based density estimation methods is that they may not
 scale well with the dimension of the vector whose distribution is being
@@ -202,9 +174,20 @@ distribution of moderate to high dimensional random vectors, and work by
 specifying a relatively simple parametric model for the dependence relations
 among those variables.  Specifically, we model the joint distribution of $Y_1,
 \ldots, Y_D$ by $F_{Y_1, \ldots, Y_D}(y_1, \ldots, y_D) = c(F_{Y_1}(y_1),
-\ldots, F_{Y_D}(y_D) ; \btheta_c)$.  Here $c: [0,1]^D \rightarrow [0,1]$ is
-the copula function depending on parameters $\btheta_c$ and mapping the vector
+\ldots, F_{Y_D}(y_D) ; \bxi)$.  Here $c: [0,1]^D \rightarrow [0,1]$ is
+the copula function depending on parameters $\bxi$ and mapping the vector
 of marginal {c.d.f.} values to the joint {c.d.f.} value.
+
+It would be possible to handle
+this task using just the formulation of KCDE we discussed above, but a
+direct application of this approach has some limitations.  First, the
+performance of kernel-based density estimation methods scales poorly with the
+dimension of the random vector whose density is being estimated (cite ***). 
+Second, we have found that different information is available in the data at
+different prediction horizons.  For example, we will demonstrate in our
+applications below that recently observed incidence is important for
+making short-term predictions, but terms capturing seasonality are more
+important for making long-term predictions.
 
 %We make several contributions in this article.  First, we apply KCDE to
 %prediction of infectious disease (specifically, Dengue fever and Influenza), a
@@ -243,63 +226,262 @@ The remainder of this article is organized as follows.  We:
  - applications
 
 \section{Method Description}
-\label{sec:MethodDescription}
+\label{sec:Methods}
 
-Suppose we observe $\bz_t = \{z_{t,1}, \ldots, z_{t,D}\} \in \mathbb{R}^D$ at
-each point in time $t = 1, \ldots, T$.  Our goal is to obtain a predictive
-distribution for one of the observed variables, with index $d_{pred} \in \{1,
-\ldots, D\}$, over a range of prediction horizons contained in the set
-$\mathcal{P}$.  For example, if we have weekly data and we are interested in
-obtaining predictions for a range between 4 and 6 weeks after the most recent
-observation then $\mathcal{P} = \{4, 5, 6\}$.  Let $P$ be the largest element of
-the set $\mathcal{P}$ of prediction horizons.
+In this Section, we give a detailed discussion of our methods.  Throughout, we
+use the term density to refer to the Radon-Nikodym derivative of the
+cumulative distribution function with respect to an appropriately defined measure.
+In the case of random vectors where some
+components are continuous random variables and other are discrete, we take this
+measure to be a product of Lebesgue and counting measures for the corresponding
+random variables.  We use bold letters to indicate column vectors or matrices;
+capital letters are random variables and lower case letters are observations of those
+random variables.
 
-For each time $t \in \btau$, we form the vectors $\by_t$ and $\bx_t$
-representing the prediction target and predictive variables respectively.  
+Suppose we observe a measure $z_t$ of disease incidence at each point in time $t
+= 1, \ldots, T$.  At time $T$, our goal is to obtain a
+predictive distribution $f(z_{T + 1}, \ldots, z_{T + H} | T, z_{1}, \ldots, z_{T})$
+for the trajectory of disease incidence over a range of prediction horizons
+from $1$ to $H$ weeks in the future given the time at which we are making the
+predictions and observed incidence at previous times.
 
-In order to perform prediction, we will use lagged observations.  Let $\bl^{max} = (l^{max}_1, \ldots, l^{max}_D)$ specify the maximum number of lags for each observed variable that may be used for prediction, and let $L = \max{d} l^{max}_d$ be the overall largest lag that may be used across all variables.  In the estimation procedure we describe in Section~\ref{sec:Estimation}, we will select a subset of these lags to actually use in the predictions.  We capture which lags are actually used in the vector 
-\begin{align*}
-&\bu = (u_{1,0}, \ldots, u_{1, l^{max}_1}, \ldots, u_{D,0}, \ldots, u_{D, l^{max}_D}) \text{, where} \\
-&u_{d, l} = \begin{cases} 0 \text{ if lag $l$ of variable $d$ is not used in forming predictions} \\ 1 \text{ if lag $l$ of variable $d$ is used in forming predictions.} \end{cases}
-\end{align*}
+%We estimate this joint predictive density in two stages.  First, we
+%use KCDE to obtain separate predictive distributions for each prediction
+%horizon $h = 1, \ldots, H$: $f(z_{T + h} | z_{1}, \ldots, z_{T}, T)$.  Next, we
+%use a copula to combine these 
 
-By analogy with the standard notation in autoregressive models, we define
-\begin{align*}
-&\by_t = (z_{t, d_{pred}}, \ldots, B^{(P - 1)} z_{t, d_{pred}}) \text{ and} \\
-&\bx_t = (B^{(P)} z_{t, 1}, \ldots, B^{(P + l^{max}_1 - 1)} z_{t, 1}, \ldots, B^{(P)} z_{t, D}, \ldots, B^{(P + l^{max}_D - 1)} z_{t, D})
-\end{align*}
-Here, $B^{(a)}$ is the backshift operator defined by $B^{(a)} z_{t, d} = z_{t - a, d}$.  Note that the lengths of $\by_t$ and $\bx_t$, as well as exactly which lags are used to form them, depend on $\mathcal{P}$ and $\bl^{max}$; we suppress this dependence in the notation for the sake of clarity.  The vector $\by_t$ represents the prediction target when our most recent observation was made at time $t - P$: the vector of observed values at each prediction horizon $p \in \mathcal{P}$.  The variable $\bx_t$ represents the vector of all lagged covariates that are available for use in performing prediction.
-
-To make the notation concrete, suppose that $\bz_t$ contains the observed case count for week $t$ in San Juan, the observed case count for week $t$ in Iquitos, and the date on Monday of week $t$, and our goal is to predict the weekly case count in San Juan.  Then $D = 3$ and $d_{pred} = 1$.  If we want to predict the weekly case counts for the two weeks after the most recently observation, then $p = 2$.  If we specify that the model may include the two most recent observations for the case counts in San Juan and Iquitos, but only the time index at the most recent observation then $\bl^{max} = (1, 1, 0)$.  If our current model uses only the most recently observed case counts for San Juan and Iquitos then $\bu = (1, 0, 1, 0, 0)$, where the 1's are in the positions of the $\bu$ vector representing lag 0 of the counts for San Juan and lag 0 of the counts for Iquitos.  The variable $y_t^{(P)}$ is a vector containing the observed case counts for San Juan in weeks $t + 1$ and $t + 2$; $\bx_t^{(\bl^{max})}$ contains the observed case counts for San Juan and Iquitos in weeks $t$ and $t - 1$ as well as the time index variable in week $t$.
-
-In order to perform prediction, we regard $\{(\by_t, \bx_t), t = 1 + P + L, \ldots, T\}$ as a sample from the joint distribution of $(\bY, \bX)$.  We wish to estimate the conditional distribution of $\bY | \bX$.  In order to do this, we employ kernel density estimation.  Let $K^{\bY}(\by, \by^*, H^{\bY})$ and $K^{\bX}(\bx, \bx^*, H^{\bX})$ be kernel functions centered at $\by^*$ and $\bx^*$ respectively and with bandwidth matrices $H^{\bY}$ and $H^{\bX}$.  We estimate the conditional distribution of $\bY | \bX$ as follows:
+Our model represents this density as follows:
 \begin{align}
-&\widehat{f}_{\bY|\bX}(\by | \bX = \bx) = \frac{\widehat{f}_{\bY, \bX}(\by, \bx)}{\widehat{f}_{\bX}(\bx)} \label{eqn:KDECondDef} \\
-&\qquad = \frac{\sum_{t \in \tau} K^{\bY, \bX}\{(\by, \bx), (\by_t, \bx_t), H^{\bY, \bX}\}}{\sum_{t \in \tau} K^{\bX}(\bx, \bx_t, H^{\bX}) } \label{eqn:KDESubKDEJtMarginal} \\
-&\qquad = \frac{\sum_{t \in \tau} K^{\bY | \bX}(\by, \by_t | \bx, \bx_t, H^{\bY, \bX}) K^{\bX}(\bx, \bx_t, H^{\bX})}{\sum_{t \in \tau} K^{\bX}(\bx, \bx_t, H^{\bX}) } \label{eqn:KDESubKDEJtMarginal} \\
-&\qquad = \sum_{t \in \tau} w_t K^{\bY | \bX}(\by, \by_t | \bx, \bx_t, H^{\bY, \bX}) \text{, where} \label{eqn:KDEwt} \\
-&w_t = \frac{ K^{\bX}(\bx, \bx_t, H^{\bX}) }{\sum_{t^* \in \tau} K^{\bX}(\bx, \bx_{t^*}, H^{\bX}) } \label{eqn:KDEWeightsDef}
+&f(z_{T + 1}, \ldots, z_{T + H} | T, z_{1}, \ldots, z_{T}) = f(z_{T + 1}, \ldots, z_{T + H} | T, z_{T - l} \text{, } l \in L) \label{eqn:ModelReducedLags} \\
+&\qquad c^H\{f^{1}(z_{T + 1} | T+1, z_{T - l} \text{, } l \in L; \btheta^1), \ldots, f^{H}(z_{T + H} | T+H, z_{T - l} \text{, } l \in L; \btheta^H) ; \xi^H\}. \label{eqn:ModelKCDECopula}
+\end{align}
+Equation~\eqref{eqn:ModelReducedLags} formalizes an assumption that all of the
+information about future incidence contained in the observed history of the
+disease is captured by the incidence at a few recent time points, with lags in
+the set $L$.  For now, we leave the set of lags included in $L$ unspecified; in
+our applications to real disease data below, we will consider several candidate
+sets of lags.  In Equation~\eqref{eqn:ModelKCDECopula}, each
+$f^{h}(z_{T + h} | T + h, z_{T - l} \text{, } l \in L; \btheta^h)$
+is a predictive density for one prediction horizon obtained through KCDE.  As
+the notation suggests, we use a separate parameter vector $\btheta^h$ for each
+prediction horizon, but the same set of lags $L$ at all horizons.  This may not
+be the optimal setup, but exploration of other alternatives is beyond the scope
+of this article.  The function $c^H(\cdot)$ is a copula used to tie these
+marginal predictive densities together into a joint predictive density.
+
+This model entails several sets of parameters: one set $\btheta^h$ for the KCDE fit at each
+prediction horizon $h = 1, \ldots, H$, and another set $\bxi^H$ for the copula
+used to obtain joint distributions for trajectories of length $H$.
+Following Joe (cite ***), we pursue a two-stage estimation procedure for these
+parameters.  In the first stage, we estimate the parameters for KCDE separately
+for each horizon $h$.  Then in the second stage, we estimate the copula
+parameters while holding the KCDE parameters fixed.  In the following
+subsections, we describe our formulations of KCDE and the copula in more
+detail and discuss parameter estimation for each of these stages in turn.
+
+\subsection{KCDE for Predictive Densities at Individual Prediction Horizons}
+\label{subsec:Methods:KCDE}
+
+We now discuss the methods we use to obtain the predictive density
+$f^{h}(z_{T + h} | T + h, z_{T - l} \text{, } l \in L; \btheta^h)$
+for disease incidence at a particular horizon $h$.  In order to simplify the
+notation we define two new variables.  $Y_t^{h} = Z_{t + h}$ represents
+the prediction target relative to time $t$.  $\bX_t^{h} = (T + h, Z_{t -
+l_1}, \ldots, Z_{t - l_M})$, where $l_1, \ldots, l_M$ are the elements of the
+set $L$ of lags used for prediction, represents the vector of predictive
+variables relative to time $t$.  We can use the observed quantities $z_t$ to
+form the pair $(\bx_t^{h}, y_t^{h})$ for all $t = 1 + \max_m l_m, \ldots, T - h$;
+for smaller values of $t$ there are not enough observations before $t$ to form
+$\bx_t^{h}$ and for larger values of t there are not enough observations after $t$ to form
+$y_t^{h}$.  With this notation, the distribution we wish to estimate is
+$f^{h}(y_T^{h} | \bx_T^{h}; \btheta^h)$.
+
+In order to do this, we regard $\{(\by_t, \bx_t), t = 1 + \max_m l_m, \ldots, T
+- h\}$ as a (dependent) sample from the joint distribution of $(\bX, Y)$, and estimate
+the conditional distribution of $Y | \bX$ via KCDE.  The KCDE estimate is given
+by
+\begin{equation}
+\widehat{f}_{\bY|\bX}(\by | \bx) = \frac{\sum_{t \in \btau} K^{\bX, \bY}\left\{(\bx', \by')', (\bx'_t, \by'_t)'; \bH^{\bX,\bY}\right\}}{\sum_{t \in \btau}K^{\bX}(\bx, \bx_t ; \bH^{\bX})}. \label{eqn:KCDEDefinition}
+\end{equation}
+Here, $'$ is the transpose operator and $\btau \subseteq \{1, \ldots, T\}$
+indexes the subset of observations used in obtaining the conditional density
+estimate.  In the final density estimate, $\btau$ typically includes all
+available time points, but proper subsets are used in the cross-validation
+procedures we discuss later for parameter estimation.
+
+
+%In order to do this, we employ kernel density estimation.  Let $K^{\bY}(\by, \by^*,
+%H^{\bY})$ and $K^{\bX}(\bx, \bx^*, H^{\bX})$ be kernel functions centered at
+%$\by^*$ and $\bx^*$ respectively and with bandwidth matrices $H^{\bY}$ and
+%$H^{\bX}$.  We estimate the conditional distribution of $\bY | \bX$ as follows:
+%\begin{align}
+%&\widehat{f}_{\bY|\bX}(\by | \bX = \bx) = \frac{\widehat{f}_{\bY, \bX}(\by, \bx)}{\widehat{f}_{\bX}(\bx)} \label{eqn:KDECondDef} \\
+%&\qquad = \frac{\sum_{t \in \tau} K^{\bY, \bX}\{(\by, \bx), (\by_t, \bx_t), H^{\bY, \bX}\}}{\sum_{t \in \tau} K^{\bX}(\bx, \bx_t, H^{\bX}) } \label{eqn:KDESubKDEJtMarginal} \\
+%&\qquad = \frac{\sum_{t \in \tau} K^{\bY | \bX}(\by, \by_t | \bx, \bx_t, H^{\bY, \bX}) K^{\bX}(\bx, \bx_t, H^{\bX})}{\sum_{t \in \tau} K^{\bX}(\bx, \bx_t, H^{\bX}) } \label{eqn:KDESubKDEJtMarginal} \\
+%&\qquad = \sum_{t \in \tau} w_t K^{\bY | \bX}(\by, \by_t | \bx, \bx_t, H^{\bY, \bX}) \text{, where} \label{eqn:KDEwt} \\
+%&w_t = \frac{ K^{\bX}(\bx, \bx_t, H^{\bX}) }{\sum_{t^* \in \tau} K^{\bX}(\bx, \bx_{t^*}, H^{\bX}) } \label{eqn:KDEWeightsDef}
+%\end{align}
+
+%In Equation~\eqref{eqn:KDECondDef}, we are making use of the fact that the
+% conditional density for $\bY | \bX$ can be written as the quotient of the joint density for $(\bY, \bX)$ and the marginal density for $\bX$.  In Equation~\eqref{eqn:KDESubKDEJtMarginal}, we obtain separate kernel density estimates for the joint and marginal densities in this quotient.  In Equation~\eqref{eqn:KDEwt}, we rewrite this quotient by passing the denominator of Equation~\eqref{eqn:KDESubKDEJtMarginal} into the summation in the numerator.  We can interpret the result as a weighted kernel density estimate, where each observation $t \in \tau$ contributes a different amount to the final conditional density estimate.  The amount of the contribution from observation $t$ is given by the weight $w_t$, which effectively measures how similar $\bx_t$ is to the point $\bx$ at which we are estimating the conditional density.  If $\bx_t^{(\bl^{max})}$ is similar to $\bx_{t^*}^{(\bl^{max})}$, a large weight is assigned to $t$; if $\bx_t^{(\bl^{max})}$ is different from $\bx_{t^*}^{(\bl^{max})}$, a small weight is assigned to $t$.
+
+%In kernel density estimation, it is generally required that the kernel
+% functions integrate to $1$ in order to obtain valid density estimates.  However, after conditioning on $\bX$, it is no longer necessary that $K^{\bX}(\bx, \bx_t, H^{\bX})$ integrate to $1$.  In fact, as can be seen from Equation~\eqref{eqn:KDEWeightsDef}, any multiplicative constants of proportionality will cancel out when we form the observation weights.  We can therefore regard $K^{\bX}(\bx, \bx_t, H^{\bX})$ as a more general weighting function that measures the similarity between $\bx$ and $\bx_t$.  As we will see, eliminating the constraint that $K^{\bX}$ integrates to $1$ is a useful expansion the space of functions that can be used in calculating the observation weights.  However, we still require that $K^{\bY}$ integrates to $1$.
+
+%In Equations \eqref{eqn:KDECondDef} through \eqref{eqn:KDEWeightsDef}, $\tau$
+% is an index set of time points used in obtaining the density estimate.  In most settings, we can take $\tau = \{1 + P + L, \ldots, T\}$.  These are the time points for which we can form the lagged observation vector $\bx_t$ and the prediction target vector $\by_t$.  However, we will place additional restrictions on the time points included in $\tau$ in the cross-validation procedure discussed in Section \ref{sec:Estimation}.
+
+%In Equation~\eqref{eqn:KCDEDefinition}, if both $K^{\bX, \bY}$ and $K^{\bX}$
+%integrate to 1 with respect to $\bx$ and $y$ then the numerator is a kernel
+%density estimate of the joint density of $\bX$ and $\bY$ and the denominator
+%is a kernel density estimate of the marginal density of $\bX$; forming the quotient yields an
+%estimate of the conditional density of $\bY | \bX$.  However, it is not strictly
+%required that 
+
+We will work with a slightly restricted specification of
+Equation~\eqref{eqn:KCDEDefinition} in which the kernel function $K^{\bX,\bY}$
+can be written as the product of $K^{\bX}$ and a
+``conditional kernel'' $K^{\bY|\bX}$:
+\begin{equation}
+K^{\bX,\bY}\left\{(\bx', \by')', (\bx'_t, \by'_t)'; \bH^{\bX,\bY}\right\} = K^{\bX}\left\{\bx, \bx_t; \bH^{\bX}\right\} K^{\bY | \bX}\left\{\by, \by_t | \bx, \bx_t; \bH^{\bX,\bY}\right\}.
+\end{equation}
+
+Make clear that $H^X$ is a sub-matrix of $H^{Y,X}$.  Hall, Racine, and
+Li \cite{hall2004crossvalidationKCDE}
+say that this "does not adversely affect
+the rate of convergence of estimators..."
+
+With this restriction, we can rearrange Equation~\eqref{eqn:KCDEDefinition} to
+obtain
+\begin{align}
+\widehat{f}_{\bY|\bX}(\by | \bx) &= \sum_{t \in \btau} w_t K^{\bY | \bX}\left\{\by, \by_t | \bx, \bx_t; \bH^{\bX,\bY}\right\}, \text{ where} \label{eqn:KCDEDefinitionWeighted} \\
+w_t &= \frac{K^{\bX}\left\{\bx, \bx_t; \bH^{\bX}\right\}}{\sum_{t^* \in \btau} K^{\bX}\left\{\bx, \bx_{t^*}; \bH^{\bX}\right\}}.
 \end{align}
 
-In Equation~\eqref{eqn:KDECondDef}, we are making use of the fact that the conditional density for $\bY | \bX$ can be written as the quotient of the joint density for $(\bY, \bX)$ and the marginal density for $\bX$.  In Equation~\eqref{eqn:KDESubKDEJtMarginal}, we obtain separate kernel density estimates for the joint and marginal densities in this quotient.  In Equation~\eqref{eqn:KDEwt}, we rewrite this quotient by passing the denominator of Equation~\eqref{eqn:KDESubKDEJtMarginal} into the summation in the numerator.  We can interpret the result as a weighted kernel density estimate, where each observation $t \in \tau$ contributes a different amount to the final conditional density estimate.  The amount of the contribution from observation $t$ is given by the weight $w_t$, which effectively measures how similar $\bx_t$ is to the point $\bx$ at which we are estimating the conditional density.  If $\bx_t^{(\bl^{max})}$ is similar to $\bx_{t^*}^{(\bl^{max})}$, a large weight is assigned to $t$; if $\bx_t^{(\bl^{max})}$ is different from $\bx_{t^*}^{(\bl^{max})}$, a small weight is assigned to $t$.
+We can now interpret $K^{\bX}$ as a weighting function determining how much each
+observation $(\bx_t, \by_t)$ contributes to our final density estimate according to how similar
+$\bx_t$ is to the value $\bx$ that we are conditioning on.
+$K^{\bY | \bX}$ is a density function that contributes
+mass to the final density estimate near the observed value $\by_t$; we require
+that for any values of $\by_t$, $\bx_t$, and $\bx$, the integral of $K^{\bY |
+\bX}$ with respect to $\by$ must equal $1$.  Since the weights $w_t$ sum to $1$,
+this condition ensures that the combined density estimate integrates to 1.  The
+bandwidth matrices $\bH^{\bX}$ and $\bH^{\bX, \bY}$ are parameterized by
+$\btheta^h$ and control the locality and orientation of the weighting function
+and the contributions to the density estimate from each observation.  In
+practice, we have used the Cholesky decomposition of 
 
-In kernel density estimation, it is generally required that the kernel functions integrate to $1$ in order to obtain valid density estimates.  However, after conditioning on $\bX$, it is no longer necessary that $K^{\bX}(\bx, \bx_t, H^{\bX})$ integrate to $1$.  In fact, as can be seen from Equation~\eqref{eqn:KDEWeightsDef}, any multiplicative constants of proportionality will cancel out when we form the observation weights.  We can therefore regard $K^{\bX}(\bx, \bx_t, H^{\bX})$ as a more general weighting function that measures the similarity between $\bx$ and $\bx_t$.  As we will see, eliminating the constraint that $K^{\bX}$ integrates to $1$ is a useful expansion the space of functions that can be used in calculating the observation weights.  However, we still require that $K^{\bY}$ integrates to $1$.
+In order to complete the formulation of the estimator given in
+Equation~\eqref{eqn:KCDEDefinition}, we must specify the kernel functions.
 
-In Equations \eqref{eqn:KDECondDef} through \eqref{eqn:KDEWeightsDef}, $\tau$ is an index set of time points used in obtaining the density estimate.  In most settings, we can take $\tau = \{1 + P + L, \ldots, T\}$.  These are the time points for which we can form the lagged observation vector $\bx_t$ and the prediction target vector $\by_t$.  However, we will place additional restrictions on the time points included in $\tau$ in the cross-validation procedure discussed in Section \ref{sec:Estimation}.
+We obtain the discretized kernel function by integrating an underlying
+continuous kernel function over the dimensions corresponding to discrete
+random variables.  To make this concrete, consider a $J$-dimensional random
+vector $\bZ = (\bZ^{d'}, \bZ^{c'})'$ that is partitioned into a
+$J^d$-dimensional subvector $\bZ^d$ of discrete random variables and a
+$J^c$-dimensional subvector $\bZ^c$ of continuous random variables.  Without
+loss of generality, we assume that the discrete variables are the first $J^d$
+variables.  For each component random variable $Z_j$, $j = 1, \ldots, J$, we
+denote the set of values that $Z_j$ may take by $\mathcal{D}^j \subseteq
+\mathbb{R}$.  In the continuous cases, we take $\mathcal{D}^j = \mathbb{R}$.  In
+the discrete cases, $\mathcal{D}^j$ is a discrete set such as the positive
+integers.  Our definitions could be modified to handle a component random
+variable whose distribution comprised a combination of discrete and continuous
+parts; however, this is not required for our applications so we have not pursued
+that line here.
 
-If we wish to obtain point predictions, we can use a summary of the predictive density.  For example, if we take the expected value, we obtain kernel regression:
-\begin{align}
-&(\widehat{\bY} | \bX = \bx) = \mathbb{E}_{\widehat{f}_{\bY|\bX}}\{\bY | \bX = \bx\} \label{eqn:PtPredDef} \\
-&\qquad = \int \sum_{t \in \tau} w_t K^{\bY}(\by, \by_t, H^{\bY}) \by \, d \by  \label{eqn:PtPredKDE} \\
-&\qquad = \sum_{t \in \tau} w_t \by_t  \label{eqn:PtPredFinal}
-\end{align}
-The equality in Equation~\eqref{eqn:PtPredFinal} holds if the kernel function $K^{\bY}(\by, \by_t, H^{\bY})$ is symmetric about $\by_t$, or more generally if it is the pdf of a random variable with expected value $\by_t$.
+Let $L(\bz, \bz^{*} ; \bH)$ be a continuous multivariate kernel function defined
+on $\prod_{j = 1}^{J} \mathcal{E}^j$.  For each discrete variable indexed by $j
+= 1, \ldots, J^d$, we associate lower and upper bounds of integration $a_{z_j}$
+and $b_{z_j}$ with each value $z_j \in \mathcal{D}^j$.  In order to ensure that
+our final density estimate integrates to $1$, we require that these integration
+bounds form a disjoint cover of $\mathcal{E}^j$ in the sense that $\cup_{z_j \in
+\mathcal{D}^j} [a_{z_j}, b_{z_j}) = \mathcal{E}^j$ and $\cap_{z_j \in
+\mathcal{D}^j} [a_{z_j}, b_{z_j}) = \emptyset$, the empty set.  At a vector of
+values $\bz \in \prod_{j = 1}^J \mathcal{D}^j$, we define the partially
+discretized kernel as follows:
+\begin{equation*}
+K(\bz, \bz^{*} ; \bH) = \int_{a_{z_1}}^{b_{z_1}} \cdots
+\int_{a_{z_{J^d}}}^{b_{z_{J^d}}} L(\bz, \bz^{*} ; \bH) \, d z_{1} \cdots d
+z_{J^d}
+\end{equation*}
 
+This approach can be used to discretize any underlying continuous kernel
+function.  In the applications in Section~\ref{sec:Applications} below, we have
+used a multivariate log-normal kernel function.  This is similar to the
+suggestion of *** of using log-transformed data, but allows us to work with the
+data on the original scale.  Advantages of this kernel specification include
+automatic handling of the restriction that counts are non-negative, and approximately
+capturing the long tail in disease incidence that we will illustrate in the
+applications Section below.
 
-Another alternative that we pursue is the use of smoothed observations in forming the lagged observation vectors.  We use smoothed case counts on a log scale for the weighting kernels, and the unsmoothed case counts on the original scale for the prediction kernels.
+Seasonality is an important characteristic of many infectious disease time
+series, as we will illustrate in the applications below. Here we describe one
+approach to capturing this seasonality within the KCDE framework by using a
+kernel function that is periodic in the observation time $t$.  This periodic
+kernel function was originally developed in the literature on Gaussian Processes
+for the purposes of specifying a periodic covariance
+function\cite{mackay1998introductionGP}, and is defined by
+\begin{equation}
+K(t, t^*; \rho, h) = \exp\left[- \frac{\sin^2\{\rho (t - t^*)\}}{2h^2} \right]. \label{eqn:PeriodicKernel}
+\end{equation}
+This functional form can also be obtained by mapping $t$ to the bivariate pair
+$\{cos(\rho t), sin(\rho t)\}$ and then applying a bivariate Gaussian kernel to
+that pair.  We picture this periodic kernel function in Figure
+\ref{fig:PeriodicKernelPlot}.
 
-\section{Parameter Estimation}
-\label{sec:Estimation}
+This kernel function does not integrate to $1$, but this does not preclude us
+from using it for the conditioning variables $\bX_t$ that are used to calculate
+the observation weights $w_t$ in Equation~\eqref{eqn:KCDEDefinitionWeighted}. 
+The result is that observations are weighted according to the similarity of the
+time of year that an observation was collected with the time of year of the
+analysis time from which we are predicting forward.  Effectively, this allows
+the approach to set the weights $w_t$ to be small when the observation time does
+not match the observation time from which we are predicting.  The strength of
+this weighting is determined by the bandwidth parameter $h$.
+
+%\begin{figure}[height=2in]
+\begin{figure}
+\caption{The periodic kernel function illustrated as a function of time in
+weeks with $\rho = \pi / 52$ and three possible values for the bandwidth
+parameter $h$.}
+\label{fig:PeriodicKernelPlot}
+<<PeriodicKernelPlot, echo = FALSE, fig.height = 2>>=
+plot_df <- data.frame(t=seq_len(5 * 52))
+
+kernel_center <- plot_df$t[nrow(plot_df)]
+rho <- pi / 52
+
+h <- 0.1
+plot_df$kernel_h0.1 <- exp( -0.5 * (sin(rho * (kernel_center - plot_df$t)) / h)^2)
+
+h <- 1
+plot_df$kernel_h1 <- exp( -0.5 * (sin(rho * (kernel_center - plot_df$t)) / h)^2)
+
+h <- 10
+plot_df$kernel_h10 <- exp( -0.5 * (sin(rho * (kernel_center - plot_df$t)) / h)^2)
+
+plot_df <- melt(plot_df, id.vars = "t")
+plot_df$variable <- as.character(plot_df$variable)
+plot_df$bandwidth <- "0.1"
+plot_df$bandwidth[plot_df$variable == "kernel_h1"] <- "1"
+plot_df$bandwidth[plot_df$variable == "kernel_h10"] <- "10"
+
+ggplot(plot_df) +
+    geom_line(aes(x = t, y = value, linetype = bandwidth, colour = bandwidth)) +
+    geom_vline(xintercept = kernel_center) +
+    scale_colour_manual("Bandwidth",
+        breaks = c("0.1", "1", "10"),
+        labels = c("0.1", "1", "10"),
+        values = c("#E69F00", "#56B4E9", "#009E73")
+    ) +
+    scale_linetype("Bandwidth") +
+    ylab("Kernel Function Value") +
+    xlab("Time in Weeks") +
+#    ggtitle("The Periodic Kernel") +
+    theme_bw(base_size = 11)
+@
+\end{figure}
 
 We use cross-validation to select the variables that are used in the model and estimate the corresponding bandwidth parameters by (approximately) minimizing a cross-validation measure of the quality of the predictions obtained from the model.  Formally,
 \begin{align}
@@ -307,13 +489,43 @@ We use cross-validation to select the variables that are used in the model and e
 \end{align}
 Here, $Q$ is a loss function that measures the quality of the estimated density $\widehat{f}$ given an observation $\by_{t^*}$.  We have made the dependence of this estimated density on the the parameters $\bu$, $H^{\bx}$, and $H^{\bY}$, as well as on the data $\{ (\by_t, \bx_t): t \in \tau_{t^*} \}$, explicit in the notation.  In order to reduce the potential for our parameter estimates to be affected by local correlation in the time series, we eliminate all time points that fall within one year of $t^*$ from the index set $\tau_{t^*}$ used to form the conditional density estimate $\widehat{f}(\by | \bX = \bx_{t^*} ; \bu, H^{\bX}, H^{\bY}, \{ (\by_t, \bx_t): t \in \tau_{t^*} \})$.
 
+Hart and Vieu\cite{hart1990bandwidthEstDependentData} show that when kernel density estimation is used to estimate
+a marginal density with dependent observations, leaving out multiple time points
+around the target time point in cross validation can yield small improvements in
+the ISE under certain assumptions about the form of the dependence.
+
 \lboxit{Talk about proper scoring rules and our particular choice of $Q$.}
 
-We use a forward/backward stagewise procedure to obtain the set of combinations of variables and lags that are included in the final model (represented by $\bu$).  For each candidate model, we use the limited memory box constrained optimization procedure of \cite{byrd1995limitedmemoryoptim} to estimate the bandwidth parameters.  The approximation in Equation~\eqref{eqn:ParamEst} is due to the fact that this optimization procedure may not find a global minimum.
 
+\subsection{Combining Marginal Predictive Distributions with Copulas}
+\label{subsec:Methods:Copulas}
 
-\section{Simulation Studies}
-\label{sec:SimStudies}
+The approach we take for some of the prediction targets we examine in our
+applications is to obtain a joint predictive distribution for disease incidence
+over a sequence of multiple prediction horizons.  We do this by
+using a copula to combine marginal predictive densities for each of those
+prediction horizons.  Specifically, we us the isotropic Gaussian copula
+implemented in the {\tt R}\cite{RCoreLanguage} package {\tt copula}
+\cite{HofertRCopulaPackage}.
+
+This copula function is given by
+\begin{equation}
+c(u_1, \ldots, u_J ; \btheta_c) = \Phi_{\Sigma}(\Phi^{-1}(u_1), \ldots, \Phi^{-1}(u_J)),
+\end{equation}
+where $\Phi^{-1}$ is the inverse {c.d.f.} of a standard univariate Gaussian
+distribution and $\Phi_{\Sigma}$ is the {c.d.f.} of a multivariate Gaussian
+distribution with mean $\b0$ and covariance matrix $\Sigma$.  We set $\Sigma =
+[\sigma_{i,j}^2]$, where 
+\begin{equation}
+\sigma_{i,j}^2 = \begin{cases} 1 \text{ if $i = j$,} \\ \rho_d \text{ if $\vert i - j \vert = d$} \end{cases}
+\end{equation}
+Intuitively, $\rho_d$ captures the correlation of incidence at future times that
+are $d$ weeks apart.
+
+Estimation by maximum likelihood.
+
+\section{Simulation Study}
+\label{sec:SimStudy}
 
 In this Section, we conduct two sets of simulation studies designed to answer
 two separate questions:
@@ -426,8 +638,8 @@ pd
 
 @
 
-\section{Examples}
-\label{sec:Examples}
+\section{Applications}
+\label{sec:Applications}
 
 In this Section, we illustrate the methods through applications to prediction in
 examples with several real time series data sets.
@@ -492,47 +704,45 @@ using values in the high season and middle of the season than of prediction of v
 This could potentially affect our inference.  However, we do not expect this effect to be large,
 so we proceed with this option for the purposes of this example.
 
-We also plot histograms of the observed total cases on the original scale and on the log scale.
+%We also plot histograms of the observed total cases on the original scale and on the log scale.
+%
+%<<FluDataHistogramPlotTotalCases, echo = FALSE>>=
+%hist_df <- rbind(
+%	data.frame(value = ili_national$weighted_ili,
+%    	variable = "Weighted ILI"),
+%    data.frame(value = log(ili_national$weighted_ili),
+%    	variable = "log(Weighted ILI)")
+%)
+%
+%ggplot(aes(x = value), data = hist_df) +
+%    geom_histogram() +
+%    facet_wrap( ~ variable, ncol = 2) +
+%    xlab("Weighted ILI") +
+%    theme_bw()
+%@
+%
+%These plots demonstrate that total cases follows an approximately log-normal
+%distribution.  In the application below, we will consider modeling these data on
+%both the original scale and the log scale.  Intuitively, since we are using a
+%kernel that is obtained from a Gaussian, modeling the data on the log scale
+%should yield better performance.  On the other hand, the performance gain may be
+%negligible if we have enough data.
 
-<<FluDataHistogramPlotTotalCases, echo = FALSE>>=
-hist_df <- rbind(
-	data.frame(value = ili_national$weighted_ili,
-    	variable = "Weighted ILI"),
-    data.frame(value = log(ili_national$weighted_ili),
-    	variable = "log(Weighted ILI)")
-)
+%Finally, we plot the autocorrelation function:
+%
+%<<FluDataACFPlotTotalCases, echo = FALSE>>=
+%last_na_ind <- max(which(is.na(ili_national$weighted_ili)))
+%non_na_inds <- seq(from = last_na_ind + 1, to=nrow(ili_national))
+%acf(ili_national$weighted_ili[non_na_inds],
+%  lag.max = 52 * 4)
+%@
+%
+%This plot illustrates the annual periodicity that was also visible in the
+%initial data plot above.  There is no apparent evidence of longer term annual
+%cycles.  We therefore include a periodic kernel acting on the time index with a
+%period of 52.2 weeks (the length of the period is motivated by the fact that
+%in our data, there is a year with 53 weeks once every 5 or 6 years).
 
-ggplot(aes(x = value), data = hist_df) +
-    geom_histogram() +
-    facet_wrap( ~ variable, ncol = 2) +
-    xlab("Weighted ILI") +
-    theme_bw()
-@
-
-These plots demonstrate that total cases follows an approximately log-normal
-distribution.  In the application below, we will consider modeling these data on
-both the original scale and the log scale.  Intuitively, since we are using a
-kernel that is obtained from a Gaussian, modeling the data on the log scale
-should yield better performance.  On the other hand, the performance gain may be
-negligible if we have enough data.
-
-Finally, we plot the autocorrelation function:
-
-<<FluDataACFPlotTotalCases, echo = FALSE>>=
-last_na_ind <- max(which(is.na(ili_national$weighted_ili)))
-non_na_inds <- seq(from = last_na_ind + 1, to=nrow(ili_national))
-acf(ili_national$weighted_ili[non_na_inds],
-  lag.max = 52 * 4)
-@
-
-This plot illustrates the annual periodicity that was also visible in the
-initial data plot above.  There is no apparent evidence of longer term annual
-cycles.  We therefore include a periodic kernel acting on the time index with a
-period of 52.2 weeks (the length of the period is motivated by the fact that
-in our data, there is a year with 53 weeks once every 5 or 6 years).
-
-We now do some set up for estimation and prediction with kcde.  First, we 
-create a list with parameters that specify the kernel function components.
 
 %<<FluDataKernelComponentsSetup, echo = TRUE>>=
 %## Definitions of kernel components.  A couple of notes:
@@ -1716,18 +1926,36 @@ ggplot(combined_acfs) +
 \section{Future Work}
 
 
+Hall, Racine, and Li\cite{hall2004crossvalidationKCDE} show that when
+cross-validation is used to select the bandwidth parameters in KCDE using product kernels, the
+estimated bandwidths corresponding to irrelevant conditioning variables tend to
+infinity asymptotically as the sample size increases.  They discuss the fact
+that similar results could be obtained for linear combinations of
+continuous variables if a full bandwidth matrix were used.  Our approach for
+obtaining kernels that can be used with mixed discrete and continuous variables
+opens up an opportunity to extend this analysis to that case; we have not
+pursued this mathematical analysis here.
+
+The above results regarding the inclusion of irrelevant conditioning variables
+hold asymptotically as the sample size increases.  However, in practice, data
+set sizes are often limited.  In other modeling settings where some conditioning
+variables may not be informative, shrinkage methods are often helpful.  These
+methods could be incorporated into a kernel-based approach by imposing a penalty
+on the elements of the bandwidth matrix; in particular, we suggest that a
+penalty on the inverse of the bandwidth matrix encouraging it to have small
+eigenvalues could be helpful.  Another alternative would be to pursue the
+Bayesian framework, using Dirichlet process mixtures with an informative prior
+on the mixture component covariance matrices.
+
+We could also make some tweaks to our implementation of KCDE.  Locally linear --
+help address edge effects.
+
 Ensembles -- either ensembles of KCDE and/or include as a component in an
-ensemble
+ensemble.  Also Bayesian model averaging.  Return to discussion of bias/variance
+trade-off?
 
-Bayesianize?
-
-\section{References}
-\label{sec:References}
-
-\begingroup
-\renewcommand{\section}[2]{}
-\bibliographystyle{plainnat}
+%\bibliographystyle{plainnat}
 \bibliography{kde-bib}
-\endgroup
+
 
 \end{document}
