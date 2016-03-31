@@ -36,7 +36,18 @@ prediction}
 \maketitle
 
 <<knitrGlobalSetup, echo = FALSE>>=
+library(cdcfluview)
+
 library(reshape2)
+library(plyr)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+
+library(ggplot2)
+library(grid)
+
+library(kcde)
 
 opts_chunk$set(cache = TRUE, autodep = TRUE)
 #opts_chunk$set(cache = FALSE)
@@ -107,8 +118,8 @@ KCDE is distinguished from these alternative approaches in that it makes
 minimal assumptions about the data generating process.  This can be
 either an advantage and a disadvantage of KCDE.
 In general, flexible non-parametric methods such as KCDE exhibit low
-bias but high variance.  If they are correctly specified, parametric
-approaches may achieve reduced variance without introducing bias.  
+bias but high variance.  If they are correctly specified, models with more
+structure may achieve reduced variance without introducing bias.
 On the other hand, because non-parametric approaches such as KCDE make fewer
 assumptions they may outperform incorrectly specified parametric models.  An
 evaluation of the benefits of an approach such as KCDE is therefore dependent on
@@ -130,10 +141,9 @@ function that is a product of univariate kernel functions \cite{aitchison1976mul
 wang1981SmoothEstDiscreteDistn,
 li2003nonparametricEstDistnsCategoricalContinuous,
 ouyang2006crossvalidationEstDistnCategorical}.
-A variety of functional forms have been proposed for this purpose, ranging from
-blah to blah to blah \cite{aitchison1976multivariateBinaryKernel,
-wang1981SmoothEstDiscreteDistn, li2008nonparametricConditionalCDFQuantile,
-li2003nonparametricEstDistnsCategoricalContinuous,
+A variety of functional forms have been proposed for this purpose, including
+geometric, triangular and Poisson among others
+\cite{aitchison1976multivariateBinaryKernel, wang1981SmoothEstDiscreteDistn, li2008nonparametricConditionalCDFQuantile, li2003nonparametricEstDistnsCategoricalContinuous,
 ouyang2006crossvalidationEstDistnCategorical}.
 
 %\cite{wang1981SmoothEstDiscreteDistn},
@@ -173,8 +183,8 @@ course of many weeks.  Copulas present one strategy for estimating the joint
 distribution of moderate to high dimensional random vectors, and work by
 specifying a relatively simple parametric model for the dependence relations
 among those variables.  Specifically, we model the joint distribution of $Y_1,
-\ldots, Y_D$ by $F_{Y_1, \ldots, Y_D}(y_1, \ldots, y_D) = c(F_{Y_1}(y_1),
-\ldots, F_{Y_D}(y_D) ; \bxi)$.  Here $c: [0,1]^D \rightarrow [0,1]$ is
+\ldots, Y_D$ by $F_{Y_1, \ldots, Y_D}(y_1, \ldots, y_D) = C(F_{Y_1}(y_1),
+\ldots, F_{Y_D}(y_D) ; \bxi)$.  Here $C: [0,1]^D \rightarrow [0,1]$ is
 the copula function depending on parameters $\bxi$ and mapping the vector
 of marginal {c.d.f.} values to the joint {c.d.f.} value.
 
@@ -228,22 +238,30 @@ The remainder of this article is organized as follows.  We:
 \section{Method Description}
 \label{sec:Methods}
 
-In this Section, we give a detailed discussion of our methods.  Throughout, we
-use the term density to refer to the Radon-Nikodym derivative of the
-cumulative distribution function with respect to an appropriately defined measure.
-In the case of random vectors where some
-components are continuous random variables and other are discrete, we take this
-measure to be a product of Lebesgue and counting measures for the corresponding
-random variables.  We use bold letters to indicate column vectors or matrices;
-capital letters are random variables and lower case letters are observations of those
-random variables.
-
-Suppose we observe a measure $z_t$ of disease incidence at each point in time $t
-= 1, \ldots, T$.  At time $T$, our goal is to obtain a
-predictive distribution $f(z_{T + 1}, \ldots, z_{T + H} | T, z_{1}, \ldots, z_{T})$
+In this Section, we give a detailed discussion of our methods. Suppose we
+observe a measure $z_t$ of disease incidence at each point in time $t = 1, \ldots, T$.
+At time $t^*$, our model gives a
+predictive distribution $f(z_{t^* + 1}, \ldots, z_{t^* + H} | t^*, z_{t^* - l_1}, \ldots, z_{t^* - l_M})$
 for the trajectory of disease incidence over a range of prediction horizons
-from $1$ to $H$ weeks in the future given the time at which we are making the
-predictions and observed incidence at previous times.
+from $1$ to $H$ weeks in the future.  The time $t^*$ will typically be
+equal to $T$ when we are applying the method to perform prediction, but takes
+other values in the estimation procedure we describe below.  The predictive
+distribution is conditional on the time at which we are making the predictions
+and observed incidence at a few recent time points with lags given by the
+non-negative integers $l_1, \ldots, l_M$.  It would also be possible to
+condition on other covariates such as weather, but we have not pursued that line in this work.
+
+
+%Throughout, we
+%use the term density to refer to the Radon-Nikodym derivative of the
+%cumulative distribution function with respect to an appropriately defined measure.
+%In the case of random vectors where some
+%components are continuous random variables and other are discrete, we take this
+%measure to be a product of Lebesgue and counting measures for the corresponding
+%random variables.  We use bold letters to indicate column vectors or matrices;
+%capital letters are random variables and lower case letters are observations of those
+%random variables.
+
 
 %We estimate this joint predictive density in two stages.  First, we
 %use KCDE to obtain separate predictive distributions for each prediction
@@ -251,64 +269,109 @@ predictions and observed incidence at previous times.
 %use a copula to combine these 
 
 Our model represents this density as follows:
-\begin{align}
-&f(z_{T + 1}, \ldots, z_{T + H} | T, z_{1}, \ldots, z_{T}) = f(z_{T + 1}, \ldots, z_{T + H} | T, z_{T - l} \text{, } l \in L) \label{eqn:ModelReducedLags} \\
-&\qquad c^H\{f^{1}(z_{T + 1} | T+1, z_{T - l} \text{, } l \in L; \btheta^1), \ldots, f^{H}(z_{T + H} | T+H, z_{T - l} \text{, } l \in L; \btheta^H) ; \xi^H\}. \label{eqn:ModelKCDECopula}
-\end{align}
-Equation~\eqref{eqn:ModelReducedLags} formalizes an assumption that all of the
-information about future incidence contained in the observed history of the
-disease is captured by the incidence at a few recent time points, with lags in
-the set $L$.  For now, we leave the set of lags included in $L$ unspecified; in
-our applications to real disease data below, we will consider several candidate
-sets of lags.  In Equation~\eqref{eqn:ModelKCDECopula}, each
-$f^{h}(z_{T + h} | T + h, z_{T - l} \text{, } l \in L; \btheta^h)$
-is a predictive density for one prediction horizon obtained through KCDE.  As
-the notation suggests, we use a separate parameter vector $\btheta^h$ for each
-prediction horizon, but the same set of lags $L$ at all horizons.  This may not
-be the optimal setup, but exploration of other alternatives is beyond the scope
-of this article.  The function $c^H(\cdot)$ is a copula used to tie these
-marginal predictive densities together into a joint predictive density.
+\begin{align*}
+&f(z_{t^* + 1}, \ldots, z_{t^* + H} | t^*, z_{t^* - l_1}, \ldots, z_{t^* - l_M}) = \\
+&\qquad c^H\{f^{1}(z_{t^* + 1} | t^*, z_{t^* - l_1}, \ldots, z_{t^* - l_M}; \btheta^1), \ldots, f^{H}(z_{t^* + H} | t^*, z_{t^* - l_1}, \ldots, z_{t^* - l_M}; \btheta^H) ; \bxi^H\}.
+\end{align*}%\label{eqn:ModelKCDECopula}
+%In Equation~\eqref{eqn:ModelKCDECopula}, each
+Here, each $f^{h}(z_{t^* + h} | t^*, z_{t^* - l_1}, \ldots, z_{t^* - l_M}; \btheta^h)$
+is a predictive density for one prediction horizon obtained through KCDE.  The
+distribution for each prediction horizon depends on a separate parameter vector $\btheta^h$.
+The function $c^H(\cdot)$ is a copula
+used to tie these marginal predictive densities together into a joint predictive
+density, and depends on parameters $\bxi^H$.  In our
+applications, we will obtain a separate copula fit for each trajectory length
+$H$ of interest for the prediction task.
 
-This model entails several sets of parameters: one set $\btheta^h$ for the KCDE fit at each
-prediction horizon $h = 1, \ldots, H$, and another set $\bxi^H$ for the copula
-used to obtain joint distributions for trajectories of length $H$.
-Following Joe (cite ***), we pursue a two-stage estimation procedure for these
-parameters.  In the first stage, we estimate the parameters for KCDE separately
-for each horizon $h$.  Then in the second stage, we estimate the copula
-parameters while holding the KCDE parameters fixed.  In the following
-subsections, we describe our formulations of KCDE and the copula in more
-detail and discuss parameter estimation for each of these stages in turn.
+Broadly, estimation for the model parameters proceeds in two stages:
+first we estimate the parameters for KCDE separately for each prediction
+horizon $h$, and second we estimate the copula parameters while holding the KCDE
+parameters fixed.  The efficiency of two-stage estimation procedures for copula
+models has been studied in the literature both theoretically and through
+simulation studies.  In general the two-stage approach may result in some loss
+of efficiency relative to one-stage methods, but this efficiency loss is be small
+for some model specifications\cite{joe2005asymptoticEfficiencyTwoStageCopula}.
+We pursue the two-stage strategy in this work because it results in a large
+reduction in the computational cost of parameter estimation.
+
+In the following subsections we describe the formulations of KCDE and
+the copula in more detail and give our estimation strategy for each set of
+model parameters.
 
 \subsection{KCDE for Predictive Densities at Individual Prediction Horizons}
 \label{subsec:Methods:KCDE}
 
 We now discuss the methods we use to obtain the predictive density
-$f^{h}(z_{T + h} | T + h, z_{T - l} \text{, } l \in L; \btheta^h)$
-for disease incidence at a particular horizon $h$.  In order to simplify the
-notation we define two new variables.  $Y_t^{h} = Z_{t + h}$ represents
-the prediction target relative to time $t$.  $\bX_t^{h} = (T + h, Z_{t -
-l_1}, \ldots, Z_{t - l_M})$, where $l_1, \ldots, l_M$ are the elements of the
-set $L$ of lags used for prediction, represents the vector of predictive
-variables relative to time $t$.  We can use the observed quantities $z_t$ to
-form the pair $(\bx_t^{h}, y_t^{h})$ for all $t = 1 + \max_m l_m, \ldots, T - h$;
+$f^{h}(z_{t^* + h} | t^*, z_{t^* - l_1}, \ldots, z_{t^* - l_M}; \btheta^h)$
+for disease incidence at a particular horizon $h$ after time $t^*$.  In order to
+simplify the notation we define two new variables: $Y_t^{h} = Z_{t + h}$ represents
+the prediction target relative to time $t$, and $\bX_t = (t, Z_{t -
+l_1}, \ldots, Z_{t - l_M})$ represents the vector of predictive
+variables relative to time $t$.  With this notation, the distribution we wish to estimate is
+$f^{h}(y_{t^*}^{h} | \bx_{t^*}; \btheta^h)$.
+
+In order to estimate this distribution, we use the observed data to form the
+pairs $(\bx_t, y_t^{h})$ for all $t = 1 + \max_m l_m, \ldots, T - h$;
 for smaller values of $t$ there are not enough observations before $t$ to form
-$\bx_t^{h}$ and for larger values of t there are not enough observations after $t$ to form
-$y_t^{h}$.  With this notation, the distribution we wish to estimate is
-$f^{h}(y_T^{h} | \bx_T^{h}; \btheta^h)$.
+$\bx_t$ and for larger values of t there are not enough observations after $t$ to form
+$y_t^{h}$.  We then regard these pairs as a (dependent) sample from the joint
+distribution of $(\bX, Y^h)$ and estimate the conditional distribution of $Y^h | \bX$ via KCDE:
+\begin{align}
+&\widehat{f}^h(y^h_{t^*} | \bx_{t^*}) = \frac{\sum_{t \in \btau} K^{\bX, Y}\left\{(\bx_{t^*}, y^h_{t^*}), (\bx_t, y^h_t); \btheta^h \right\}}{\sum_{t \in \btau}K^{\bX}(\bx_{t^*}, \bx_t ; \btheta^h)} \label{eqn:KCDEDefinition} \\
+&\qquad = \frac{\sum_{t \in \btau} K^{Y | \bX}(y^h_{t^*}, y^h_t | \bx_{t^*}, \bx_t; \btheta^h) K^{\bX}(\bx_{t^*}, \bx_t; \btheta^h)}{\sum_{t \in \btau} K^{\bX}(\bx_{t^*}, \bx_t; \btheta^h) } \label{eqn:KDESubKDEJtMarginal} \\
+&\qquad = \sum_{t \in \btau} w^h_t K^{Y | \bX}(y^h_{t^*}, y^h_t | \bx_{t^*}, \bx_t; \btheta^h) \text{, where} \label{eqn:KDEwt} \\
+&w^h_t = \frac{ K^{\bX}(\bx_{t^*}, \bx_t; \btheta^h) }{\sum_{s \in \btau} K^{\bX}(\bx_{t^*}, \bx_{s}; \btheta^h) } \label{eqn:KCDEWeightsDef}
+\end{align}
 
-In order to do this, we regard $\{(\by_t, \bx_t), t = 1 + \max_m l_m, \ldots, T
-- h\}$ as a (dependent) sample from the joint distribution of $(\bX, Y)$, and estimate
-the conditional distribution of $Y | \bX$ via KCDE.  The KCDE estimate is given
-by
+Here we are working with a slightly restricted specification in which
+the kernel function $K^{\bX, Y}$ can be written as the product of $K^{\bX}$ and a ``conditional kernel'' $K^{\bY|\bX}$.
+With this restriction, we can
+interpret $K^{\bX}$ as a weighting function determining how much each observation
+$(\bx_t, y^h_t)$ contributes to our final density estimate according to how
+similar $\bx_t$ is to the value $\bx_{t^*}$ that we are conditioning on.
+For each $y^h_t$, $K^{\bY | \bX}$ is a density function that contributes
+mass to the final density estimate near $y^h_t$.  The
+parameters $\btheta^h$ control the locality and orientation of the weighting
+function and the contributions to the density estimate from each observation.
+In Equations \eqref{eqn:KCDEDefinition} through \eqref{eqn:KCDEWeightsDef},
+$\btau \subseteq \{1 + \max_m l_m, \ldots, T - h\}$ indexes the subset of
+observations used in obtaining the conditional density estimate; we return to
+how this subset of observations is defined in the discussion of estimation
+below.
+%In practice, we have parameterized these matrices in terms of the Cholesky
+% decomposition.
+%; we further take the bandwidth matrix $\bB^X$ to be a sub-matrix of $\bB^{Y,X}$
+%  Hall, Racine,
+%and Li \cite{hall2004crossvalidationKCDE} say that this "does not adversely affect
+%the rate of convergence of estimators..."
+
+We take the kernel function $K^{Y, \bX}$ to be a product kernel with one
+component being a periodic kernel in time and the other component capturing the
+remaining covariates:
+\begin{align}
+&K^{\bX, Y}\left\{(\bx_{t^*}, y^h_{t^*}), (\bx_t, y^h_t); \btheta^h \right\} \nonumber \\
+&\qquad = K^{\bX, Y}\left\{(t^*, z_{t^* - l_1}, \ldots, z_{t^* - l_M}, z_{t^* + h}), (t, z_{t - l_1}, \ldots, z_{t - l_M}, z_{t + h}); \btheta^h \right\} \nonumber \\
+&\qquad = K^{Periodic}(t^*, t; \btheta^h) K^{Incidence}\{(z_{t^* - l_1}, \ldots, z_{t^* - l_M}, z_{t^* + h}), (z_{t - l_1}, \ldots, z_{t - l_M}, z_{t + h}); \btheta^h\} \nonumber
+\end{align}
+
+The periodic kernel function was originally developed in the
+literature on Gaussian Processes\cite{mackay1998introductionGP}, and is defined by
 \begin{equation}
-\widehat{f}_{\bY|\bX}(\by | \bx) = \frac{\sum_{t \in \btau} K^{\bX, \bY}\left\{(\bx', \by')', (\bx'_t, \by'_t)'; \bH^{\bX,\bY}\right\}}{\sum_{t \in \btau}K^{\bX}(\bx, \bx_t ; \bH^{\bX})}. \label{eqn:KCDEDefinition}
+K^{Periodic}(t^*, t; \rho, b) = \exp\left[- \frac{\sin^2\{\rho (t^* - t)\}}{2b^2} \right]. \label{eqn:PeriodicKernel}
 \end{equation}
-Here, $'$ is the transpose operator and $\btau \subseteq \{1, \ldots, T\}$
-indexes the subset of observations used in obtaining the conditional density
-estimate.  In the final density estimate, $\btau$ typically includes all
-available time points, but proper subsets are used in the cross-validation
-procedures we discuss later for parameter estimation.
+We illustrate this kernel function in Figure \ref{fig:PeriodicKernelPlot}. 
+The kernel has two parameters: $\rho$, which determines the length of the
+periodicity, and $b$, which determines the strength and locality of
+of this periodic component in computing the observation weights $w_t^h$.
+In our applications, we have fixed $\rho = \pi / 52$, so that the kernel has
+period of length 1 year with weekly data.  Using this periodic kernel provides a
+mechanism to capture seasonality in disease incidence by allowing the
+observation weights to depend on the similarity of the time of year that an
+observation was collected and the time of year at which we are making a prediction.
 
+%  In the final density estimate, $\btau$ typically includes all
+%available time points, but proper subsets are used in the cross-validation
+%procedures we discuss later for parameter estimation.
 
 %In order to do this, we employ kernel density estimation.  Let $K^{\bY}(\by, \by^*,
 %H^{\bY})$ and $K^{\bX}(\bx, \bx^*, H^{\bX})$ be kernel functions centered at
@@ -338,109 +401,25 @@ procedures we discuss later for parameter estimation.
 %estimate of the conditional density of $\bY | \bX$.  However, it is not strictly
 %required that 
 
-We will work with a slightly restricted specification of
-Equation~\eqref{eqn:KCDEDefinition} in which the kernel function $K^{\bX,\bY}$
-can be written as the product of $K^{\bX}$ and a
-``conditional kernel'' $K^{\bY|\bX}$:
-\begin{equation}
-K^{\bX,\bY}\left\{(\bx', \by')', (\bx'_t, \by'_t)'; \bH^{\bX,\bY}\right\} = K^{\bX}\left\{\bx, \bx_t; \bH^{\bX}\right\} K^{\bY | \bX}\left\{\by, \by_t | \bx, \bx_t; \bH^{\bX,\bY}\right\}.
-\end{equation}
+%\begin{equation}
+%K^{\bX,\bY}\left\{(\bx', \by')', (\bx'_t, \by'_t)'; \bH^{\bX,\bY}\right\} = K^{\bX}\left\{\bx, \bx_t; \bH^{\bX}\right\} K^{\bY | \bX}\left\{\by, \by_t | \bx, \bx_t; \bH^{\bX,\bY}\right\}.
+%\end{equation}
 
-Make clear that $H^X$ is a sub-matrix of $H^{Y,X}$.  Hall, Racine, and
-Li \cite{hall2004crossvalidationKCDE}
-say that this "does not adversely affect
-the rate of convergence of estimators..."
 
-With this restriction, we can rearrange Equation~\eqref{eqn:KCDEDefinition} to
-obtain
-\begin{align}
-\widehat{f}_{\bY|\bX}(\by | \bx) &= \sum_{t \in \btau} w_t K^{\bY | \bX}\left\{\by, \by_t | \bx, \bx_t; \bH^{\bX,\bY}\right\}, \text{ where} \label{eqn:KCDEDefinitionWeighted} \\
-w_t &= \frac{K^{\bX}\left\{\bx, \bx_t; \bH^{\bX}\right\}}{\sum_{t^* \in \btau} K^{\bX}\left\{\bx, \bx_{t^*}; \bH^{\bX}\right\}}.
-\end{align}
 
-We can now interpret $K^{\bX}$ as a weighting function determining how much each
-observation $(\bx_t, \by_t)$ contributes to our final density estimate according to how similar
-$\bx_t$ is to the value $\bx$ that we are conditioning on.
-$K^{\bY | \bX}$ is a density function that contributes
-mass to the final density estimate near the observed value $\by_t$; we require
-that for any values of $\by_t$, $\bx_t$, and $\bx$, the integral of $K^{\bY |
-\bX}$ with respect to $\by$ must equal $1$.  Since the weights $w_t$ sum to $1$,
-this condition ensures that the combined density estimate integrates to 1.  The
-bandwidth matrices $\bH^{\bX}$ and $\bH^{\bX, \bY}$ are parameterized by
-$\btheta^h$ and control the locality and orientation of the weighting function
-and the contributions to the density estimate from each observation.  In
-practice, we have used the Cholesky decomposition of 
+%With this restriction, we can rearrange Equation~\eqref{eqn:KCDEDefinition} to
+%obtain
+%\begin{align}
+%\widehat{f}_{\bY|\bX}(\by | \bx) &= \sum_{t \in \btau} w_t K^{\bY | \bX}\left\{\by, \by_t | \bx, \bx_t; \bH^{\bX,\bY}\right\}, \text{ where} \label{eqn:KCDEDefinitionWeighted} \\
+%w_t &= \frac{K^{\bX}\left\{\bx, \bx_t; \bH^{\bX}\right\}}{\sum_{t^* \in \btau} K^{\bX}\left\{\bx, \bx_{t^*}; \bH^{\bX}\right\}}.
+%\end{align}
 
-In order to complete the formulation of the estimator given in
-Equation~\eqref{eqn:KCDEDefinition}, we must specify the kernel functions.
+%In order to complete the formulation of the KCDE estimator, we must specify the
+%kernel function.  We take this kernel to be a product of two components.  The
+%first is a periodic kernel in the time at which we are making the prediction,
+%and allows us to capture seasonality in disease incidence within the KCDE
+%framework.  
 
-We obtain the discretized kernel function by integrating an underlying
-continuous kernel function over the dimensions corresponding to discrete
-random variables.  To make this concrete, consider a $J$-dimensional random
-vector $\bZ = (\bZ^{d'}, \bZ^{c'})'$ that is partitioned into a
-$J^d$-dimensional subvector $\bZ^d$ of discrete random variables and a
-$J^c$-dimensional subvector $\bZ^c$ of continuous random variables.  Without
-loss of generality, we assume that the discrete variables are the first $J^d$
-variables.  For each component random variable $Z_j$, $j = 1, \ldots, J$, we
-denote the set of values that $Z_j$ may take by $\mathcal{D}^j \subseteq
-\mathbb{R}$.  In the continuous cases, we take $\mathcal{D}^j = \mathbb{R}$.  In
-the discrete cases, $\mathcal{D}^j$ is a discrete set such as the positive
-integers.  Our definitions could be modified to handle a component random
-variable whose distribution comprised a combination of discrete and continuous
-parts; however, this is not required for our applications so we have not pursued
-that line here.
-
-Let $L(\bz, \bz^{*} ; \bH)$ be a continuous multivariate kernel function defined
-on $\prod_{j = 1}^{J} \mathcal{E}^j$.  For each discrete variable indexed by $j
-= 1, \ldots, J^d$, we associate lower and upper bounds of integration $a_{z_j}$
-and $b_{z_j}$ with each value $z_j \in \mathcal{D}^j$.  In order to ensure that
-our final density estimate integrates to $1$, we require that these integration
-bounds form a disjoint cover of $\mathcal{E}^j$ in the sense that $\cup_{z_j \in
-\mathcal{D}^j} [a_{z_j}, b_{z_j}) = \mathcal{E}^j$ and $\cap_{z_j \in
-\mathcal{D}^j} [a_{z_j}, b_{z_j}) = \emptyset$, the empty set.  At a vector of
-values $\bz \in \prod_{j = 1}^J \mathcal{D}^j$, we define the partially
-discretized kernel as follows:
-\begin{equation*}
-K(\bz, \bz^{*} ; \bH) = \int_{a_{z_1}}^{b_{z_1}} \cdots
-\int_{a_{z_{J^d}}}^{b_{z_{J^d}}} L(\bz, \bz^{*} ; \bH) \, d z_{1} \cdots d
-z_{J^d}
-\end{equation*}
-
-This approach can be used to discretize any underlying continuous kernel
-function.  In the applications in Section~\ref{sec:Applications} below, we have
-used a multivariate log-normal kernel function.  This is similar to the
-suggestion of *** of using log-transformed data, but allows us to work with the
-data on the original scale.  Advantages of this kernel specification include
-automatic handling of the restriction that counts are non-negative, and approximately
-capturing the long tail in disease incidence that we will illustrate in the
-applications Section below.
-
-Seasonality is an important characteristic of many infectious disease time
-series, as we will illustrate in the applications below. Here we describe one
-approach to capturing this seasonality within the KCDE framework by using a
-kernel function that is periodic in the observation time $t$.  This periodic
-kernel function was originally developed in the literature on Gaussian Processes
-for the purposes of specifying a periodic covariance
-function\cite{mackay1998introductionGP}, and is defined by
-\begin{equation}
-K(t, t^*; \rho, h) = \exp\left[- \frac{\sin^2\{\rho (t - t^*)\}}{2h^2} \right]. \label{eqn:PeriodicKernel}
-\end{equation}
-This functional form can also be obtained by mapping $t$ to the bivariate pair
-$\{cos(\rho t), sin(\rho t)\}$ and then applying a bivariate Gaussian kernel to
-that pair.  We picture this periodic kernel function in Figure
-\ref{fig:PeriodicKernelPlot}.
-
-This kernel function does not integrate to $1$, but this does not preclude us
-from using it for the conditioning variables $\bX_t$ that are used to calculate
-the observation weights $w_t$ in Equation~\eqref{eqn:KCDEDefinitionWeighted}. 
-The result is that observations are weighted according to the similarity of the
-time of year that an observation was collected with the time of year of the
-analysis time from which we are predicting forward.  Effectively, this allows
-the approach to set the weights $w_t$ to be small when the observation time does
-not match the observation time from which we are predicting.  The strength of
-this weighting is determined by the bandwidth parameter $h$.
-
-%\begin{figure}[height=2in]
 \begin{figure}
 \caption{The periodic kernel function illustrated as a function of time in
 weeks with $\rho = \pi / 52$ and three possible values for the bandwidth
@@ -483,19 +462,87 @@ ggplot(plot_df) +
 @
 \end{figure}
 
-We use cross-validation to select the variables that are used in the model and estimate the corresponding bandwidth parameters by (approximately) minimizing a cross-validation measure of the quality of the predictions obtained from the model.  Formally,
-\begin{align}
-&(\widehat{\bu}, \widehat{H}^{\bX}, \widehat{H}^{\bY}) \approx \argmin{(\bu, H^{\bX}, H^{\bY})} \sum_{t^* = 1 + P + L}^T Q[ \by_{t^*}, \widehat{f}(\by | \bX = \bx_{t^*} ; \bu, H^{\bX}, H^{\bY}, \{ (\by_t, \bx_t): t \in \tau_{t^*} \}) ] \label{eqn:ParamEst}
-\end{align}
-Here, $Q$ is a loss function that measures the quality of the estimated density $\widehat{f}$ given an observation $\by_{t^*}$.  We have made the dependence of this estimated density on the the parameters $\bu$, $H^{\bx}$, and $H^{\bY}$, as well as on the data $\{ (\by_t, \bx_t): t \in \tau_{t^*} \}$, explicit in the notation.  In order to reduce the potential for our parameter estimates to be affected by local correlation in the time series, we eliminate all time points that fall within one year of $t^*$ from the index set $\tau_{t^*}$ used to form the conditional density estimate $\widehat{f}(\by | \bX = \bx_{t^*} ; \bu, H^{\bX}, H^{\bY}, \{ (\by_t, \bx_t): t \in \tau_{t^*} \})$.
+The second component of our kernel is a multivariate kernel incorporating
+all of the other variables in $\bx_t$ and $y_t^h$.  In our
+applications, these variables are measures of incidence, and are
+continuous in the application to Influenza and discrete case counts in
+the application to Dengue fever.  In the continuous case, we have used a
+multivariate log-normal kernel function.  This kernel specification automatically
+handles the restriction that counts are non-negative, and approximately
+captures the long tail in disease incidence that we will illustrate in the
+applications Section below.
 
-Hart and Vieu\cite{hart1990bandwidthEstDependentData} show that when kernel density estimation is used to estimate
-a marginal density with dependent observations, leaving out multiple time points
+\lboxit{functional form for multivariate log-normal?  discussion of bandwidth
+matrix -- locality, orientation, parameterization in terms of $\btheta$?}
+
+In the discrete case, we obtain the kernel function by discretizing an
+underlying continuous kernel function:
+\begin{align*}
+&K^{Incidence}\{(z_{t^* - l_1}, \ldots, z_{t^* - l_M}, z_{t^* + h}), (z_{t -l_1}, \ldots, z_{t - l_M}, z_{t + h}); \btheta^h\} \\
+&\qquad = \int_{a_{z_{t^* - l_1}}}^{b_{z_{t^* - l_1}}} \cdots \int_{a_{z_{t^* + h}}}^{b_{z_{t^* + h}}} L\{(w_1, \ldots, w_{M+1}), (z_{t -l_1}, \ldots, z_{t - l_M}, z_{t + h}); \btheta^h\} \, d w_{1} \cdots d w_{M+1}
+\end{align*}
+Here, the $w_m$ are dummy integration variables and $L(\cdot)$ is a continuous
+multivariate kernel function; in our application we have used the multivariate
+log-normal kernel as above.
+For each component variable in $(z_{t^* - l_1}, \ldots, z_{t^* - l_M}, z_{t^* +
+h})$, we associate lower and upper bounds of integration $a_{z_j}$ and $b_{z_j}$
+with each value in the domain of that random variable.  The value of the
+kernel function $K$ at $\bw$ is obtained by integrating over the hyper-rectangle
+specified by these bounds.
+In our application, the possible values of the random variables are integer
+counts and the corresponding integration bounds are the half-integers.
+
+%Here, $L(\bw, \bw^{*} ; \bH)$ is a continuous multivariate kernel function
+%defined on $\prod_{j = 1}^{J} \mathcal{E}^j$.  For each discrete variable indexed by $j
+%= 1, \ldots, J^d$, we associate lower and upper bounds of integration $a_{z_j}$
+%and $b_{z_j}$ with each value $z_j \in \mathcal{D}^j$.  In order to ensure that
+%our final density estimate integrates to $1$, we require that these integration
+%bounds form a disjoint cover of $\mathcal{E}^j$ in the sense that $\cup_{z_j \in
+%\mathcal{D}^j} [a_{z_j}, b_{z_j}) = \mathcal{E}^j$ and $\cap_{z_j \in
+%\mathcal{D}^j} [a_{z_j}, b_{z_j}) = \emptyset$, the empty set.  At a vector of
+%values $\bz \in \prod_{j = 1}^J \mathcal{D}^j$, we define the partially
+%discretized kernel as follows:
+%\begin{equation*}
+%K(\bz, \bz^{*} ; \bH) = \int_{a_{z_1}}^{b_{z_1}} \cdots
+%\int_{a_{z_{J^d}}}^{b_{z_{J^d}}} L(\bz, \bz^{*} ; \bH) \, d z_{1} \cdots d
+%z_{J^d}
+%\end{equation*}
+
+%To make this concrete, consider a $J$-dimensional random
+%vector $\bW = (\bW^{d'}, \bW^{c'})'$ that is partitioned into a
+%$J^d$-dimensional subvector $\bZ^d$ of discrete random variables and a
+%$J^c$-dimensional subvector $\bZ^c$ of continuous random variables.  Without
+%loss of generality, we assume that the discrete variables are the first $J^d$
+%variables.  For each component random variable $Z_j$, $j = 1, \ldots, J$, we
+%denote the set of values that $Z_j$ may take by $\mathcal{D}^j \subseteq
+%\mathbb{R}$.  In the continuous cases, we take $\mathcal{D}^j = \mathbb{R}$.  In
+%the discrete cases, $\mathcal{D}^j$ is a discrete set such as the positive
+%integers.  Our definitions could be modified to handle a component random
+%variable whose distribution comprised a combination of discrete and continuous
+%parts; however, this is not required for our applications so we have not pursued
+%that line here.
+
+
+
+
+%\begin{figure}[height=2in]
+
+We use cross-validation to estimate the bandwidth parameters by numerically
+minimizing a cross-validation measure of the quality of the predictions obtained
+from the model.  Specifically, we use the log-score.
+We leave out a year of data before and after the time $t^*$.  Hart and
+Vieu\cite{hart1990bandwidthEstDependentData} show that when kernel density estimation is used to estimate a marginal density with dependent observations, leaving out multiple time points
 around the target time point in cross validation can yield small improvements in
 the ISE under certain assumptions about the form of the dependence.
+%Formally,
+%\begin{align}
+%&(\widehat{\bu}, \widehat{H}^{\bX}, \widehat{H}^{\bY}) \approx \argmin{(\bu, H^{\bX}, H^{\bY})} \sum_{t^* = 1 + P + L}^T Q[ \by_{t^*}, \widehat{f}(\by | \bX = \bx_{t^*} ; \bu, H^{\bX}, H^{\bY}, \{ (\by_t, \bx_t): t \in \tau_{t^*} \}) ] \label{eqn:ParamEst}
+%\end{align}
+%Here, $Q$ is a loss function that measures the quality of the estimated density $\widehat{f}$ given an observation $\by_{t^*}$.  We have made the dependence of this estimated density on the the parameters $\bu$, $H^{\bx}$, and $H^{\bY}$, as well as on the data $\{ (\by_t, \bx_t): t \in \tau_{t^*} \}$, explicit in the notation.  In order to reduce the potential for our parameter estimates to be affected by local correlation in the time series, we eliminate all time points that fall within one year of $t^*$ from the index set $\tau_{t^*}$ used to form the conditional density estimate $\widehat{f}(\by | \bX = \bx_{t^*} ; \bu, H^{\bX}, H^{\bY}, \{ (\by_t, \bx_t): t \in \tau_{t^*} \})$.
 
-\lboxit{Talk about proper scoring rules and our particular choice of $Q$.}
-
+\lboxit{Talk about proper scoring rules and our particular choice of $Q$. 
+Criticism of bandwidth estimation by likelihood crossvalidation.  Relationship
+to evaluation criteria.}
 
 \subsection{Combining Marginal Predictive Distributions with Copulas}
 \label{subsec:Methods:Copulas}
@@ -641,68 +688,151 @@ pd
 \section{Applications}
 \label{sec:Applications}
 
-In this Section, we illustrate the methods through applications to prediction in
-examples with several real time series data sets.
+In this Section, we illustrate our methods through applications to prediction
+of infectious disease in two examples with real disease incidence data sets: one
+with a weekly measure of incidence of influenza like illness in the United
+States, and a second with a weekly measure of incidence of Dengue fever in San
+Juan, Puerto Rico.  These data sets were used in two recent prediction
+competitions sponsored by the United States federal government. (cite something???)
 
-\subsection{Example 1: Influenza Prediction}
+We plot the data in Figure ***.  As indicated in the figure, we have divided
+each data set into two subsets.  The first period is used as a training set in
+estimating the model parameters.  The last four years of each data set are
+reserved as a test set for evaluating model performance.
 
-In our first and simplest example, we apply the method for prediction of
-influenza with prediction horizons of 1 through 4 weeks.  Data on influenza
-incidence are available through {\tt R}'s {\tt cdcfluview} package.  Here we
-create a data set with a nationally aggregated measure of flu incidence
-
-<<FluDataLoadData, echo = FALSE>>=
-library(cdcfluview)
-library(plyr)
-library(dplyr)
-library(lubridate)
-library(ggplot2)
-library(grid)
-library(kcde)
-
-usflu<-get_flu_data("national", "ilinet", years=1997:2015)
-ili_national <- transmute(usflu,
+<<LoadFluData, echo = FALSE>>=
+junk <- capture.output({
+    usflu <- suppressMessages(get_flu_data("national", "ilinet", years=1997:2015))
+})
+ili_national <- suppressWarnings(transmute(usflu,
     region.type = REGION.TYPE,
     region = REGION,
     year = YEAR,
     week = WEEK,
-    weighted_ili = as.numeric(X..WEIGHTED.ILI))
+    weighted_ili = as.numeric(X..WEIGHTED.ILI)))
 ili_national$time <- ymd(paste(ili_national$year, "01", "01", sep = "-"))
 week(ili_national$time) <- ili_national$week
 ili_national$time_index <- seq_len(nrow(ili_national))
 
-str(ili_national)
+## Subset to data actually used in this analysis -- up through end of 2014.
+ili_national <- ili_national[ili_national$year <= 2014, , drop = FALSE]
+
+## cutoff time for training data
+ili_train_cutoff_time <- ili_national$time[max(which(ili_national$year == 2010))]
 @
 
-We plot the {\tt total\_cases} measure over time, representing missing values
-with vertical grey lines.  The low season was not measured in the first few
-years.
+<<LoadDengueData, echo = FALSE>>=
+dengue_sj <- read.csv("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/data-raw/San_Juan_Testing_Data.csv")
 
-<<FluDataInitialPlotTotalCases, echo = FALSE>>=
-ggplot() +
-    geom_line(aes(x = as.Date(time), y = weighted_ili), data =
-ili_national) +
+## convert dates
+dengue_sj$time <- ymd(dengue_sj$week_start_date)
+
+## cutoff time for training data
+dengue_train_cutoff_time <- dengue_sj$time[max(which(dengue_sj$season == "2008/2009"))]
+@
+
+\begin{figure}
+\caption{Plots of the data sets we apply our methods to.  In each case, the last
+four years of data are held out as a test data set; this cutoff is indicated
+with a vertical dashed line.  For the flu data set, low-season incidence was not
+recorded in early years of data collection; these missing data are indicated
+with vertical grey bars.}
+\label{fig:IntialDataPlots}
+<<InitialDataPlot, echo = FALSE>>=
+#time_limits <- c(min(c(ili_national$time, dengue_sj$time)),
+#    max(c(ili_national$time, dengue_sj$time)))
+
+ili_plot <- ggplot() +
+    geom_line(aes(x = as.Date(time), y = weighted_ili),
+        data = ili_national) +
     geom_vline(aes(xintercept = as.numeric(as.Date(time))),
         colour = "grey",
         data = ili_national[is.na(ili_national$weighted_ili), ]) +
+    geom_vline(aes(xintercept = as.numeric(as.Date(ili_train_cutoff_time))),
+        colour = "red", linetype = 2) +
     scale_x_date() +
+#    scale_x_date(limits = time_limits, expand = c(0, 0)) +
     xlab("Time") +
-    ylab("Weighted ILI") +
-    theme_bw()
-@
+    ylab("Weighted Influenza-like Illness\n") +
+    ggtitle("(a) Flu Data - National United States") +
+    theme_bw(base_size = 11)
 
-There are several methods that we could employ to handle these missing data:
-\begin{enumerate}
-\item Impute the missing values.  They are all in the low season, so this should be relatively easy to do.
-\item Drop all data up through the last NA.
-\item Use the data that are available.
-\end{enumerate}
-Of these approaches, the first is probably preferred.  The concern with the second
-is that we are not making use of all of the available data.  The potential concern with the
-third is that in the data used in estimation, there will be more examples of prediction of values in the high season
-using values in the high season and middle of the season than of prediction of values in the high season using values in the low season.
-This could potentially affect our inference.  However, we do not expect this effect to be large,
-so we proceed with this option for the purposes of this example.
+dengue_plot <- ggplot() +
+    geom_line(aes(x = as.Date(time), y = total_cases),
+        data = dengue_sj) +
+    geom_vline(aes(xintercept = as.numeric(as.Date(dengue_train_cutoff_time))),
+        colour = "red", linetype = 2) +
+    scale_x_date() +
+#    scale_x_date(limits = time_limits, expand = c(0, 0)) +
+    scale_y_continuous(limits = c(0, 500), expand = c(0, 0)) +
+    xlab("Time") +
+    ylab("Total Cases") +
+    ggtitle("(b) Dengue Fever Data - San Juan, Puerto Rico") +
+    theme_bw(base_size = 11)
+
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(nrow = 2, ncol = 1)))
+print(ili_plot, vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
+print(dengue_plot, vp = viewport(layout.pos.row = 2, layout.pos.col = 1))
+@
+\end{figure}
+
+There are three prediction targets for each data set, based closely
+on the prediction targets that were used in those competitions.  First, for each week
+in the test data, we obtain a predictive distribution for the incidence measure
+in that week at each prediction horizon from 1 to 52 weeks ahead.  Second, in
+each season of the test data set, we make predictions for the timing of the peak
+week.  Third, we predict the incidence measure in the peak week.  In all cases,
+we compare the models using log score.
+
+We use a seasonal ARIMA model as a baseline to compare our approach to.  In
+fitting this model, we first transformed the observed incidence measure to the
+log scale (after adding $1$ in the Dengue data set, which included some
+observations of $0$ cases); this transformation makes the normality assumptions
+of the ARIMA model more plausible.  We then performed first-order seasonal
+differencing, and obtained the final model fits
+using the {\tt auto.arima} function in {\tt R}'s {\tt forecast}
+package\cite{hyndmanRForecastPackage}; this function uses a stepwise
+procedure to determine the terms to include in the model.
+This procedure resulted in a 
+<<ILISarimaModelFitSummary, echo = FALSE, results = "asis">>=
+ili_sarima_fit <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/ili_national/estimation-results/sarima-fit.rds")
+temp <- capture.output(summary(ili_sarima_fit))
+cat(paste0("SARIMA(", substr(temp[2], 7, 15), as.integer(substr(temp[2], 16,16)) + 1, substr(temp[2], 17, 18), ")$_{52}$"))
+@
+model for the influenza data and a 
+<<DengueSarimaModelFitSummary, echo = FALSE, results = "asis">>=
+dengue_sarima_fit <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/dengue_sj/estimation-results/sarima-fit.rds")
+temp <- capture.output(summary(dengue_sarima_fit))
+cat(paste0("SARIMA(", substr(temp[2], 7, 15), as.integer(substr(temp[2], 16, 16)) + 1, substr(temp[2], 17, 18), ")$_{52}$"))
+@
+model for the Dengue data.  We note that a different SARIMA model was
+used as a baseline in the Dengue competition, but the SARIMA model we obtained
+using this procedure performed slightly better on the test set than that
+previous baseline model.
+
+Discuss variations on KCDE models.
+
+\subsection{Example 1: Influenza}
+
+%In our first example, we apply the method for prediction of
+%influenza with prediction horizons of 1 through 4 weeks.  Data on influenza
+%incidence are available through {\tt R}'s {\tt cdcfluview} package.  Here we
+%create a data set with a nationally aggregated measure of flu incidence
+%
+%
+%There are several methods that we could employ to handle these missing data:
+%\begin{enumerate}
+%\item Impute the missing values.  They are all in the low season, so this should be relatively easy to do.
+%\item Drop all data up through the last NA.
+%\item Use the data that are available.
+%\end{enumerate}
+%Of these approaches, the first is probably preferred.  The concern with the second
+%is that we are not making use of all of the available data.  The potential concern with the
+%third is that in the data used in estimation, there will be more examples of prediction of values in the high season
+%using values in the high season and middle of the season than of prediction of values in the high season using values in the low season.
+%This could potentially affect our inference.  However, we do not expect this effect to be large,
+%so we proceed with this option for the purposes of this example.
 
 %We also plot histograms of the observed total cases on the original scale and on the log scale.
 %
@@ -820,12 +950,9 @@ so we proceed with this option for the purposes of this example.
 %@
 
 <<FluDataMergePredictionResults, echo = FALSE>>=
-library(plyr)
-library(dplyr)
-library(tidyr)
-
 ili_prediction_results_sarima <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/ili_national/prediction-results/sarima-predictions.rds")
 ili_prediction_results_kcde <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/ili_national/prediction-results/kcde-predictions.rds")
+ili_prediction_results_kcde$model <- "KCDE"
 ili_prediction_results <- rbind.fill(ili_prediction_results_sarima[!is.na(ili_prediction_results_sarima$log_score), ],
     ili_prediction_results_kcde)
 ili_prediction_results$AE <- unlist(ili_prediction_results$AE)
@@ -836,45 +963,527 @@ ili_prediction_results$full_model_descriptor <- paste0(ili_prediction_results$mo
     "-differencing_", ili_prediction_results$differencing,
     "-periodic_", ili_prediction_results$seasonality,
     "-bw_", ili_prediction_results$bw_parameterization)
+
+ili_prediction_log_score_diffs_from_sarima_wide <- ili_prediction_results %>%
+    select(full_model_descriptor, prediction_time, prediction_horizon, log_score) %>%
+    spread(full_model_descriptor, log_score)
+
+ili_prediction_log_score_diffs_from_sarima_wide[, unique(ili_prediction_results$full_model_descriptor)] <-
+    ili_prediction_log_score_diffs_from_sarima_wide[, unique(ili_prediction_results$full_model_descriptor)] -
+    ili_prediction_log_score_diffs_from_sarima_wide[, "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"]
+
+ili_prediction_log_score_diffs_from_sarima_long <- ili_prediction_log_score_diffs_from_sarima_wide %>%
+    gather_("model", "log_score_difference", unique(ili_prediction_results$full_model_descriptor)) %>%
+    mutate(
+        seasonal_lag = grepl("seasonal_lag_1", model),
+        differencing = grepl("differencing_TRUE", model),
+        periodic = grepl("periodic_TRUE", model),
+        bw_full = grepl("bw_full", model)
+    )
+ili_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor <- "Null Model"
+ili_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    ili_prediction_log_score_diffs_from_sarima_long$periodic & !ili_prediction_log_score_diffs_from_sarima_long$bw_full] <-
+    "Periodic Kernel"
+ili_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    !ili_prediction_log_score_diffs_from_sarima_long$periodic & ili_prediction_log_score_diffs_from_sarima_long$bw_full] <-
+    "Full Bandwidth"
+ili_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    ili_prediction_log_score_diffs_from_sarima_long$periodic & ili_prediction_log_score_diffs_from_sarima_long$bw_full] <-
+    "Periodic Kernel and\nFull Bandwidth"
+ili_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor <-
+    factor(ili_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor,
+        levels = c("Null Model", "Full Bandwidth", "Periodic Kernel", "Periodic Kernel,\nFull Bandwidth"))
 @
 
-%<<FluDataRibbonsPredictionPlot50Intervals, echo = FALSE>>=
-%ribbons_df <- ili_prediction_results %>%
-%    select(prediction_time,
-%        prediction_horizon,
-%        full_model_descriptor,
-%        model,
-%        interval_pred_lb_95:interval_pred_ub_50) %>%
-%    gather("bound_type", "predictive_value", interval_pred_lb_95:interval_pred_ub_50) %>%
-%    mutate(interval_type = ifelse(grepl("50", bound_type), "50", "95"),
-%        bound_type = ifelse(grepl("lb", bound_type), "lower", "upper")) %>%
-%    spread(bound_type, predictive_value)
-%
-%phs_used <- c(1, 6, 13, 26, 52)
-%models_used <- c("SARIMA-filtering_NA-periodic_NA-bw_NA", "kcde-filtering_FALSE-periodic_TRUE-bw_full")
-%
-%ggplot() +
-%    geom_ribbon(aes(x = prediction_time, ymin = lower, ymax = upper, colour = model, fill = model),
-%        alpha = 0.4,
-%        size = 0,
-%        data = ribbons_df[ribbons_df$prediction_horizon %in% phs_used &
-%                ribbons_df$full_model_descriptor %in% models_used &
-%                ribbons_df$interval_type == "50", ]) +
-%    geom_line(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
-%#    geom_point(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
-%    geom_line(aes(x = prediction_time, y = pt_pred, colour = model),
-%        data = ili_prediction_results[ili_prediction_results$prediction_horizon %in% phs_used &
-%                ili_prediction_results$full_model_descriptor %in% models_used, ]) +
-%#    scale_alpha_discrete("Prediction\nInterval\nCoverage",
-%#        labels = c("50 Percent", "95 Percent"),
-%#        limits = c("50", "95"),
-%#        range = c(0.4, 0.2)) +
-%    facet_wrap( ~ prediction_horizon, ncol = 1) +
-%    ggtitle("Point and 50% Interval Predictions") +
-%    theme_bw()
-%@
-%
-%
+\begin{figure}
+\caption{Differences in log scores for the weekly predictive distributions among
+pairs of models across all combinations of prediction horizon and prediction time in the test period.
+In panel (a) positive values indicate cases when KCDE outperformed SARIMA.  In panel
+(b) positive values indicate cases when the specification of KCDE with the
+periodic kernel outperformed the corresponding specification without the periodic kernel.
+In panel (c) positive values indicate cases when the specification of KCDE with
+a fully parameterized bandwidth outperformed the KCDE specification with a diagonal
+bandwidth matrix.}
+\label{fig:IntialDataPlots}
+<<FluDataResultsAggregatedBoxplots, echo = FALSE>>=
+models_used <- unique(ili_prediction_results$full_model_descriptor[
+    !ili_prediction_results$differencing & !(ili_prediction_results$max_seasonal_lag == 1)])
+
+boxplot_sarima_contrasts <- ggplot() +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(y = log_score_difference, x = reduced_model_descriptor),
+        data = ili_prediction_log_score_diffs_from_sarima_long[ili_prediction_log_score_diffs_from_sarima_long$model %in% models_used, ]) +
+    ylim(c(-4, 4)) +
+    ggtitle("(a) Comparison of KCDE with SARIMA") +
+#    xlab("Model") +
+    xlab("") +
+    ylab("Log Score Difference") +
+#    ylab("Log Score KCDE -\nLog Score SARIMA") +
+    theme_bw(base_size = 11)# +
+#    theme(axis.text.x=element_text(angle = -90, hjust = 0))
+
+
+
+ili_contrast_periodic_kernel <- ili_prediction_log_score_diffs_from_sarima_long %>%
+    filter(model %in% models_used) %>%
+    select_("prediction_time", "prediction_horizon", "log_score_difference",
+        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
+    spread_("periodic",
+        "log_score_difference") %>%
+    mutate(
+        contrast_value = `TRUE` - `FALSE`)
+ili_contrast_periodic_kernel$fixed_values <- "Null Model"
+ili_contrast_periodic_kernel$fixed_values[ili_contrast_periodic_kernel$bw_full] <-
+    "Full Bandwidth"
+ili_contrast_periodic_kernel$fixed_values <-
+    factor(ili_contrast_periodic_kernel$fixed_values,
+        levels = c("Null Model", "Full Bandwidth"))
+
+boxplot_periodic_kernel_contrasts <- ggplot(ili_contrast_periodic_kernel) +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value)) +
+#    facet_wrap( ~ fixed_values, ncol = 1) +
+    ggtitle("(b) Effect of Adding Periodic Kernel to Model") +
+#    xlab("Base Model") +
+    xlab("") +
+    ylab("Log Score Difference") +
+#    ylab("Log Score Model With Periodic Kernel -\nLog Score Model Without Periodic Kernel") +
+    theme_bw(base_size = 11)
+
+
+
+ili_contrast_bw_full <- ili_prediction_log_score_diffs_from_sarima_long %>%
+    filter(model %in% models_used) %>%
+    select_("prediction_time", "prediction_horizon", "log_score_difference",
+        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
+    spread_("bw_full",
+        "log_score_difference") %>%
+    mutate(
+        contrast_value = `TRUE` - `FALSE`)
+ili_contrast_bw_full$fixed_values <- "Null Model"
+ili_contrast_bw_full$fixed_values[ili_contrast_bw_full$periodic] <-
+    "Periodic Kernel"
+ili_contrast_bw_full$fixed_values <-
+    factor(ili_contrast_bw_full$fixed_values,
+        levels = c("Null Model", "Periodic Kernel"))
+
+boxplot_bw_full_contrasts <- ggplot(ili_contrast_bw_full) +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value)) +
+#    facet_wrap( ~ fixed_values, ncol = 1) +
+    ggtitle("(c) Effect of Adding Fully Parameterized BW to Model") +
+#    xlab("Base Model") +
+    xlab("") +
+    ylab("Log Score Difference") +
+#    ylab("Log Score Model With Full Bandwidth -\nLog Score Model With Diagonal Bandwidth") +
+    theme_bw(base_size = 11)
+
+
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(nrow = 3, ncol = 1)))
+print(boxplot_sarima_contrasts, vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
+print(boxplot_periodic_kernel_contrasts, vp = viewport(layout.pos.row = 2, layout.pos.col = 1))
+print(boxplot_bw_full_contrasts, vp = viewport(layout.pos.row = 3, layout.pos.col = 1))
+
+
+#ili_prediction_log_score_diffs_from_sarima_long$fixed_values <-
+#    as.character(ili_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor)
+#ili_prediction_log_score_diffs_from_sarima_long$contrast_value <-
+#    ili_prediction_log_score_diffs_from_sarima_long$log_score_difference
+#ili_prediction_log_score_diffs_from_sarima_long$contrast_type <- "Difference from SARIMA"
+#ili_contrast_periodic_kernel$contrast_type <- "Effect of Adding Periodic Kernel"
+#ili_contrast_bw_full$contrast_type <- "Effect of Adding Full Bandwidth"
+#
+#ili_contrasts_merged <- rbind.fill(
+#    ili_prediction_log_score_diffs_from_sarima_long[ili_prediction_log_score_diffs_from_sarima_long$model %in% models_used, ],
+#    ili_contrast_periodic_kernel,
+#    ili_contrast_bw_full)
+#
+#ggplot(ili_contrasts_merged) +
+#    geom_hline(yintercept = 0) +
+#    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value)) +
+#    facet_wrap( ~ contrast_type, ncol = 1) +
+##    ggtitle("Effect of Adding Fully Parameterized BW to Model") +
+#    xlab("") +
+#    ylab("Log Score Difference") +
+#    theme_bw()
+@
+\end{figure}
+
+\begin{figure}
+\caption{Plots of point and interval predictions from SARIMA and KCDE.}
+\label{fig:FluRibbonsPredictions}
+<<FluDataRibbonsPredictionPlot95Intervals, echo = FALSE>>=
+ribbons_df <- ili_prediction_results %>%
+    select(prediction_time,
+        prediction_horizon,
+        full_model_descriptor,
+        model,
+        interval_pred_lb_95:interval_pred_ub_50) %>%
+    gather("bound_type", "predictive_value", interval_pred_lb_95:interval_pred_ub_50) %>%
+    mutate(interval_type = ifelse(grepl("50", bound_type), "50", "95"),
+        bound_type = ifelse(grepl("lb", bound_type), "lower", "upper")) %>%
+    spread(bound_type, predictive_value)
+
+phs_used <- c(1, 6, 13, 26)
+models_used <- c("SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
+
+ggplot() +
+    geom_ribbon(aes(x = prediction_time, ymin = lower, ymax = upper, colour = model, fill = model),
+        alpha = 0.4,
+        size = 0,
+        data = ribbons_df[ribbons_df$prediction_horizon %in% phs_used &
+                ribbons_df$full_model_descriptor %in% models_used &
+                ribbons_df$interval_type == "95", ]) +
+    geom_line(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
+#    geom_point(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
+    geom_line(aes(x = prediction_time, y = pt_pred, colour = model, linetype = model),
+        data = ili_prediction_results[ili_prediction_results$prediction_horizon %in% phs_used &
+                ili_prediction_results$full_model_descriptor %in% models_used, ]) +
+#    scale_alpha_discrete("Prediction\nInterval\nCoverage",
+#        labels = c("50 Percent", "95 Percent"),
+#        limits = c("50", "95"),
+#        range = c(0.4, 0.2)) +
+    scale_fill_discrete("Model") +
+    scale_colour_discrete("Model") +
+    scale_linetype("Model") +
+    facet_wrap( ~ prediction_horizon, ncol = 1) +
+    xlab("Prediction Time") +
+    ylab("Weighted Influenza-like Illness") +
+#    ggtitle("Point and 95% Interval Predictions") +
+    theme_bw()
+@
+\end{figure}
+
+
+
+<<FluDataMergePeakWeekPredictionResults, echo = FALSE>>=
+data_set <- "ili_national"
+
+prediction_save_path <- file.path("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results",
+    data_set,
+    "prediction-results")
+
+all_max_lags <- as.character(c(1L))
+all_max_seasonal_lags <- as.character(c(0L, 1L))
+all_filtering_values <- c("FALSE")
+all_differencing_values <- c("FALSE", "TRUE")
+all_seasonality_values <- c("FALSE", "TRUE")
+all_bw_parameterizations <- c("diagonal", "full")
+
+case_definitions <- expand.grid(
+        data_set,
+        all_max_lags,
+        all_max_seasonal_lags,
+        all_filtering_values,
+        all_differencing_values,
+        all_seasonality_values,
+        all_bw_parameterizations,
+        stringsAsFactors = FALSE) %>%
+    `colnames<-`(c("data_set",
+            "max_lag",
+            "max_seasonal_lag",
+            "filtering",
+            "differencing",
+            "seasonality",
+            "bw_parameterization"))
+
+ili_peak_week_results <- rbind.fill(
+    c(
+        list(
+            readRDS(file.path(prediction_save_path,
+                        paste0("peak-week-sarima-", data_set, ".rds"))) %>%
+                mutate(model = "SARIMA")
+        ),
+        lapply(seq_len(nrow(case_definitions)), function(case_row_ind) {
+                max_lag <- case_definitions$max_lag[case_row_ind]
+                max_seasonal_lag <- case_definitions$max_seasonal_lag[case_row_ind]
+                filtering <- case_definitions$filtering[case_row_ind]
+                differencing <- case_definitions$differencing[case_row_ind]
+                seasonality <- case_definitions$seasonality[case_row_ind]
+                bw_parameterization <- case_definitions$bw_parameterization[case_row_ind]
+                
+                case_descriptor <- paste0(
+                    data_set,
+                    "-max_lag_", max_lag,
+                    "-max_seasonal_lag_", max_seasonal_lag,
+                    "-filtering_", filtering,
+                    "-differencing_", differencing,
+                    "-seasonality_", seasonality,
+                    "-bw_parameterization_", bw_parameterization
+                )
+                
+                readRDS(file.path(prediction_save_path,
+                            paste0("peak-week-", case_descriptor, ".rds"))) %>%
+                    mutate(model = "KCDE",
+                        max_lag = max_lag,
+                        max_seasonal_lag = max_seasonal_lag,
+                        filtering = filtering,
+                        differencing = differencing,
+                        seasonality = seasonality,
+                        bw_parameterization = bw_parameterization)
+            })
+    )
+)
+
+ili_peak_week_results$full_model_descriptor <- paste0(ili_peak_week_results$model,
+    "-seasonal_lag_", ili_peak_week_results$max_seasonal_lag,
+#    "-filtering_", ili_prediction_results$filtering,
+    "-differencing_", ili_peak_week_results$differencing,
+    "-periodic_", ili_peak_week_results$seasonality,
+    "-bw_", ili_peak_week_results$bw_parameterization)
+
+ili_peak_week_results$peak_week_log_score[ili_peak_week_results$peak_week_log_score < -50] <- -50
+ili_peak_week_results$peak_height_log_score[ili_peak_week_results$peak_height_log_score < -50] <- -50
+@
+
+
+\begin{figure}
+\caption{Differences in log scores for the predictive distributions for the peak
+week and incidence at the peak week among pairs of models across all analysis
+times in the test period.
+In panel (a) positive values indicate cases when KCDE outperformed SARIMA.  In panel
+(b) positive values indicate cases when the specification of KCDE with the
+periodic kernel outperformed the corresponding specification without the periodic kernel.
+In panel (c) positive values indicate cases when the specification of KCDE with
+a fully parameterized bandwidth outperformed the KCDE specification with a diagonal
+bandwidth matrix.  In the plot for peak week timing in panel (a), the log score
+differences are not displayed for one analysis time when none of the simulated
+trajectories from SARIMA peaked at the true peak week.  In that case, our
+monte carlo estimate of the difference in log scores is infinity.}
+\label{fig:FluPeakWeekPredictions}
+<<FluDataPeakWeekPredictionBoxPlots, echo = FALSE>>=
+## Contrasts with SARIMA for peak week timing
+ili_peak_timing_log_score_diffs_from_sarima_wide <- ili_peak_week_results %>%
+    select(full_model_descriptor, analysis_time_season, analysis_time_season_week, peak_week_log_score) %>%
+    spread(full_model_descriptor, peak_week_log_score)
+
+ili_peak_timing_log_score_diffs_from_sarima_wide[, unique(ili_peak_week_results$full_model_descriptor)] <-
+    ili_peak_timing_log_score_diffs_from_sarima_wide[, unique(ili_peak_week_results$full_model_descriptor)] -
+    ili_peak_timing_log_score_diffs_from_sarima_wide[, "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"]
+
+ili_peak_timing_log_score_diffs_from_sarima_long <- ili_peak_timing_log_score_diffs_from_sarima_wide %>%
+    gather_("model", "log_score_difference", unique(ili_peak_week_results$full_model_descriptor)) %>%
+    mutate(
+        seasonal_lag = as.logical(grepl("seasonal_lag_1", model)),
+        differencing = as.logical(grepl("differencing_TRUE", model)),
+        periodic = as.logical(grepl("periodic_TRUE", model)),
+        bw_full = as.logical(grepl("bw_full", model))
+    )
+ili_peak_timing_log_score_diffs_from_sarima_long$reduced_model_descriptor <- "Null Model"
+ili_peak_timing_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    ili_peak_timing_log_score_diffs_from_sarima_long$periodic & !ili_peak_timing_log_score_diffs_from_sarima_long$bw_full] <-
+    "Periodic Kernel"
+ili_peak_timing_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    !ili_peak_timing_log_score_diffs_from_sarima_long$periodic & ili_peak_timing_log_score_diffs_from_sarima_long$bw_full] <-
+    "Full Bandwidth"
+ili_peak_timing_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    ili_peak_timing_log_score_diffs_from_sarima_long$periodic & ili_peak_timing_log_score_diffs_from_sarima_long$bw_full] <-
+    "Periodic Kernel and\nFull Bandwidth"
+ili_peak_timing_log_score_diffs_from_sarima_long$reduced_model_descriptor <-
+    factor(ili_peak_timing_log_score_diffs_from_sarima_long$reduced_model_descriptor,
+        levels = c("Null Model", "Full Bandwidth", "Periodic Kernel", "Periodic Kernel,\nFull Bandwidth"))
+
+
+models_used <- unique(ili_peak_week_results$full_model_descriptor[
+        !as.logical(ili_peak_week_results$differencing) & !(ili_peak_week_results$max_seasonal_lag == 1)])
+
+boxplot_timing_sarima_contrasts <- ggplot() +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(y = log_score_difference, x = reduced_model_descriptor),
+        data = ili_peak_timing_log_score_diffs_from_sarima_long[
+            ili_peak_timing_log_score_diffs_from_sarima_long$model %in% models_used & 
+                ili_peak_timing_log_score_diffs_from_sarima_long$log_score_difference < 40, ]) +
+#    ylim(c(-4, 4)) +
+    ggtitle("Peak Week Timing") +
+#    xlab("Model") +
+    xlab("") +
+    ylab("Log Score Difference") +
+#    ylab("Log Score KCDE -\nLog Score SARIMA") +
+    theme_bw(base_size = 11)# +
+
+
+
+## Contrasts with SARIMA for peak week height
+ili_peak_height_log_score_diffs_from_sarima_wide <- ili_peak_week_results %>%
+    select(full_model_descriptor, analysis_time_season, analysis_time_season_week, peak_height_log_score) %>%
+    spread(full_model_descriptor, peak_height_log_score)
+
+ili_peak_height_log_score_diffs_from_sarima_wide[, unique(ili_peak_week_results$full_model_descriptor)] <-
+    ili_peak_height_log_score_diffs_from_sarima_wide[, unique(ili_peak_week_results$full_model_descriptor)] -
+    ili_peak_height_log_score_diffs_from_sarima_wide[, "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"]
+
+ili_peak_height_log_score_diffs_from_sarima_long <- ili_peak_height_log_score_diffs_from_sarima_wide %>%
+    gather_("model", "log_score_difference", unique(ili_peak_week_results$full_model_descriptor)) %>%
+    mutate(
+        seasonal_lag = as.logical(grepl("seasonal_lag_1", model)),
+        differencing = as.logical(grepl("differencing_TRUE", model)),
+        periodic = as.logical(grepl("periodic_TRUE", model)),
+        bw_full = as.logical(grepl("bw_full", model))
+    )
+ili_peak_height_log_score_diffs_from_sarima_long$reduced_model_descriptor <- "Null Model"
+ili_peak_height_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    ili_peak_height_log_score_diffs_from_sarima_long$periodic & !ili_peak_height_log_score_diffs_from_sarima_long$bw_full] <-
+    "Periodic Kernel"
+ili_peak_height_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    !ili_peak_height_log_score_diffs_from_sarima_long$periodic & ili_peak_height_log_score_diffs_from_sarima_long$bw_full] <-
+    "Full Bandwidth"
+ili_peak_height_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    ili_peak_height_log_score_diffs_from_sarima_long$periodic & ili_peak_height_log_score_diffs_from_sarima_long$bw_full] <-
+    "Periodic Kernel and\nFull Bandwidth"
+ili_peak_height_log_score_diffs_from_sarima_long$reduced_model_descriptor <-
+    factor(ili_peak_height_log_score_diffs_from_sarima_long$reduced_model_descriptor,
+        levels = c("Null Model", "Full Bandwidth", "Periodic Kernel", "Periodic Kernel,\nFull Bandwidth"))
+
+
+models_used <- unique(ili_peak_week_results$full_model_descriptor[
+        !as.logical(ili_peak_week_results$differencing) & !(ili_peak_week_results$max_seasonal_lag == 1)])
+
+boxplot_height_sarima_contrasts <- ggplot() +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(y = log_score_difference, x = reduced_model_descriptor),
+        data = ili_peak_height_log_score_diffs_from_sarima_long[ili_peak_height_log_score_diffs_from_sarima_long$model %in% models_used, ]) +
+#    ylim(c(-4, 4)) +
+    ggtitle("Peak Week Incidence") +
+#    xlab("Model") +
+    xlab("") +
+    ylab("") +
+#    ylab("Log Score KCDE -\nLog Score SARIMA") +
+    theme_bw(base_size = 11)# +
+
+
+
+ili_timing_contrast_periodic_kernel <- ili_peak_timing_log_score_diffs_from_sarima_long %>%
+    filter(model %in% models_used) %>%
+    select_("analysis_time_season", "analysis_time_season_week", "log_score_difference",
+        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
+    spread_("periodic",
+        "log_score_difference") %>%
+    mutate(
+        contrast_value = `TRUE` - `FALSE`)
+ili_timing_contrast_periodic_kernel$fixed_values <- "Null Model"
+ili_timing_contrast_periodic_kernel$fixed_values[ili_timing_contrast_periodic_kernel$bw_full] <-
+    "Full Bandwidth"
+ili_timing_contrast_periodic_kernel$fixed_values <-
+    factor(ili_timing_contrast_periodic_kernel$fixed_values,
+        levels = c("Null Model", "Full Bandwidth"))
+
+
+ili_height_contrast_periodic_kernel <- ili_peak_height_log_score_diffs_from_sarima_long %>%
+    filter(model %in% models_used) %>%
+    select_("analysis_time_season", "analysis_time_season_week", "log_score_difference",
+        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
+    spread_("periodic",
+        "log_score_difference") %>%
+    mutate(
+        contrast_value = `TRUE` - `FALSE`)
+ili_height_contrast_periodic_kernel$fixed_values <- "Null Model"
+ili_height_contrast_periodic_kernel$fixed_values[ili_height_contrast_periodic_kernel$bw_full] <-
+    "Full Bandwidth"
+ili_height_contrast_periodic_kernel$fixed_values <-
+    factor(ili_height_contrast_periodic_kernel$fixed_values,
+        levels = c("Null Model", "Full Bandwidth"))
+
+
+boxplot_timing_periodic_kernel_contrasts <- ggplot(ili_timing_contrast_periodic_kernel) +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value)) +
+#    facet_wrap( ~ fixed_values, ncol = 1) +
+    ggtitle("Peak Week Timing") +
+#    xlab("Base Model") +
+    xlab("") +
+    ylab("Log Score Difference") +
+#    ylab("Log Score Model With Periodic Kernel -\nLog Score Model Without Periodic Kernel") +
+    theme_bw(base_size = 11)
+
+
+boxplot_height_periodic_kernel_contrasts <- ggplot(ili_height_contrast_periodic_kernel) +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value)) +
+#    facet_wrap( ~ fixed_values, ncol = 1) +
+    ggtitle("Peak Week Incidence") +
+#    xlab("Base Model") +
+    xlab("") +
+    ylab("") +
+#    ylab("Log Score Model With Periodic Kernel -\nLog Score Model Without Periodic Kernel") +
+    theme_bw(base_size = 11)
+
+
+ili_timing_contrast_bw_full <- ili_peak_timing_log_score_diffs_from_sarima_long %>%
+    filter(model %in% models_used) %>%
+    select_("analysis_time_season", "analysis_time_season_week", "log_score_difference",
+        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
+    spread_("bw_full",
+        "log_score_difference") %>%
+    mutate(
+        contrast_value = `TRUE` - `FALSE`)
+ili_timing_contrast_bw_full$fixed_values <- "Null Model"
+ili_timing_contrast_bw_full$fixed_values[ili_timing_contrast_bw_full$periodic] <-
+    "Periodic Kernel"
+ili_timing_contrast_bw_full$fixed_values <-
+    factor(ili_timing_contrast_bw_full$fixed_values,
+        levels = c("Null Model", "Periodic Kernel"))
+
+ili_height_contrast_bw_full <- ili_peak_height_log_score_diffs_from_sarima_long %>%
+    filter(model %in% models_used) %>%
+    select_("analysis_time_season", "analysis_time_season_week", "log_score_difference",
+        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
+    spread_("bw_full",
+        "log_score_difference") %>%
+    mutate(
+        contrast_value = `TRUE` - `FALSE`)
+ili_height_contrast_bw_full$fixed_values <- "Null Model"
+ili_height_contrast_bw_full$fixed_values[ili_height_contrast_bw_full$periodic] <-
+    "Periodic Kernel"
+ili_height_contrast_bw_full$fixed_values <-
+    factor(ili_height_contrast_bw_full$fixed_values,
+        levels = c("Null Model", "Periodic Kernel"))
+
+boxplot_timing_bw_full_contrasts <- ggplot(ili_timing_contrast_bw_full) +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value)) +
+#    facet_wrap( ~ fixed_values, ncol = 1) +
+    ggtitle("Peak Week Timing") +
+#    xlab("Base Model") +
+    xlab("") +
+    ylab("Log Score Difference") +
+#    ylab("Log Score Model With Full Bandwidth -\nLog Score Model With Diagonal Bandwidth") +
+    theme_bw(base_size = 11)
+
+boxplot_height_bw_full_contrasts <- ggplot(ili_height_contrast_bw_full) +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value)) +
+#    facet_wrap( ~ fixed_values, ncol = 1) +
+    ggtitle("Peak Week Incidence") +
+#    xlab("Base Model") +
+    xlab("") +
+    ylab("") +
+#    ylab("Log Score Model With Full Bandwidth -\nLog Score Model With Diagonal Bandwidth") +
+    theme_bw(base_size = 11)
+
+
+grid.newpage()
+pushViewport(viewport(layout =
+    grid.layout(nrow = 6, ncol = 2, heights = unit(rep(1, 6), rep(c("lines", "null"), times = 3)))))
+grid.text("(a) Comparison of KCDE with SARIMA",
+    gp = gpar(fontsize = 12),
+    vp = viewport(layout.pos.row = 1, layout.pos.col = 1:2))
+print(boxplot_timing_sarima_contrasts, vp = viewport(layout.pos.row = 2, layout.pos.col = 1))
+print(boxplot_height_sarima_contrasts, vp = viewport(layout.pos.row = 2, layout.pos.col = 2))
+grid.text("(b) Effect of Adding Periodic Kernel to Model",
+    gp = gpar(fontsize = 12),
+    vp = viewport(layout.pos.row = 3, layout.pos.col = 1:2))
+print(boxplot_timing_periodic_kernel_contrasts, vp = viewport(layout.pos.row = 4, layout.pos.col = 1))
+print(boxplot_height_periodic_kernel_contrasts, vp = viewport(layout.pos.row = 4, layout.pos.col = 2))
+grid.text("(c) Effect of Adding Fully Parameterized BW to Model",
+    gp = gpar(fontsize = 12),
+    vp = viewport(layout.pos.row = 5, layout.pos.col = 1:2))
+print(boxplot_timing_bw_full_contrasts, vp = viewport(layout.pos.row = 6, layout.pos.col = 1))
+print(boxplot_height_bw_full_contrasts, vp = viewport(layout.pos.row = 6, layout.pos.col = 2))
+@
+\end{figure}
+
 %<<FluDataRibbonsPredictionPlot95Intervals, echo = FALSE>>=
 %ggplot() +
 %    geom_ribbon(aes(x = prediction_time, ymin = lower, ymax = upper, colour = model, fill = model),
@@ -906,106 +1515,106 @@ ili_prediction_results$full_model_descriptor <- paste0(ili_prediction_results$mo
 %     ili_prediction_results) + theme_bw()
 %@
 
-<<FluDataPredictionsPlotViolinLogScoreDifference, fig.height = 8, echo = FALSE>>=
-ili_prediction_log_score_diffs_wide <- ili_prediction_results %>%
-    select(full_model_descriptor, prediction_time, prediction_horizon, log_score) %>%
-    spread(full_model_descriptor, log_score)
-
-ili_prediction_log_score_diffs_wide[, unique(ili_prediction_results$full_model_descriptor)] <-
-    ili_prediction_log_score_diffs_wide[, unique(ili_prediction_results$full_model_descriptor)] -
-    ili_prediction_log_score_diffs_wide[, "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"]
-#    ili_prediction_log_score_diffs_wide[, "SARIMA-seasonal_lag_NA-filtering_NA-differencing_NA-periodic_NA-bw_NA"]
-
-ili_prediction_log_score_diffs_long <- ili_prediction_log_score_diffs_wide %>%
-    gather_("model", "log_score_difference", unique(ili_prediction_results$full_model_descriptor))
-
-ggplot() +
-    geom_violin(aes(x = factor(model), y = log_score_difference), data = ili_prediction_log_score_diffs_long) +
-    theme_bw() +
-    theme(axis.text.x=element_text(angle = -90, hjust = 0))
-@
-
-
-<<FluDataPredictionsPlotViolinLogScoreDifferenceZoomedIn, fig.height = 8, echo = FALSE>>=
-ggplot() +
-    geom_violin(aes(x = factor(model), y = log_score_difference), data = ili_prediction_log_score_diffs_long) +
-    theme_bw() +
-    ylim(c(-6, 6)) +
-    theme(axis.text.x=element_text(angle = -90, hjust = 0))
-@
-
-<<FluDataPredictionsPlotBoxplotLogScoreDifferenceZoomedIn, fig.height = 8, echo = FALSE>>=
-ggplot() +
-    geom_boxplot(aes(x = factor(model), y = log_score_difference), data = ili_prediction_log_score_diffs_long) +
-    theme_bw() +
-    ylim(c(-6, 6)) +
-    theme(axis.text.x=element_text(angle = -90, hjust = 0))
-@
-
-
-<<FluDataPredictionsPlotStripLogScoreDifference, fig.height = 9, echo = FALSE>>=
-ggplot() +
-    geom_point(aes(x = factor(model), y = log_score_difference), size = 0.1, position = position_jitter(w = 0.2, h = 0), alpha = 0.01, data = ili_prediction_log_score_diffs_long) +
-    theme_bw() +
-    ylim(c(-6, 6)) +
-    theme(axis.text.x=element_text(angle = -90, hjust = 0))
-@
-
-
-<<FluDataPredictionsPlotViolinLogScoreDifferencePeakSeasonOnly, echo = FALSE>>=
-peak_season_test_inds_in_ili_national <- c(
-    693:704, # 2010/2011 season, starting Jan 2011
-    744:755, # 2011/2012 season
-    791:808, # 2012/2013 season
-    844:857, # 2013/2014 season
-    895:901  # 2014/2015 season, ending end of Dec 2014
-)
-peak_season_test_times <- ili_national$time[peak_season_test_inds_in_ili_national]
-
-
-
-ili_prediction_log_score_diffs_wide <- ili_prediction_results %>%
-    select(full_model_descriptor, prediction_time, prediction_horizon, log_score) %>%
-    spread(full_model_descriptor, log_score)
-
-ili_prediction_log_score_diffs_wide[, unique(ili_prediction_results$full_model_descriptor)] <-
-    ili_prediction_log_score_diffs_wide[, unique(ili_prediction_results$full_model_descriptor)] -
-    ili_prediction_log_score_diffs_wide[, "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"]
-#    ili_prediction_log_score_diffs_wide[, "SARIMA-seasonal_lag_NA-filtering_NA-differencing_NA-periodic_NA-bw_NA"]
-
-ili_prediction_log_score_diffs_long <- ili_prediction_log_score_diffs_wide %>%
-    gather_("model", "log_score_difference", unique(ili_prediction_results$full_model_descriptor))
-
-ggplot() +
-    geom_violin(aes(x = factor(model), y = log_score_difference),
-        data = ili_prediction_log_score_diffs_long[ili_prediction_log_score_diffs_long$prediction_time %in% peak_season_test_times, ]) +
-    theme_bw() +
-    theme(axis.text.x=element_text(angle = -60, hjust = 0))
-@
-
-
-
-<<FluDataPredictionsPlotViolinLogScoreDifferenceOnlyModelsWithoutFiltering, echo = FALSE>>=
-models_used <- c("kcde-filtering_FALSE-periodic_FALSE-bw_diagonal",
-    "kcde-filtering_FALSE-periodic_FALSE-bw_full",
-    "kcde-filtering_FALSE-periodic_TRUE-bw_diagonal",
-    "kcde-filtering_FALSE-periodic_TRUE-bw_full")
-
-central_stat_log_score_diff_by_model <- ili_prediction_log_score_diffs_long %>%
-    group_by(model) %>%
-    summarize(median = median(log_score_difference),
-        mean = mean(log_score_difference)) %>%
-    gather_("statistic", "value", c("median", "mean"))
-
-ggplot() +
-    geom_violin(aes(x = factor(model), y = log_score_difference),
-        data = ili_prediction_log_score_diffs[ili_prediction_log_score_diffs$model %in% models_used, ]) +
-    geom_hline(aes(yintercept = 0), colour = "red") +
-    geom_point(aes(x = factor(model), y = value, colour = statistic),
-        data = central_stat_log_score_diff_by_model[central_stat_log_score_diff_by_model$model %in% models_used, ]) +
-    theme_bw() +
-    theme(axis.text.x=element_text(angle = -60, hjust = 0))
-@
+%<<FluDataPredictionsPlotViolinLogScoreDifference, fig.height = 8, echo = FALSE>>=
+%ili_prediction_log_score_diffs_wide <- ili_prediction_results %>%
+%    select(full_model_descriptor, prediction_time, prediction_horizon, log_score) %>%
+%    spread(full_model_descriptor, log_score)
+%
+%ili_prediction_log_score_diffs_wide[, unique(ili_prediction_results$full_model_descriptor)] <-
+%    ili_prediction_log_score_diffs_wide[, unique(ili_prediction_results$full_model_descriptor)] -
+%    ili_prediction_log_score_diffs_wide[, "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"]
+%#    ili_prediction_log_score_diffs_wide[, "SARIMA-seasonal_lag_NA-filtering_NA-differencing_NA-periodic_NA-bw_NA"]
+%
+%ili_prediction_log_score_diffs_long <- ili_prediction_log_score_diffs_wide %>%
+%    gather_("model", "log_score_difference", unique(ili_prediction_results$full_model_descriptor))
+%
+%ggplot() +
+%    geom_violin(aes(x = factor(model), y = log_score_difference), data = ili_prediction_log_score_diffs_long) +
+%    theme_bw() +
+%    theme(axis.text.x=element_text(angle = -90, hjust = 0))
+%@
+%
+%
+%<<FluDataPredictionsPlotViolinLogScoreDifferenceZoomedIn, fig.height = 8, echo = FALSE>>=
+%ggplot() +
+%    geom_violin(aes(x = factor(model), y = log_score_difference), data = ili_prediction_log_score_diffs_long) +
+%    theme_bw() +
+%    ylim(c(-6, 6)) +
+%    theme(axis.text.x=element_text(angle = -90, hjust = 0))
+%@
+%
+%<<FluDataPredictionsPlotBoxplotLogScoreDifferenceZoomedIn, fig.height = 8, echo = FALSE>>=
+%ggplot() +
+%    geom_boxplot(aes(x = factor(model), y = log_score_difference), data = ili_prediction_log_score_diffs_long) +
+%    theme_bw() +
+%    ylim(c(-6, 6)) +
+%    theme(axis.text.x=element_text(angle = -90, hjust = 0))
+%@
+%
+%
+%<<FluDataPredictionsPlotStripLogScoreDifference, fig.height = 9, echo = FALSE>>=
+%ggplot() +
+%    geom_point(aes(x = factor(model), y = log_score_difference), size = 0.1, position = position_jitter(w = 0.2, h = 0), alpha = 0.01, data = ili_prediction_log_score_diffs_long) +
+%    theme_bw() +
+%    ylim(c(-6, 6)) +
+%    theme(axis.text.x=element_text(angle = -90, hjust = 0))
+%@
+%
+%
+%<<FluDataPredictionsPlotViolinLogScoreDifferencePeakSeasonOnly, echo = FALSE>>=
+%peak_season_test_inds_in_ili_national <- c(
+%    693:704, # 2010/2011 season, starting Jan 2011
+%    744:755, # 2011/2012 season
+%    791:808, # 2012/2013 season
+%    844:857, # 2013/2014 season
+%    895:901  # 2014/2015 season, ending end of Dec 2014
+%)
+%peak_season_test_times <- ili_national$time[peak_season_test_inds_in_ili_national]
+%
+%
+%
+%ili_prediction_log_score_diffs_wide <- ili_prediction_results %>%
+%    select(full_model_descriptor, prediction_time, prediction_horizon, log_score) %>%
+%    spread(full_model_descriptor, log_score)
+%
+%ili_prediction_log_score_diffs_wide[, unique(ili_prediction_results$full_model_descriptor)] <-
+%    ili_prediction_log_score_diffs_wide[, unique(ili_prediction_results$full_model_descriptor)] -
+%    ili_prediction_log_score_diffs_wide[, "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"]
+%#    ili_prediction_log_score_diffs_wide[, "SARIMA-seasonal_lag_NA-filtering_NA-differencing_NA-periodic_NA-bw_NA"]
+%
+%ili_prediction_log_score_diffs_long <- ili_prediction_log_score_diffs_wide %>%
+%    gather_("model", "log_score_difference", unique(ili_prediction_results$full_model_descriptor))
+%
+%ggplot() +
+%    geom_violin(aes(x = factor(model), y = log_score_difference),
+%        data = ili_prediction_log_score_diffs_long[ili_prediction_log_score_diffs_long$prediction_time %in% peak_season_test_times, ]) +
+%    theme_bw() +
+%    theme(axis.text.x=element_text(angle = -60, hjust = 0))
+%@
+%
+%
+%
+%<<FluDataPredictionsPlotViolinLogScoreDifferenceOnlyModelsWithoutFiltering, echo = FALSE>>=
+%models_used <- c("kcde-filtering_FALSE-periodic_FALSE-bw_diagonal",
+%    "kcde-filtering_FALSE-periodic_FALSE-bw_full",
+%    "kcde-filtering_FALSE-periodic_TRUE-bw_diagonal",
+%    "kcde-filtering_FALSE-periodic_TRUE-bw_full")
+%
+%central_stat_log_score_diff_by_model <- ili_prediction_log_score_diffs_long %>%
+%    group_by(model) %>%
+%    summarize(median = median(log_score_difference),
+%        mean = mean(log_score_difference)) %>%
+%    gather_("statistic", "value", c("median", "mean"))
+%
+%ggplot() +
+%    geom_violin(aes(x = factor(model), y = log_score_difference),
+%        data = ili_prediction_log_score_diffs[ili_prediction_log_score_diffs$model %in% models_used, ]) +
+%    geom_hline(aes(yintercept = 0), colour = "red") +
+%    geom_point(aes(x = factor(model), y = value, colour = statistic),
+%        data = central_stat_log_score_diff_by_model[central_stat_log_score_diff_by_model$model %in% models_used, ]) +
+%    theme_bw() +
+%    theme(axis.text.x=element_text(angle = -60, hjust = 0))
+%@
 
 
 %<<FluDataPredictionsPlotViolinLogScoreDifferenceByHorizon, echo = FALSE>>=
@@ -1600,138 +2209,134 @@ ggplot() +
 %print(plots[[16]])
 %@
 
-<<FluDataResultsEmpiricalContrastsSeasonalLag, fig.height = 9, echo = FALSE>>=
-ili_prediction_log_score_diffs_long <- ili_prediction_log_score_diffs_long %>%
-    mutate(
-        seasonal_lag = grepl("seasonal_lag_1", model),
-        differencing = grepl("differencing_TRUE", model),
-        periodic = grepl("periodic_TRUE", model),
-        bw_full = grepl("bw_full", model)
-    )
-
-ili_contrast_seasonal_lag <- ili_prediction_log_score_diffs_long %>%
-    select_("prediction_time", "prediction_horizon", "log_score_difference",
-        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
-    spread_("seasonal_lag",
-        "log_score_difference") %>%
-    mutate(
-        contrast_value = `TRUE` - `FALSE`,
-        fixed_values = paste0("differencing_", differencing, "-periodic_", periodic, "-bw_full_", bw_full))
-
-ggplot(ili_contrast_seasonal_lag) +
-    geom_boxplot(aes(x = factor(prediction_horizon), y = contrast_value)) +
-    geom_hline(yintercept = 0, colour = "red") +
-    facet_wrap( ~ fixed_values, ncol = 1) +
-    ggtitle("Effect of Adding Seasonal Lag to Model") +
-    theme_bw()
-@
-
-<<FluDataResultsEmpiricalContrastsMedianSeasonalLag, fig.height = 9, echo = FALSE>>=
-ili_contrast_seasonal_lag_medians <- ili_contrast_seasonal_lag %>%
-    group_by(prediction_horizon, fixed_values) %>%
-    summarize(median_contrast = median(contrast_value))
-
-ggplot(ili_contrast_seasonal_lag_medians) +
-    geom_point(aes(x = factor(prediction_horizon), y = median_contrast)) +
-    geom_hline(yintercept = 0, colour = "red") +
-    facet_wrap( ~ fixed_values, ncol = 1) +
-    ggtitle("Effect of Adding Seasonal Lag to Model") +
-    theme_bw()
-@
+%<<FluDataResultsEmpiricalContrastsSeasonalLag, fig.height = 9, echo = FALSE>>=
+%ili_contrast_seasonal_lag <- ili_prediction_log_score_diffs_from_sarima_long %>%
+%    select_("prediction_time", "prediction_horizon", "log_score_difference",
+%        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
+%    spread_("seasonal_lag",
+%        "log_score_difference") %>%
+%    mutate(
+%        contrast_value = `TRUE` - `FALSE`,
+%        fixed_values = paste0("differencing_", differencing, "-periodic_", periodic, "-bw_full_", bw_full))
+%
+%ggplot(ili_contrast_seasonal_lag) +
+%    geom_boxplot(aes(x = factor(prediction_horizon), y = contrast_value)) +
+%    geom_hline(yintercept = 0, colour = "red") +
+%    facet_wrap( ~ fixed_values, ncol = 1) +
+%    ggtitle("Effect of Adding Seasonal Lag to Model") +
+%    theme_bw()
+%@
 
 
-<<FluDataResultsEmpiricalContrastsDifferencing, fig.height = 9, echo = FALSE>>=
-ili_contrast_differencing <- ili_prediction_log_score_diffs_long %>%
-    select_("prediction_time", "prediction_horizon", "log_score_difference",
-        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
-    spread_("differencing",
-        "log_score_difference") %>%
-    mutate(
-        contrast_value = `TRUE` - `FALSE`,
-        fixed_values = paste0("seasonal_lag_", seasonal_lag, "-periodic_", periodic, "-bw_full_", bw_full))
 
-ggplot(ili_contrast_differencing) +
-    geom_boxplot(aes(x = factor(prediction_horizon), y = contrast_value)) +
-    geom_hline(yintercept = 0, colour = "red") +
-    facet_wrap( ~ fixed_values, ncol = 1) +
-    ggtitle("Effect of Adding Seasonal Differencing to Model") +
-    theme_bw()
-@
 
-<<FluDataResultsEmpiricalContrastsMedianDifferencing, fig.height = 9, echo = FALSE>>=
-ili_contrast_differencing_medians <- ili_contrast_differencing %>%
-    group_by(prediction_horizon, fixed_values) %>%
-    summarize(median_contrast = median(contrast_value))
-
-ggplot(ili_contrast_differencing_medians) +
-    geom_point(aes(x = factor(prediction_horizon), y = median_contrast)) +
-    geom_hline(yintercept = 0, colour = "red") +
-    facet_wrap( ~ fixed_values, ncol = 1) +
-    ggtitle("Effect of Adding Seasonal Differencing to Model") +
-    theme_bw()
-@
-
-<<FluDataResultsEmpiricalContrastsPeriodic, fig.height = 9, echo = FALSE>>=
-ili_contrast_periodic <- ili_prediction_log_score_diffs_long %>%
-    select_("prediction_time", "prediction_horizon", "log_score_difference",
-        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
-    spread_("periodic",
-        "log_score_difference") %>%
-    mutate(
-        contrast_value = `TRUE` - `FALSE`,
-        fixed_values = paste0("seasonal_lag_", seasonal_lag, "-differencing_", differencing, "-bw_full_", bw_full))
-
-ggplot(ili_contrast_periodic) +
-    geom_boxplot(aes(x = factor(prediction_horizon), y = contrast_value)) +
-    geom_hline(yintercept = 0, colour = "red") +
-    facet_wrap( ~ fixed_values, ncol = 1) +
-    ggtitle("Effect of Adding Periodic Kernel to Model") +
-    theme_bw()
-@
-
-<<FluDataResultsEmpiricalContrastsMedianPeriodic, fig.height = 9, echo = FALSE>>=
-ili_contrast_periodic_medians <- ili_contrast_periodic %>%
-    group_by(prediction_horizon, fixed_values) %>%
-    summarize(median_contrast = median(contrast_value))
-
-ggplot(ili_contrast_periodic_medians) +
-    geom_point(aes(x = factor(prediction_horizon), y = median_contrast)) +
-    geom_hline(yintercept = 0, colour = "red") +
-    facet_wrap( ~ fixed_values, ncol = 1) +
-    ggtitle("Effect of Adding Periodic Kernel to Model") +
-    theme_bw()
-@
-
-<<FluDataResultsEmpiricalContrastsBWFull, fig.height = 9, echo = FALSE>>=
-ili_contrast_bw_full <- ili_prediction_log_score_diffs_long %>%
-    select_("prediction_time", "prediction_horizon", "log_score_difference",
-        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
-    spread_("bw_full",
-        "log_score_difference") %>%
-    mutate(
-        contrast_value = `TRUE` - `FALSE`,
-        fixed_values = paste0("seasonal_lag_", seasonal_lag, "-differencing_", differencing, "-periodic_", periodic))
-
-ggplot(ili_contrast_bw_full) +
-    geom_boxplot(aes(x = factor(prediction_horizon), y = contrast_value)) +
-    geom_hline(yintercept = 0, colour = "red") +
-    facet_wrap( ~ fixed_values, ncol = 1) +
-    ggtitle("Effect of Adding Full BW Parameterization to Model") +
-    theme_bw()
-@
-
-<<FluDataResultsEmpiricalContrastsMedianBWFull, fig.height = 9, echo = FALSE>>=
-ili_contrast_bw_full_medians <- ili_contrast_bw_full %>%
-    group_by(prediction_horizon, fixed_values) %>%
-    summarize(median_contrast = median(contrast_value))
-
-ggplot(ili_contrast_bw_full_medians) +
-    geom_point(aes(x = factor(prediction_horizon), y = median_contrast)) +
-    geom_hline(yintercept = 0, colour = "red") +
-    facet_wrap( ~ fixed_values, ncol = 1) +
-    ggtitle("Effect of Adding Full BW Parameterization to Model") +
-    theme_bw()
-@
+%<<FluDataResultsEmpiricalContrastsMedianSeasonalLag, fig.height = 9, echo =
+% FALSE>>=
+%ili_contrast_seasonal_lag_medians <- ili_contrast_seasonal_lag %>%
+%    group_by(prediction_horizon, fixed_values) %>%
+%    summarize(median_contrast = median(contrast_value))
+%
+%ggplot(ili_contrast_seasonal_lag_medians) +
+%    geom_point(aes(x = factor(prediction_horizon), y = median_contrast)) +
+%    geom_hline(yintercept = 0, colour = "red") +
+%    facet_wrap( ~ fixed_values, ncol = 1) +
+%    ggtitle("Effect of Adding Seasonal Lag to Model") +
+%    theme_bw()
+%@
+%
+%
+%<<FluDataResultsEmpiricalContrastsDifferencing, fig.height = 9, echo = FALSE>>=
+%ili_contrast_differencing <- ili_prediction_log_score_diffs_long %>%
+%    select_("prediction_time", "prediction_horizon", "log_score_difference",
+%        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
+%    spread_("differencing",
+%        "log_score_difference") %>%
+%    mutate(
+%        contrast_value = `TRUE` - `FALSE`,
+%        fixed_values = paste0("seasonal_lag_", seasonal_lag, "-periodic_", periodic, "-bw_full_", bw_full))
+%
+%ggplot(ili_contrast_differencing) +
+%    geom_boxplot(aes(x = factor(prediction_horizon), y = contrast_value)) +
+%    geom_hline(yintercept = 0, colour = "red") +
+%    facet_wrap( ~ fixed_values, ncol = 1) +
+%    ggtitle("Effect of Adding Seasonal Differencing to Model") +
+%    theme_bw()
+%@
+%
+%<<FluDataResultsEmpiricalContrastsMedianDifferencing, fig.height = 9, echo = FALSE>>=
+%ili_contrast_differencing_medians <- ili_contrast_differencing %>%
+%    group_by(prediction_horizon, fixed_values) %>%
+%    summarize(median_contrast = median(contrast_value))
+%
+%ggplot(ili_contrast_differencing_medians) +
+%    geom_point(aes(x = factor(prediction_horizon), y = median_contrast)) +
+%    geom_hline(yintercept = 0, colour = "red") +
+%    facet_wrap( ~ fixed_values, ncol = 1) +
+%    ggtitle("Effect of Adding Seasonal Differencing to Model") +
+%    theme_bw()
+%@
+%
+%<<FluDataResultsEmpiricalContrastsPeriodic, fig.height = 9, echo = FALSE>>=
+%ili_contrast_periodic <- ili_prediction_log_score_diffs_long %>%
+%    select_("prediction_time", "prediction_horizon", "log_score_difference",
+%        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
+%    spread_("periodic",
+%        "log_score_difference") %>%
+%    mutate(
+%        contrast_value = `TRUE` - `FALSE`,
+%        fixed_values = paste0("seasonal_lag_", seasonal_lag, "-differencing_", differencing, "-bw_full_", bw_full))
+%
+%ggplot(ili_contrast_periodic) +
+%    geom_boxplot(aes(x = factor(prediction_horizon), y = contrast_value)) +
+%    geom_hline(yintercept = 0, colour = "red") +
+%    facet_wrap( ~ fixed_values, ncol = 1) +
+%    ggtitle("Effect of Adding Periodic Kernel to Model") +
+%    theme_bw()
+%@
+%
+%<<FluDataResultsEmpiricalContrastsMedianPeriodic, fig.height = 9, echo = FALSE>>=
+%ili_contrast_periodic_medians <- ili_contrast_periodic %>%
+%    group_by(prediction_horizon, fixed_values) %>%
+%    summarize(median_contrast = median(contrast_value))
+%
+%ggplot(ili_contrast_periodic_medians) +
+%    geom_point(aes(x = factor(prediction_horizon), y = median_contrast)) +
+%    geom_hline(yintercept = 0, colour = "red") +
+%    facet_wrap( ~ fixed_values, ncol = 1) +
+%    ggtitle("Effect of Adding Periodic Kernel to Model") +
+%    theme_bw()
+%@
+%
+%<<FluDataResultsEmpiricalContrastsBWFull, fig.height = 9, echo = FALSE>>=
+%ili_contrast_bw_full <- ili_prediction_log_score_diffs_long %>%
+%    select_("prediction_time", "prediction_horizon", "log_score_difference",
+%        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
+%    spread_("bw_full",
+%        "log_score_difference") %>%
+%    mutate(
+%        contrast_value = `TRUE` - `FALSE`,
+%        fixed_values = paste0("seasonal_lag_", seasonal_lag, "-differencing_", differencing, "-periodic_", periodic))
+%
+%ggplot(ili_contrast_bw_full) +
+%    geom_boxplot(aes(x = factor(prediction_horizon), y = contrast_value)) +
+%    geom_hline(yintercept = 0, colour = "red") +
+%    facet_wrap( ~ fixed_values, ncol = 1) +
+%    ggtitle("Effect of Adding Full BW Parameterization to Model") +
+%    theme_bw()
+%@
+%
+%<<FluDataResultsEmpiricalContrastsMedianBWFull, fig.height = 9, echo = FALSE>>=
+%ili_contrast_bw_full_medians <- ili_contrast_bw_full %>%
+%    group_by(prediction_horizon, fixed_values) %>%
+%    summarize(median_contrast = median(contrast_value))
+%
+%ggplot(ili_contrast_bw_full_medians) +
+%    geom_point(aes(x = factor(prediction_horizon), y = median_contrast)) +
+%    geom_hline(yintercept = 0, colour = "red") +
+%    facet_wrap( ~ fixed_values, ncol = 1) +
+%    ggtitle("Effect of Adding Full BW Parameterization to Model") +
+%    theme_bw()
+%@
 
 
 %<<FluDataResultsGAMM>>=
@@ -1802,125 +2407,125 @@ ggplot(ili_contrast_bw_full_medians) +
 
 
 
-<<ACFBySeasonInfluenza>>=
-pit_inc_traj_acf_by_season <- rbind.fill(lapply(
-        seq_len(11),
-        function(season_row_ind) {
-            temp <- acf(pit_incidence_trajectories[season_row_ind, ], plot = FALSE)
-            return(data.frame(
-                    season = rownames(pit_incidence_trajectories)[season_row_ind],
-                    acf = temp$acf,
-                    lag = temp$lag
-                ))
-        }
-    ))
-
-acf_null_limits <- qnorm((1 + 0.95)/2)/sqrt(max_prediction_horizon)
-
-ggplot(pit_inc_traj_acf_by_season) +
-    geom_point(aes(x = lag, y = acf), colour = "grey") +
-    geom_line(aes(x = lag, y = acf, group = season), colour = "grey") +
-    geom_hline(yintercept = 0) +
-    geom_hline(yintercept = acf_null_limits, colour = "blue", linetype = 2) +
-    geom_hline(yintercept = -acf_null_limits, colour = "blue", linetype = 2) +
-    theme_bw()
-@
-
-
-<<ACFBySeasonVsFromCopulaSimInfluenza>>=
-pit_inc_traj_acf_by_season <- rbind.fill(lapply(
-        seq_len(11),
-        function(season_row_ind) {
-            temp <- acf(pit_incidence_trajectories[season_row_ind, ], plot = FALSE)
-            return(data.frame(
-                    season = rownames(pit_incidence_trajectories)[season_row_ind],
-                    acf = temp$acf,
-                    lag = temp$lag,
-                    type = "observed",
-                    stringsAsFactors = FALSE
-                ))
-        }
-    ))
-
-acf_null_limits <- qnorm((1 + 0.95)/2)/sqrt(max_prediction_horizon)
-
-
-ggplot(pit_inc_traj_acf_by_season) +
-    geom_point(aes(x = lag, y = acf), colour = "grey") +
-    geom_line(aes(x = lag, y = acf, group = season), colour = "grey") +
-    geom_hline(yintercept = 0) +
-    geom_hline(yintercept = acf_null_limits, colour = "blue", linetype = 2) +
-    geom_hline(yintercept = -acf_null_limits, colour = "blue", linetype = 2) +
-    theme_bw()
-
-n_sim <- 11L
-
-clayton_copula_fit <- fitCopula(
-    copula = claytonCopula(dim = max_prediction_horizon),
-    data = pit_incidence_trajectories,
-    method = "ml")
-frank_copula_fit <- fitCopula(
-    copula = frankCopula(dim = max_prediction_horizon),
-    data = pit_incidence_trajectories,
-    method = "ml")
-t_copula_fit <- fitCopula(
-    copula = tCopula(dim = max_prediction_horizon, df.fixed = TRUE),
-    data = pit_incidence_trajectories,
-    method = "ml")
-ar1_normal_copula_fit <- fitCopula(
-    copula = normalCopula(dim = max_prediction_horizon, dispstr = "ar1"),
-    data = pit_incidence_trajectories,
-    method = "ml")
-toep_normal_copula_fit <- fitCopula(
-    copula = normalCopula(dim = max_prediction_horizon, dispstr = "toep"),
-    data = pit_incidence_trajectories,
-    method = "ml")
-
-sim_pit_seq_acf <- rbind.fill(lapply(
-    c(frank_copula_fit, clayton_copula_fit, t_copula_fit, toep_normal_copula_fit),
-    function(copula_fit) {
-        rbind.fill(lapply(
-            seq_len(n_sim),
-            function(sim_ind) {
-                predictive_copula <- copula_fit@copula
-                ## Note that the variance estimate for parameters is low; at least we're accounting for some uncertainty though...
-                orig_params <- predictive_copula@parameters
-                predictive_copula@parameters <- rmvnorm(1, copula_fit@estimate, sigma = copula_fit@var.est)[1, ]
-                random_params <- predictive_copula@parameters
-                if(identical(class(predictive_copula)[1], "normalCopula")) {
-                    ## randomly generated parameters above may not yield a positive definite correlation matrix; correct
-                    while(min(eigen(getSigma(predictive_copula))$values) < 0.00001) {
-                        predictive_copula@parameters <- copula:::makePosDef(getSigma(predictive_copula))[1, 1 + seq_along(predictive_copula@parameters)]
-                    }
-                }
-                
-                sim_sequence <- rCopula(1, predictive_copula)[1, ]
-                
-                temp <- acf(sim_sequence, plot = FALSE)
-                return(data.frame(
-                    sim_ind = sim_ind,
-                    acf = temp$acf,
-                    lag = temp$lag,
-                    type = class(copula_fit@copula)[[1]],
-                    stringsAsFactors = FALSE
-                ))
-            }
-        ))
-    }
-))
-
-pit_inc_traj_acf_by_season$sim_ind <- pit_inc_traj_acf_by_season$season
-combined_acfs <- rbind.fill(pit_inc_traj_acf_by_season, sim_pit_seq_acf)
-
-ggplot(combined_acfs) +
-    geom_point(aes(x = lag, y = acf), colour = "grey") +
-    geom_line(aes(x = lag, y = acf, group = sim_ind), colour = "grey") +
-    geom_hline(yintercept = 0) +
-    geom_hline(yintercept = acf_null_limits, colour = "blue", linetype = 2) +
-    geom_hline(yintercept = -acf_null_limits, colour = "blue", linetype = 2) +
-    facet_wrap(~type, ncol = 1) +
-    theme_bw()
-@
+%<<ACFBySeasonInfluenza>>=
+%pit_inc_traj_acf_by_season <- rbind.fill(lapply(
+%        seq_len(11),
+%        function(season_row_ind) {
+%            temp <- acf(pit_incidence_trajectories[season_row_ind, ], plot = FALSE)
+%            return(data.frame(
+%                    season = rownames(pit_incidence_trajectories)[season_row_ind],
+%                    acf = temp$acf,
+%                    lag = temp$lag
+%                ))
+%        }
+%    ))
+%
+%acf_null_limits <- qnorm((1 + 0.95)/2)/sqrt(max_prediction_horizon)
+%
+%ggplot(pit_inc_traj_acf_by_season) +
+%    geom_point(aes(x = lag, y = acf), colour = "grey") +
+%    geom_line(aes(x = lag, y = acf, group = season), colour = "grey") +
+%    geom_hline(yintercept = 0) +
+%    geom_hline(yintercept = acf_null_limits, colour = "blue", linetype = 2) +
+%    geom_hline(yintercept = -acf_null_limits, colour = "blue", linetype = 2) +
+%    theme_bw()
+%@
+%
+%
+%<<ACFBySeasonVsFromCopulaSimInfluenza>>=
+%pit_inc_traj_acf_by_season <- rbind.fill(lapply(
+%        seq_len(11),
+%        function(season_row_ind) {
+%            temp <- acf(pit_incidence_trajectories[season_row_ind, ], plot = FALSE)
+%            return(data.frame(
+%                    season = rownames(pit_incidence_trajectories)[season_row_ind],
+%                    acf = temp$acf,
+%                    lag = temp$lag,
+%                    type = "observed",
+%                    stringsAsFactors = FALSE
+%                ))
+%        }
+%    ))
+%
+%acf_null_limits <- qnorm((1 + 0.95)/2)/sqrt(max_prediction_horizon)
+%
+%
+%ggplot(pit_inc_traj_acf_by_season) +
+%    geom_point(aes(x = lag, y = acf), colour = "grey") +
+%    geom_line(aes(x = lag, y = acf, group = season), colour = "grey") +
+%    geom_hline(yintercept = 0) +
+%    geom_hline(yintercept = acf_null_limits, colour = "blue", linetype = 2) +
+%    geom_hline(yintercept = -acf_null_limits, colour = "blue", linetype = 2) +
+%    theme_bw()
+%
+%n_sim <- 11L
+%
+%clayton_copula_fit <- fitCopula(
+%    copula = claytonCopula(dim = max_prediction_horizon),
+%    data = pit_incidence_trajectories,
+%    method = "ml")
+%frank_copula_fit <- fitCopula(
+%    copula = frankCopula(dim = max_prediction_horizon),
+%    data = pit_incidence_trajectories,
+%    method = "ml")
+%t_copula_fit <- fitCopula(
+%    copula = tCopula(dim = max_prediction_horizon, df.fixed = TRUE),
+%    data = pit_incidence_trajectories,
+%    method = "ml")
+%ar1_normal_copula_fit <- fitCopula(
+%    copula = normalCopula(dim = max_prediction_horizon, dispstr = "ar1"),
+%    data = pit_incidence_trajectories,
+%    method = "ml")
+%toep_normal_copula_fit <- fitCopula(
+%    copula = normalCopula(dim = max_prediction_horizon, dispstr = "toep"),
+%    data = pit_incidence_trajectories,
+%    method = "ml")
+%
+%sim_pit_seq_acf <- rbind.fill(lapply(
+%    c(frank_copula_fit, clayton_copula_fit, t_copula_fit, toep_normal_copula_fit),
+%    function(copula_fit) {
+%        rbind.fill(lapply(
+%            seq_len(n_sim),
+%            function(sim_ind) {
+%                predictive_copula <- copula_fit@copula
+%                ## Note that the variance estimate for parameters is low; at least we're accounting for some uncertainty though...
+%                orig_params <- predictive_copula@parameters
+%                predictive_copula@parameters <- rmvnorm(1, copula_fit@estimate, sigma = copula_fit@var.est)[1, ]
+%                random_params <- predictive_copula@parameters
+%                if(identical(class(predictive_copula)[1], "normalCopula")) {
+%                    ## randomly generated parameters above may not yield a positive definite correlation matrix; correct
+%                    while(min(eigen(getSigma(predictive_copula))$values) < 0.00001) {
+%                        predictive_copula@parameters <- copula:::makePosDef(getSigma(predictive_copula))[1, 1 + seq_along(predictive_copula@parameters)]
+%                    }
+%                }
+%                
+%                sim_sequence <- rCopula(1, predictive_copula)[1, ]
+%                
+%                temp <- acf(sim_sequence, plot = FALSE)
+%                return(data.frame(
+%                    sim_ind = sim_ind,
+%                    acf = temp$acf,
+%                    lag = temp$lag,
+%                    type = class(copula_fit@copula)[[1]],
+%                    stringsAsFactors = FALSE
+%                ))
+%            }
+%        ))
+%    }
+%))
+%
+%pit_inc_traj_acf_by_season$sim_ind <- pit_inc_traj_acf_by_season$season
+%combined_acfs <- rbind.fill(pit_inc_traj_acf_by_season, sim_pit_seq_acf)
+%
+%ggplot(combined_acfs) +
+%    geom_point(aes(x = lag, y = acf), colour = "grey") +
+%    geom_line(aes(x = lag, y = acf, group = sim_ind), colour = "grey") +
+%    geom_hline(yintercept = 0) +
+%    geom_hline(yintercept = acf_null_limits, colour = "blue", linetype = 2) +
+%    geom_hline(yintercept = -acf_null_limits, colour = "blue", linetype = 2) +
+%    facet_wrap(~type, ncol = 1) +
+%    theme_bw()
+%@
 
 
 \section{Future Work}
@@ -1948,11 +2553,16 @@ Bayesian framework, using Dirichlet process mixtures with an informative prior
 on the mixture component covariance matrices.
 
 We could also make some tweaks to our implementation of KCDE.  Locally linear --
-help address edge effects.
+help address edge effects.  Cite Hyndman, Bashtannyk, Grunwald - "Estimating and
+Visualizing Conditional Densities", maybe also Fan and Yim - "A crossvaildation
+method for estimating conditional densities" and Fan et al. 1996 "Estimation of
+conditional densities and sensitivity measures in nonlinear dynamical systems."
 
 Ensembles -- either ensembles of KCDE and/or include as a component in an
 ensemble.  Also Bayesian model averaging.  Return to discussion of bias/variance
 trade-off?
+
+Other covariates
 
 %\bibliographystyle{plainnat}
 \bibliography{kde-bib}
