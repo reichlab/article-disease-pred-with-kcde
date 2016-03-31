@@ -5,7 +5,7 @@ library(dplyr)
 library(lubridate)
 
 all_data_sets <- c("ili_national")
-all_data_sets <- c("dengue_sj")
+#all_data_sets <- c("dengue_sj")
 all_prediction_horizons <- 1:52
 all_prediction_statistics <- c("log_score",
     "pt_pred",

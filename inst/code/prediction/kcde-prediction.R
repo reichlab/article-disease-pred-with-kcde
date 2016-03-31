@@ -179,7 +179,7 @@ for(data_set in all_data_sets) {
                                     
                                     if(differencing) {
                                         ph_results$log_score[results_row_ind] <-
-                                            ph_results$log_score[results_row_ind] /
+                                            ph_results$log_score[results_row_ind] -
                                             (abs(data[analysis_time_ind - 52, orig_prediction_target_var]))
                                     }
                                     
