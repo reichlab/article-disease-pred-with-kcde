@@ -989,7 +989,7 @@ ili_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor[
     "Full Bandwidth"
 ili_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor[
     ili_prediction_log_score_diffs_from_sarima_long$periodic & ili_prediction_log_score_diffs_from_sarima_long$bw_full] <-
-    "Periodic Kernel and\nFull Bandwidth"
+    "Periodic Kernel,\nFull Bandwidth"
 ili_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor <-
     factor(ili_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor,
         levels = c("Null Model", "Full Bandwidth", "Periodic Kernel", "Periodic Kernel,\nFull Bandwidth"))
@@ -1145,8 +1145,10 @@ ggplot() +
 #        labels = c("50 Percent", "95 Percent"),
 #        limits = c("50", "95"),
 #        range = c(0.4, 0.2)) +
-    scale_fill_discrete("Model") +
-    scale_colour_discrete("Model") +
+#    scale_fill_manual("Model", values = c("#0072B2", "#E69F00")) +
+#    scale_colour_manual("Model", values = c("#0072B2", "#E69F00")) +
+    scale_fill_manual("Model", values = c("#E69F00", "#0072B2")) +
+    scale_colour_manual("Model", values = c("#E69F00", "#0072B2")) +
     scale_linetype("Model") +
     facet_wrap( ~ prediction_horizon, ncol = 1) +
     xlab("Prediction Time") +
@@ -1280,7 +1282,7 @@ ili_peak_timing_log_score_diffs_from_sarima_long$reduced_model_descriptor[
     "Full Bandwidth"
 ili_peak_timing_log_score_diffs_from_sarima_long$reduced_model_descriptor[
     ili_peak_timing_log_score_diffs_from_sarima_long$periodic & ili_peak_timing_log_score_diffs_from_sarima_long$bw_full] <-
-    "Periodic Kernel and\nFull Bandwidth"
+    "Periodic Kernel,\nFull Bandwidth"
 ili_peak_timing_log_score_diffs_from_sarima_long$reduced_model_descriptor <-
     factor(ili_peak_timing_log_score_diffs_from_sarima_long$reduced_model_descriptor,
         levels = c("Null Model", "Full Bandwidth", "Periodic Kernel", "Periodic Kernel,\nFull Bandwidth"))
@@ -1331,7 +1333,7 @@ ili_peak_height_log_score_diffs_from_sarima_long$reduced_model_descriptor[
     "Full Bandwidth"
 ili_peak_height_log_score_diffs_from_sarima_long$reduced_model_descriptor[
     ili_peak_height_log_score_diffs_from_sarima_long$periodic & ili_peak_height_log_score_diffs_from_sarima_long$bw_full] <-
-    "Periodic Kernel and\nFull Bandwidth"
+    "Periodic Kernel,\nFull Bandwidth"
 ili_peak_height_log_score_diffs_from_sarima_long$reduced_model_descriptor <-
     factor(ili_peak_height_log_score_diffs_from_sarima_long$reduced_model_descriptor,
         levels = c("Null Model", "Full Bandwidth", "Periodic Kernel", "Periodic Kernel,\nFull Bandwidth"))
@@ -1481,6 +1483,108 @@ grid.text("(c) Effect of Adding Fully Parameterized BW to Model",
     vp = viewport(layout.pos.row = 5, layout.pos.col = 1:2))
 print(boxplot_timing_bw_full_contrasts, vp = viewport(layout.pos.row = 6, layout.pos.col = 1))
 print(boxplot_height_bw_full_contrasts, vp = viewport(layout.pos.row = 6, layout.pos.col = 2))
+@
+\end{figure}
+
+
+
+\begin{figure}
+\caption{Log scores for predictions of peak week timing by predictive
+model and analysis time.}
+\label{fig:FluPeakWeekTimingPredictionLogScores}
+<<PeakWeekTimingLogScoreByAnalysisTime, echo = FALSE>>=
+## Add season and season week columns to data so that we can get from
+## analysis_time_season and analysis_time_season_week to analysis_time
+#ili_national$season <- ifelse(
+#    ili_national$week <= 30,
+#    paste0(ili_national$year - 1, "/", ili_national$year),
+#    paste0(ili_national$year, "/", ili_national$year + 1)
+#)
+#
+## Season week column: week number within season
+#ili_national$season_week <- sapply(seq_len(nrow(ili_national)), function(row_ind) {
+#    sum(ili_national$season == ili_national$season[row_ind] & ili_national$time_index <= ili_national$time_index[row_ind])
+#})
+#
+#
+#ili_peak_week_results$analysis_time <- ili_peak_week_results$analysis_time_season_week
+
+#ili_peak_week_results_for_plot
+
+models_used <- c(
+    "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_diagonal",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_full",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_diagonal",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
+
+ili_peak_week_results$reduced_model_descriptor <- "Null Model"
+ili_peak_week_results$reduced_model_descriptor[
+    as.logical(ili_peak_week_results$seasonality) & !(ili_peak_week_results$bw_parameterization == "full")] <-
+    "Periodic Kernel"
+ili_peak_week_results$reduced_model_descriptor[
+    !as.logical(ili_peak_week_results$seasonality) & (ili_peak_week_results$bw_parameterization == "full")] <-
+    "Full Bandwidth"
+ili_peak_week_results$reduced_model_descriptor[
+    as.logical(ili_peak_week_results$seasonality) & (ili_peak_week_results$bw_parameterization == "full")] <-
+    "Periodic Kernel,\nFull Bandwidth"
+ili_peak_week_results$reduced_model_descriptor[
+    ili_peak_week_results$model == "SARIMA"] <-
+    "SARIMA"
+
+ili_peak_week_results$reduced_model_descriptor <-
+    factor(ili_peak_week_results$reduced_model_descriptor,
+        levels = c("SARIMA", "Null Model", "Full Bandwidth", "Periodic Kernel",
+        "Periodic Kernel,\nFull Bandwidth"))
+
+
+ili_peak_week_results$peak_week_log_score[ili_peak_week_results$peak_week_log_score == -50] <- NA
+ggplot(ili_peak_week_results[ili_peak_week_results$full_model_descriptor %in% models_used, ]) +
+    geom_line(aes(x = analysis_time_season_week, y = peak_week_log_score, colour = reduced_model_descriptor, linetype = reduced_model_descriptor)) +
+    facet_wrap( ~ analysis_time_season, ncol = 1) +
+#    geom_raster(aes(x = analysis_time_season_week, y = log_score),
+#        data = ili_peak_week_results) +
+    theme_bw()
+@
+\end{figure}
+
+\begin{figure}
+\caption{Log scores for predictions of incidence in the peak week by predictive
+model and analysis time.}
+\label{fig:FluPeakWeekIncidencePredictionLogScores}
+<<PeakWeekIncidenceLogScoreByAnalysisTime, echo = FALSE>>=
+## Add season and season week columns to data so that we can get from
+## analysis_time_season and analysis_time_season_week to analysis_time
+#ili_national$season <- ifelse(
+#    ili_national$week <= 30,
+#    paste0(ili_national$year - 1, "/", ili_national$year),
+#    paste0(ili_national$year, "/", ili_national$year + 1)
+#)
+#
+## Season week column: week number within season
+#ili_national$season_week <- sapply(seq_len(nrow(ili_national)), function(row_ind) {
+#    sum(ili_national$season == ili_national$season[row_ind] & ili_national$time_index <= ili_national$time_index[row_ind])
+#})
+#
+#
+#ili_peak_week_results$analysis_time <- ili_peak_week_results$analysis_time_season_week
+
+#ili_peak_week_results_for_plot
+ 
+models_used <- c(
+    "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_diagonal",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_full",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_diagonal",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
+
+ili_peak_week_results$peak_height_log_score[ili_peak_week_results$peak_height_log_score == -50] <- NA
+ggplot(ili_peak_week_results[ili_peak_week_results$full_model_descriptor %in% models_used, ]) +
+    geom_line(aes(x = analysis_time_season_week, y = peak_height_log_score, colour = reduced_model_descriptor, linetype = reduced_model_descriptor)) +
+    facet_wrap( ~ analysis_time_season, ncol = 1) +
+#    geom_raster(aes(x = analysis_time_season_week, y = log_score),
+#        data = ili_peak_week_results) +
+    theme_bw()
 @
 \end{figure}
 
