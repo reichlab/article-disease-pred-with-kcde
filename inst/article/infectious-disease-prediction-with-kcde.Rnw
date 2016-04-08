@@ -49,8 +49,8 @@ library(grid)
 
 library(kcde)
 
-opts_chunk$set(cache = TRUE, autodep = TRUE)
-#opts_chunk$set(cache = FALSE)
+#opts_chunk$set(cache = TRUE, autodep = TRUE)
+opts_chunk$set(cache = FALSE)
 @
 
 \section{Introduction}
@@ -714,6 +714,21 @@ ili_national$time <- ymd(paste(ili_national$year, "01", "01", sep = "-"))
 week(ili_national$time) <- ili_national$week
 ili_national$time_index <- seq_len(nrow(ili_national))
 
+## Season column: for example, weeks of 2010 up through and including week 30 get season 2009/2010;
+## weeks after week 30 get season 2010/2011
+ili_national$season <- ifelse(
+    ili_national$week <= 30,
+    paste0(ili_national$year - 1, "/", ili_national$year),
+    paste0(ili_national$year, "/", ili_national$year + 1)
+)
+
+## Season week column: week number within season
+ili_national$season_week <- sapply(seq_len(nrow(ili_national)), function(row_ind) {
+        sum(ili_national$season == ili_national$season[row_ind] &
+                ili_national$time_index <= ili_national$time_index[row_ind])
+    })
+
+
 ## Subset to data actually used in this analysis -- up through end of 2014.
 ili_national <- ili_national[ili_national$year <= 2014, , drop = FALSE]
 
@@ -1139,6 +1154,7 @@ ggplot() +
     geom_line(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
 #    geom_point(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
     geom_line(aes(x = prediction_time, y = pt_pred, colour = model, linetype = model),
+        size = 1,
         data = ili_prediction_results[ili_prediction_results$prediction_horizon %in% phs_used &
                 ili_prediction_results$full_model_descriptor %in% models_used, ]) +
 #    scale_alpha_discrete("Prediction\nInterval\nCoverage",
@@ -1256,6 +1272,17 @@ trajectories from SARIMA peaked at the true peak week.  In that case, our
 monte carlo estimate of the difference in log scores is infinity.}
 \label{fig:FluPeakWeekPredictions}
 <<FluDataPeakWeekPredictionBoxPlots, echo = FALSE>>=
+peak_week_times <- data.frame(
+    analysis_time_season = unique(ili_peak_week_results$analysis_time_season),
+    peak_week = sapply(unique(ili_peak_week_results$analysis_time_season),
+        function(season_val) {
+            max_incidence_in_season <-
+                max(ili_national$weighted_ili[ili_national$season == season_val])
+            return(ili_national$season_week[ili_national$season == season_val &
+                        ili_national$weighted_ili == max_incidence_in_season])
+        })
+)
+
 ## Contrasts with SARIMA for peak week timing
 ili_peak_timing_log_score_diffs_from_sarima_wide <- ili_peak_week_results %>%
     select(full_model_descriptor, analysis_time_season, analysis_time_season_week, peak_week_log_score) %>%
@@ -1287,13 +1314,18 @@ ili_peak_timing_log_score_diffs_from_sarima_long$reduced_model_descriptor <-
     factor(ili_peak_timing_log_score_diffs_from_sarima_long$reduced_model_descriptor,
         levels = c("Null Model", "Full Bandwidth", "Periodic Kernel", "Periodic Kernel,\nFull Bandwidth"))
 
+ili_peak_timing_log_score_diffs_from_sarima_long$leq_peak_week <-
+    ili_peak_timing_log_score_diffs_from_sarima_long$analysis_time_season_week <=
+    peak_week_times$peak_week[
+        sapply(ili_peak_timing_log_score_diffs_from_sarima_long$analysis_time_season,
+            function(season_val) which(peak_week_times$analysis_time_season == season_val))]
 
 models_used <- unique(ili_peak_week_results$full_model_descriptor[
         !as.logical(ili_peak_week_results$differencing) & !(ili_peak_week_results$max_seasonal_lag == 1)])
 
 boxplot_timing_sarima_contrasts <- ggplot() +
     geom_hline(yintercept = 0) +
-    geom_boxplot(aes(y = log_score_difference, x = reduced_model_descriptor),
+    geom_boxplot(aes(y = log_score_difference, x = reduced_model_descriptor, colour = leq_peak_week),
         data = ili_peak_timing_log_score_diffs_from_sarima_long[
             ili_peak_timing_log_score_diffs_from_sarima_long$model %in% models_used & 
                 ili_peak_timing_log_score_diffs_from_sarima_long$log_score_difference < 40, ]) +
@@ -1338,13 +1370,18 @@ ili_peak_height_log_score_diffs_from_sarima_long$reduced_model_descriptor <-
     factor(ili_peak_height_log_score_diffs_from_sarima_long$reduced_model_descriptor,
         levels = c("Null Model", "Full Bandwidth", "Periodic Kernel", "Periodic Kernel,\nFull Bandwidth"))
 
+ili_peak_height_log_score_diffs_from_sarima_long$leq_peak_week <-
+    ili_peak_height_log_score_diffs_from_sarima_long$analysis_time_season_week <=
+    peak_week_times$peak_week[
+        sapply(ili_peak_height_log_score_diffs_from_sarima_long$analysis_time_season,
+            function(season_val) which(peak_week_times$analysis_time_season == season_val))]
 
 models_used <- unique(ili_peak_week_results$full_model_descriptor[
         !as.logical(ili_peak_week_results$differencing) & !(ili_peak_week_results$max_seasonal_lag == 1)])
 
 boxplot_height_sarima_contrasts <- ggplot() +
     geom_hline(yintercept = 0) +
-    geom_boxplot(aes(y = log_score_difference, x = reduced_model_descriptor),
+    geom_boxplot(aes(y = log_score_difference, x = reduced_model_descriptor, colour = leq_peak_week),
         data = ili_peak_height_log_score_diffs_from_sarima_long[ili_peak_height_log_score_diffs_from_sarima_long$model %in% models_used, ]) +
 #    ylim(c(-4, 4)) +
     ggtitle("Peak Week Incidence") +
@@ -1371,6 +1408,12 @@ ili_timing_contrast_periodic_kernel$fixed_values <-
     factor(ili_timing_contrast_periodic_kernel$fixed_values,
         levels = c("Null Model", "Full Bandwidth"))
 
+ili_timing_contrast_periodic_kernel$leq_peak_week <-
+    ili_timing_contrast_periodic_kernel$analysis_time_season_week <=
+    peak_week_times$peak_week[
+        sapply(ili_timing_contrast_periodic_kernel$analysis_time_season,
+            function(season_val) which(peak_week_times$analysis_time_season == season_val))]
+
 
 ili_height_contrast_periodic_kernel <- ili_peak_height_log_score_diffs_from_sarima_long %>%
     filter(model %in% models_used) %>%
@@ -1387,10 +1430,16 @@ ili_height_contrast_periodic_kernel$fixed_values <-
     factor(ili_height_contrast_periodic_kernel$fixed_values,
         levels = c("Null Model", "Full Bandwidth"))
 
+ili_height_contrast_periodic_kernel$leq_peak_week <-
+    ili_height_contrast_periodic_kernel$analysis_time_season_week <=
+    peak_week_times$peak_week[
+        sapply(ili_height_contrast_periodic_kernel$analysis_time_season,
+            function(season_val) which(peak_week_times$analysis_time_season == season_val))]
+
 
 boxplot_timing_periodic_kernel_contrasts <- ggplot(ili_timing_contrast_periodic_kernel) +
     geom_hline(yintercept = 0) +
-    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value)) +
+    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value, colour = leq_peak_week)) +
 #    facet_wrap( ~ fixed_values, ncol = 1) +
     ggtitle("Peak Week Timing") +
 #    xlab("Base Model") +
@@ -1402,7 +1451,7 @@ boxplot_timing_periodic_kernel_contrasts <- ggplot(ili_timing_contrast_periodic_
 
 boxplot_height_periodic_kernel_contrasts <- ggplot(ili_height_contrast_periodic_kernel) +
     geom_hline(yintercept = 0) +
-    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value)) +
+    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value, colour = leq_peak_week)) +
 #    facet_wrap( ~ fixed_values, ncol = 1) +
     ggtitle("Peak Week Incidence") +
 #    xlab("Base Model") +
@@ -1427,6 +1476,13 @@ ili_timing_contrast_bw_full$fixed_values <-
     factor(ili_timing_contrast_bw_full$fixed_values,
         levels = c("Null Model", "Periodic Kernel"))
 
+ili_timing_contrast_bw_full$leq_peak_week <-
+    ili_timing_contrast_bw_full$analysis_time_season_week <=
+    peak_week_times$peak_week[
+        sapply(ili_timing_contrast_bw_full$analysis_time_season,
+            function(season_val) which(peak_week_times$analysis_time_season == season_val))]
+
+
 ili_height_contrast_bw_full <- ili_peak_height_log_score_diffs_from_sarima_long %>%
     filter(model %in% models_used) %>%
     select_("analysis_time_season", "analysis_time_season_week", "log_score_difference",
@@ -1442,9 +1498,16 @@ ili_height_contrast_bw_full$fixed_values <-
     factor(ili_height_contrast_bw_full$fixed_values,
         levels = c("Null Model", "Periodic Kernel"))
 
+ili_height_contrast_bw_full$leq_peak_week <-
+    ili_height_contrast_bw_full$analysis_time_season_week <=
+    peak_week_times$peak_week[
+        sapply(ili_height_contrast_bw_full$analysis_time_season,
+            function(season_val) which(peak_week_times$analysis_time_season == season_val))]
+
+
 boxplot_timing_bw_full_contrasts <- ggplot(ili_timing_contrast_bw_full) +
     geom_hline(yintercept = 0) +
-    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value)) +
+    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value, colour = leq_peak_week)) +
 #    facet_wrap( ~ fixed_values, ncol = 1) +
     ggtitle("Peak Week Timing") +
 #    xlab("Base Model") +
@@ -1455,7 +1518,7 @@ boxplot_timing_bw_full_contrasts <- ggplot(ili_timing_contrast_bw_full) +
 
 boxplot_height_bw_full_contrasts <- ggplot(ili_height_contrast_bw_full) +
     geom_hline(yintercept = 0) +
-    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value)) +
+    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value, colour = leq_peak_week)) +
 #    facet_wrap( ~ fixed_values, ncol = 1) +
     ggtitle("Peak Week Incidence") +
 #    xlab("Base Model") +
@@ -1516,9 +1579,10 @@ models_used <- c(
     "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_diagonal",
     "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_full",
     "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_diagonal",
-    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full",
+    "Equal Bin Probabilities")
 
-ili_peak_week_results$reduced_model_descriptor <- "Null Model"
+ili_peak_week_results$reduced_model_descriptor <- "Null KCDE Model"
 ili_peak_week_results$reduced_model_descriptor[
     as.logical(ili_peak_week_results$seasonality) & !(ili_peak_week_results$bw_parameterization == "full")] <-
     "Periodic Kernel"
@@ -1532,27 +1596,59 @@ ili_peak_week_results$reduced_model_descriptor[
     ili_peak_week_results$model == "SARIMA"] <-
     "SARIMA"
 
+num_analysis_time_season_values <- length(unique(ili_peak_week_results$analysis_time_season))
+num_analysis_time_season_week_values <- length(unique(ili_peak_week_results$analysis_time_season_week))
+ili_peak_week_results <- rbind.fill(ili_peak_week_results,
+    data.frame(
+        full_model_descriptor = rep("Equal Bin Probabilities", num_analysis_time_season_week_values * num_analysis_time_season_values),
+        reduced_model_descriptor = rep("Equal Bin Probabilities", num_analysis_time_season_week_values * num_analysis_time_season_values),
+        analysis_time_season = rep(unique(ili_peak_week_results$analysis_time_season), each = num_analysis_time_season_week_values),
+        analysis_time_season_week = rep(unique(ili_peak_week_results$analysis_time_season_week), times = num_analysis_time_season_values),
+        peak_week_log_score = rep(log(1/31), num_analysis_time_season_week_values * num_analysis_time_season_values)
+    ))
+    
+    
 ili_peak_week_results$reduced_model_descriptor <-
     factor(ili_peak_week_results$reduced_model_descriptor,
-        levels = c("SARIMA", "Null Model", "Full Bandwidth", "Periodic Kernel",
-        "Periodic Kernel,\nFull Bandwidth"))
+        levels = c("SARIMA", "Null KCDE Model", "Full Bandwidth", "Periodic Kernel",
+            "Periodic Kernel,\nFull Bandwidth",
+            "Equal Bin Probabilities"
+        ))
+    
+geom_hline(yintercept = log(1/31), colour = "grey", linetype = 2)
 
+peak_week_times <- data.frame(
+    analysis_time_season = unique(ili_peak_week_results$analysis_time_season),
+    peak_week = sapply(unique(ili_peak_week_results$analysis_time_season),
+        function(season_val) {
+            max_incidence_in_season <-
+                max(ili_national$weighted_ili[ili_national$season == season_val])
+            return(ili_national$season_week[ili_national$season == season_val &
+                ili_national$weighted_ili == max_incidence_in_season])
+        })
+)
 
 ili_peak_week_results$peak_week_log_score[ili_peak_week_results$peak_week_log_score == -50] <- NA
-ggplot(ili_peak_week_results[ili_peak_week_results$full_model_descriptor %in% models_used, ]) +
+p <- ggplot(ili_peak_week_results[ili_peak_week_results$full_model_descriptor %in% models_used, ]) +
     geom_line(aes(x = analysis_time_season_week, y = peak_week_log_score, colour = reduced_model_descriptor, linetype = reduced_model_descriptor)) +
+    geom_point(aes(x = analysis_time_season_week, y = peak_week_log_score, colour = reduced_model_descriptor, shape = reduced_model_descriptor)) +
+    geom_vline(aes(xintercept = peak_week), data = peak_week_times) +
     facet_wrap( ~ analysis_time_season, ncol = 1) +
 #    geom_raster(aes(x = analysis_time_season_week, y = log_score),
 #        data = ili_peak_week_results) +
     theme_bw()
+
+suppressWarnings(print(p))
 @
 \end{figure}
+
+
 
 \begin{figure}
 \caption{Log scores for predictions of incidence in the peak week by predictive
 model and analysis time.}
 \label{fig:FluPeakWeekIncidencePredictionLogScores}
-<<PeakWeekIncidenceLogScoreByAnalysisTime, echo = FALSE>>=
+<<FluPeakWeekIncidenceLogScoreByAnalysisTime, echo = FALSE>>=
 ## Add season and season week columns to data so that we can get from
 ## analysis_time_season and analysis_time_season_week to analysis_time
 #ili_national$season <- ifelse(
@@ -1581,12 +1677,188 @@ models_used <- c(
 ili_peak_week_results$peak_height_log_score[ili_peak_week_results$peak_height_log_score == -50] <- NA
 ggplot(ili_peak_week_results[ili_peak_week_results$full_model_descriptor %in% models_used, ]) +
     geom_line(aes(x = analysis_time_season_week, y = peak_height_log_score, colour = reduced_model_descriptor, linetype = reduced_model_descriptor)) +
+    geom_point(aes(x = analysis_time_season_week, y = peak_height_log_score, colour = reduced_model_descriptor, shape = reduced_model_descriptor)) +
+    geom_vline(aes(xintercept = peak_week), data = peak_week_times) +
     facet_wrap( ~ analysis_time_season, ncol = 1) +
 #    geom_raster(aes(x = analysis_time_season_week, y = log_score),
 #        data = ili_peak_week_results) +
     theme_bw()
 @
 \end{figure}
+
+
+<<FluObtainPeakWeekTimingPredictiveDistributionsByAnalysisTime, echo = FALSE>>=
+ili_incidence_bins <- data.frame(
+    lower = seq(from = 0, to = 13, by = 0.5),
+    upper = c(seq(from = 0.5, to = 13, by = 0.5), Inf))
+
+for(bin_num in seq(from = 10, to = 40)) {
+    ili_peak_week_results[, paste0("est_prob_bin_", bin_num)] <-
+        apply(ili_peak_week_results[, paste0("peak_week_", seq_len(10000))],
+            1,
+            function(x) {sum(x == bin_num) / length(x)})
+}
+
+peak_timing_pred_dist_by_analysis_time <- ili_peak_week_results %>%
+    select(full_model_descriptor,
+            analysis_time_season,
+            analysis_time_season_week,
+            starts_with("est_prob_bin_")) %>%
+    gather_("bin", "est_prob", paste0("est_prob_bin_", seq(from = 10, to = 40)))
+peak_timing_pred_dist_by_analysis_time$bin <-
+    as.integer(substr(peak_timing_pred_dist_by_analysis_time$bin, 14, 15))
+
+
+#peak_timing_pred_dist_by_analysis_time <- ili_peak_week_results %>%
+#    mutate(count_)
+#    select_(c("full_model_descriptor", "analysis_time_season", "analysis_time_season_week"))
+#
+#
+#
+#peak_timing_pred_dist_by_analysis_time <-
+#    as.data.frame(expand.grid(
+#            model = c(
+#                "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+#                "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full"),
+#            analysis_time_season = unique(ili_peak_week_results$analysis_time_season),
+#            analysis_time_season_week = seq(from = 10, to = 40),
+#            bin_number = seq(from = 10, to = 40),
+##        incidence_bin = seq_len(nrow(ili_incidence_bins)),
+#            stringsAsFactors = FALSE
+#        ))
+#peak_timing_pred_dist_by_analysis_time$est_bin_prob <- sapply(
+#    seq_len(nrow(peak_timing_pred_dist_by_analysis_time)),
+#    function(row_ind) {
+#        sum(ili_peak_week_results[
+#                    ili_peak_week_results$full_model_descriptor == peak_timing_pred_dist_by_analysis_time$model[row_ind] &
+#                        ili_peak_week_results$analysis_time_season == peak_timing_pred_dist_by_analysis_time$analysis_time_season[row_ind] &
+#                        ili_peak_week_results$analysis_time_season_week == peak_timing_pred_dist_by_analysis_time$analysis_time_season_week[row_ind],
+#                    paste0("peak_week_", seq_len(10000))] ==
+#                peak_timing_pred_dist_by_analysis_time$bin_number[row_ind]) / 10000
+#    })
+#
+#
+#
+@
+
+\begin{figure}
+\caption{Predictive distributions for predictions of peak week timing.}
+\label{fig:FluPeakWeekTimingPredictiveDistributions}
+<<FluPlotPeakWeekTimingPredictiveDistributionsByAnalysisTime, echo = FALSE>>=
+models_used <- c(
+    "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_diagonal",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_full",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_diagonal",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
+models_used <- c(
+    "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
+
+ggplot() +
+    geom_raster(aes(x = analysis_time_season_week, y = bin, fill = est_prob),
+        data = peak_timing_pred_dist_by_analysis_time[peak_timing_pred_dist_by_analysis_time$full_model_descriptor %in% models_used, ]) +
+    scale_fill_gradientn(colours = rev(c("#000000", "#111111", "#222222", "#333333", "#444444", "#555555", "#666666", "#777777", "#888888", "#999999", "#AAAAAA", "#BBBBBB", "#CCCCCC", "#DDDDDD", "#EEEEEE", "#FFFFFF")),
+        values = c(0, exp(seq(from = log(10^-4), to = log(1), length = 15)))) +
+    facet_grid(analysis_time_season ~ full_model_descriptor) +
+    theme_bw()
+@
+\end{figure}
+
+
+
+
+<<FluObtainPeakWeekHeightPredictiveDistributionsByAnalysisTime, echo = FALSE>>=
+ili_incidence_bins <- data.frame(
+    lower = seq(from = 0, to = 13, by = 0.5),
+    upper = c(seq(from = 0.5, to = 13, by = 0.5), Inf))
+
+for(bin_num in seq_len(nrow(ili_incidence_bins))) {
+    ili_peak_week_results[, paste0("est_prob_bin_", bin_num)] <-
+        apply(ili_peak_week_results[, paste0("peak_height_", seq_len(10000))],
+            1,
+            function(x) {sum(x == bin_num) / length(x)})
+}
+
+peak_height_pred_dist_by_analysis_time <- ili_peak_week_results %>%
+    select(full_model_descriptor,
+            analysis_time_season,
+            analysis_time_season_week,
+            starts_with("est_prob_bin_")) %>%
+    gather_("bin", "est_prob", paste0("est_prob_bin_", seq_len(nrow(ili_incidence_bins))))
+peak_height_pred_dist_by_analysis_time$bin <-
+    as.integer(substr(peak_height_pred_dist_by_analysis_time$bin, 14, 15))
+
+
+#peak_timing_pred_dist_by_analysis_time <- ili_peak_week_results %>%
+#    mutate(count_)
+#    select_(c("full_model_descriptor", "analysis_time_season", "analysis_time_season_week"))
+#
+#
+#
+#peak_timing_pred_dist_by_analysis_time <-
+#    as.data.frame(expand.grid(
+#            model = c(
+#                "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+#                "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full"),
+#            analysis_time_season = unique(ili_peak_week_results$analysis_time_season),
+#            analysis_time_season_week = seq(from = 10, to = 40),
+#            bin_number = seq(from = 10, to = 40),
+##        incidence_bin = seq_len(nrow(ili_incidence_bins)),
+#            stringsAsFactors = FALSE
+#        ))
+#peak_timing_pred_dist_by_analysis_time$est_bin_prob <- sapply(
+#    seq_len(nrow(peak_timing_pred_dist_by_analysis_time)),
+#    function(row_ind) {
+#        sum(ili_peak_week_results[
+#                    ili_peak_week_results$full_model_descriptor == peak_timing_pred_dist_by_analysis_time$model[row_ind] &
+#                        ili_peak_week_results$analysis_time_season == peak_timing_pred_dist_by_analysis_time$analysis_time_season[row_ind] &
+#                        ili_peak_week_results$analysis_time_season_week == peak_timing_pred_dist_by_analysis_time$analysis_time_season_week[row_ind],
+#                    paste0("peak_week_", seq_len(10000))] ==
+#                peak_timing_pred_dist_by_analysis_time$bin_number[row_ind]) / 10000
+#    })
+#
+#
+#
+@
+
+\begin{figure}
+\caption{Predictive distributions for predictions of peak week timing.}
+\label{fig:FluPeakWeekHeightPredictiveDistributions}
+<<FluPlotPeakWeekHeightPredictiveDistributionsByAnalysisTime, echo = FALSE>>=
+models_used <- c(
+    "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_diagonal",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_full",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_diagonal",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
+models_used <- c(
+    "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
+
+ggplot() +
+    geom_raster(aes(x = analysis_time_season_week, y = bin, fill = est_prob),
+        data = peak_height_pred_dist_by_analysis_time[peak_height_pred_dist_by_analysis_time$full_model_descriptor %in% models_used, ]) +
+    scale_fill_gradientn(colours = rev(c("#000000", "#111111", "#222222", "#333333", "#444444", "#555555", "#666666", "#777777", "#888888", "#999999", "#AAAAAA", "#BBBBBB", "#CCCCCC", "#DDDDDD", "#EEEEEE", "#FFFFFF")),
+        values = c(0, exp(seq(from = log(10^-4), to = log(1), length = 15)))) +
+    facet_grid(analysis_time_season ~ full_model_descriptor) +
+    ylab("Peak incidence bin") +
+    theme_bw()
+@
+\end{figure}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 %<<FluDataRibbonsPredictionPlot95Intervals, echo = FALSE>>=
 %ggplot() +

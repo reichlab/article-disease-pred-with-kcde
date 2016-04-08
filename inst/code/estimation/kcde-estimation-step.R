@@ -44,13 +44,14 @@ sim_family <- args[11]
 
 
 ## Manually set values for testing purposes
-data_set <- "ili_national"
-prediction_horizon <- 24L
+#data_set <- "ili_national"
+data_set <- "dengue_sj"
+prediction_horizon <- 15L
 max_lag <- 1L
 max_seasonal_lag <- 0L
 filtering <- FALSE
-differencing <- TRUE
-seasonality <- TRUE
+differencing <- FALSE
+seasonality <- FALSE
 bw_parameterization <- "full"
 save_path <- "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/ili_national/estimation-results"
 #save_path <- "/home/er71a/kcde-applied-paper/R/application-influenza/estimation-results"
@@ -121,7 +122,8 @@ if(identical(data_set, "ili_national")) {
     crossval_buffer <- ymd("2010-01-01") - ymd("2009-01-01")
 } else if(identical(data_set, "dengue_sj")) {
     ## Load data for Dengue fever in San Juan
-    data <- read.csv("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/data/San_Juan_Training_Data.csv")
+    data <- read.csv("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/data-raw/San_Juan_Training_Data.csv")
+#    data <- read.csv("/home/er71a/kcde-applied-paper/R/San_Juan_Training_Data.csv")
     
     ## Restrict to data from 1990/1991 through 2008/2009 seasons
     train_seasons <- paste0(1990:2008, "/", 1991:2009)
@@ -138,14 +140,24 @@ if(identical(data_set, "ili_national")) {
     ## The origin is arbitrary.
     data$time_index <- as.integer(data$time -  ymd(paste("1970", "01", "01", sep = "-")))
     
-    prediction_target_var <- "total_cases_plus_1"
-    continuous_var_names <- c(
-        paste0(c("total_cases_plus_1", "filtered_total_cases_plus_1"), "_lag", rep(seq(from = 0, to = max_lag + 52 * max_seasonal_lag), each=2))
-    )
-    discrete_var_names <- c(
-        paste0(c("total_cases_plus_1", "filtered_total_cases_plus_1"), "_horizon", rep(1:52, each=2))
-    )
-    predictive_vars <- "total_cases_plus_1"
+    if(differencing) {
+        data$total_cases_plus_1_ratio <- data$total_cases_plus_1 / lag(data$total_cases_plus_1, 52)
+        prediction_target_var <- "total_cases_plus_1_ratio"
+        continuous_var_names <- c(
+            paste0(c("total_cases_plus_1_ratio", "filtered_total_cases_plus_1_ratio"), "_horizon", rep(1:52, each=2)),
+            paste0(c("total_cases_plus_1_ratio", "filtered_total_cases_plus_1_ratio"), "_lag", rep(seq(from = 0, to = max_lag + 52 * max_seasonal_lag), each=2))
+        )
+        discrete_var_names <- NULL
+        predictive_vars <- c("total_cases_plus_1_ratio")
+    } else {
+        prediction_target_var <- "total_cases_plus_1"
+    	continuous_var_names <- NULL
+    	discrete_var_names <- c(
+            paste0(c("total_cases_plus_1", "filtered_total_cases_plus_1"), "_lag", rep(seq(from = 0, to = max_lag + 52 * max_seasonal_lag), each=2)),
+            paste0(c("total_cases_plus_1", "filtered_total_cases_plus_1"), "_horizon", rep(1:52, each=2))
+        )
+        predictive_vars <- "total_cases_plus_1"
+    }
     time_var <- "time"
     
     kernel_fn <- log_pdtmvn_kernel
@@ -155,8 +167,8 @@ if(identical(data_set, "ili_national")) {
     crossval_buffer <- ymd("2010-01-01") - ymd("2009-01-01")
 } else if(identical(substr(data_set, 1, 3), "sim")) {
     ## Load functions for generating simulated data
-#    source("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/code/sim-densities-sim-study-discretized-Duong-Hazelton.R")
-    source("/home/er71a/kcde-applied-paper/R/sim-densities-sim-study-discretized-Duong-Hazelton.R")
+    source("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/code/sim-densities-sim-study-discretized-Duong-Hazelton.R")
+#    source("/home/er71a/kcde-applied-paper/R/sim-densities-sim-study-discretized-Duong-Hazelton.R")
     
     ## Get arguments determining size of simulation and simulation family
 #    sim_n <- as.integer(args[9])
@@ -455,7 +467,7 @@ kernel_components <- c(kernel_components,
         upper_trunc_bds <- rep(Inf, nrow(vars_and_offsets))
         names(upper_trunc_bds) <- vars_and_offsets$combined_name
         
-        if("horizon" %in% vars_and_offsets$offset_type || identical(substr(data_set, 1, 3), "sim")) {
+        if((identical(data_set, "dengue_sj") && !differencing) || identical(substr(data_set, 1, 3), "sim")) {
             discrete_var_range_fns <- lapply(
                  discrete_var_names,
                  function(discrete_var_name) {
@@ -551,17 +563,10 @@ kcde_control <- create_kcde_control(X_names = "time_index",
 
 
 ### Do estimation
-#num_cores <- (max_lag + 1) * (filtering + 1) + seasonality
-num_cores <- 1L
-registerDoMC(cores = num_cores)
-fit_time <- system.time({
-    kcde_fit <- kcde(data = data,
-        kcde_control = kcde_control)
-})
-
-
-
-### Save results
+## Read in output from an earlier run if it exists.
+## We started some runs that cut off by the cluster.
+## Read in output to get initial values for parameters that are the
+## best that were realized in that earlier run.
 case_descriptor <- paste0(
     data_set,
     "-prediction_horizon_", prediction_horizon,
@@ -573,6 +578,44 @@ case_descriptor <- paste0(
     "-bw_parameterization_", bw_parameterization
 )
 
+prev_Rout_file <- file.path(
+    "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results",
+    data_set,
+    "estimation-output",
+    paste0("output-kde-estimation-step-",
+        case_descriptor,
+        ".Rout")
+)
+
+if(file.exists(prev_Rout_file)) {
+    Rout_lines <- readLines(prev_Rout_file)
+    first_params_line <- which(Rout_lines == "Scalable Robust Estimators with High Breakdown Point (version 1.3-8)") + 2
+    num_param_values <- length(Rout_lines) - first_params_line + 1
+    best_param_value_ind <- which.min(as.numeric(Rout_lines[
+                seq(from = first_params_line + 1, length = num_param_values, by = 3)
+    ]))
+    init_theta_vector <- as.numeric(strsplit(
+            Rout_lines[first_params_line + 3 * (best_param_value_ind - 1) ],
+            " ")[[1]])
+    init_phi_vector <- NULL # assumes filtering == FALSE, which is the case for everything I'm doing.
+} else {
+    init_theta_vector <- NULL
+    init_phi_vector <- NULL
+}
+
+#num_cores <- (max_lag + 1) * (filtering + 1) + seasonality
+num_cores <- 1L
+registerDoMC(cores = num_cores)
+fit_time <- system.time({
+    kcde_fit <- kcde(data = data,
+        kcde_control = kcde_control,
+        init_theta_vector = init_theta_vector,
+        init_phi_vector = init_phi_vector)
+})
+
+
+
+### Save results
 if(identical(substr(data_set, 1, 3), "sim")) {
     case_descriptor <- paste0(
         case_descriptor,

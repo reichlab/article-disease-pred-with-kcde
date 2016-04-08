@@ -7,15 +7,17 @@ library(doMC)
 
 options(error = recover)
 
-all_data_sets <- c("ili_national")
+#all_data_sets <- c("ili_national")
+all_data_sets <- c("dengue_sj")
 all_prediction_horizons <- seq_len(52)
 all_max_lags <- 1L
-all_max_seasonal_lags <- c(0L, 1L)
+all_max_seasonal_lags <- c(0L)
+#all_max_seasonal_lags <- c(0L, 1L)
 #all_filtering_values <- c(FALSE, TRUE)
 all_filtering_values <- FALSE
 #all_differencing_values <- c(FALSE, TRUE)
-all_differencing_values <- TRUE
-#all_differencing_values <- c(FALSE)
+#all_differencing_values <- TRUE
+all_differencing_values <- c(FALSE)
 all_seasonality_values <- c(FALSE, TRUE)
 all_bw_parameterizations <- c("diagonal", "full")
 
@@ -29,7 +31,7 @@ all_bw_parameterizations <- c("diagonal", "full")
 #all_seasonality_values <- c(TRUE)
 #all_bw_parameterizations <- c("full")
 
-num_cores <- 2L
+num_cores <- 3L
 registerDoMC(cores = num_cores)
 
 for(data_set in all_data_sets) {
@@ -66,6 +68,24 @@ for(data_set in all_data_sets) {
         ## Here, this is calculated as the number of days since some origin date (1970-1-1 in this case).
         ## The origin is arbitrary.
         data$time_index <- as.integer(data$time - ymd(paste("1970", "01", "01", sep = "-")))
+    } else if(identical(data_set, "dengue_sj")) {
+        ## Load data for Dengue fever in San Juan
+        data <- read.csv("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/data-raw/San_Juan_Testing_Data.csv")
+        
+        ## Form variable with total cases + 1 which can be logged, and its seasonally lagged ratio
+        data$total_cases_plus_1 <- data$total_cases + 1
+        data$total_cases_plus_1_ratio <- data$total_cases_plus_1 / lag(data$total_cases_plus_1, 52)
+        
+        ## Row indices in data corresponding to times at which we want to make a prediction
+        prediction_time_inds <- which(data$season %in% paste0(2009:2012, "/", 2010:2013))
+        
+        ## convert dates
+        data$time <- ymd(data$week_start_date)
+        
+        ## Add time_index column.  This is used for calculating the periodic kernel.
+        ## Here, this is calculated as the number of days since some origin date (1970-1-1 in this case).
+        ## The origin is arbitrary.
+        data$time_index <- as.integer(data$time -  ymd(paste("1970", "01", "01", sep = "-")))
     }
     
     
@@ -117,6 +137,13 @@ for(data_set in all_data_sets) {
                             } else {
                                 prediction_target_var <- "weighted_ili"
                             }
+                        } else if(identical(data_set, "dengue_sj")) {
+                            if(differencing) {
+                                prediction_target_var <- "total_cases_plus_1_ratio"
+                                orig_prediction_target_var <- "total_cases_plus_1"
+                            } else {
+                                prediction_target_var <- "total_cases_plus_1"
+                            }
                         }
                         
                         for(seasonality in all_seasonality_values) {
@@ -152,8 +179,71 @@ for(data_set in all_data_sets) {
                                         "-bw_parameterization_", bw_parameterization
                                     )
                                     
-                                    kcde_fit <- readRDS(file.path(results_path,
-                                        paste0("kcde_fit-", case_descriptor, ".rds")))
+                                    kcde_fit_file_path <- file.path(results_path,
+                                        paste0("kcde_fit-", case_descriptor, ".rds"))
+                                    
+                                    ## In my first run of this, one set of kcde estimation results doesn't exist because
+                                    ## it ran out of run time on the cluster.  For now, read in fit with next prediction horizon
+                                    if(!file.exists(kcde_fit_file_path)) {
+                                        file_path_case_descriptor <- paste0(
+                                            data_set,
+                                            "-prediction_horizon_", prediction_horizon + 1,
+                                            "-max_lag_", max_lag,
+                                            "-max_seasonal_lag_", max_seasonal_lag,
+                                            "-filtering_", filtering,
+                                            "-differencing_", differencing,
+                                            "-seasonality_", seasonality,
+                                            "-bw_parameterization_", bw_parameterization
+                                        )
+                                        
+                                        kcde_fit_file_path <- file.path(results_path,
+                                            paste0("kcde_fit-", file_path_case_descriptor, ".rds"))
+                                    }
+                                    kcde_fit <- readRDS(kcde_fit_file_path)
+                                    
+                                    ## If Dengue fit, add truncation lower bound at log(0.5)
+                                    ## This bound was implicitly used during estimation since the smallest
+                                    ## value of the observed variable is 1, with discretization lower bound
+                                    ## for integration of 0.5.  However, it was not specified as part
+                                    ## of the kernel, which artificially deflates the method's log scores.
+                                    ## Here we insert this lower bound on the horizon term to correct this problem.
+                                    ## Also, we fix a bug in the in_range function for discrete variables 
+                                    ## that was supplied at time of estimation.  This function was not used in
+                                    ## estimation, but is required here.
+                                    if(identical(data_set, "dengue_sj") && !differencing) {
+                                        ## Iterate through kernel components looking for the one with the
+                                        ## right variable in it
+                                        for(kernel_component_ind in seq_along(kcde_fit$kcde_control$kernel_components)) {
+                                            kernel_component <- kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]
+                                            if("horizon" %in% kernel_component$vars_and_offsets$offset_type) {
+                                                ## Get variable name whose lower bound we want to update
+                                                horizon_var_name <- kernel_component$vars_and_offsets$combined_name[
+                                                    kernel_component$vars_and_offsets$offset_type == "horizon"]
+                                                
+                                                ## Update lower bound
+                                                lower_bound_update_ind <- which(
+                                                    names(kernel_component$theta_fixed$lower) == horizon_var_name)
+                                                kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]$theta_fixed$lower[lower_bound_update_ind] <-
+#                                                    log(0.5)
+                                                     -Inf
+                                            }
+                                            
+                                            if(!is.null(kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]$theta_fixed$discrete_var_range_fns)) {
+                                                for(var_ind in seq_along(kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]$theta_fixed$discrete_var_range_fns)) {
+                                                    kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]$theta_fixed$discrete_var_range_fns[[var_ind]]$in_range <-
+                                                        function(x, tolerance = .Machine$double.eps^0.5) {
+                                                            return(sapply(x, function(x_i) {
+                                                                return(isTRUE(all.equal(x_i, 
+                                                                    kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]$theta_fixed$discrete_var_range_fns[[var_ind]]$discretizer(x_i))))
+                                                            }))
+                                                        }
+                                                }
+                                                
+                                                kcde_fit$theta_hat[[kernel_component_ind]]$discrete_var_range_fns <-
+                                                    kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]$theta_fixed$discrete_var_range_fns
+                                            }
+                                        }
+                                    }
                                     
                                     ## Get index of analysis time in data set
                                     ## (time from which we predict forward)
@@ -229,6 +319,12 @@ for(data_set in all_data_sets) {
                 } # filtering
             } # max_seasonal_lag
         } # max_lag
+        
+        saveRDS(ph_results, file = file.path(
+                "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results",
+                data_set,
+                "prediction-results",
+                paste0("kcde-predictions-ph_", prediction_horizon, ".rds")))
         
         return(ph_results)
     } # prediction_horizon -- in foreach/dopar statement

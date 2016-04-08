@@ -37,67 +37,14 @@ sample_predictive_trajectories_arima <- function (object, h = ifelse(object$arma
         10), level = c(80, 95), fan = FALSE, xreg = NULL, lambda = object$lambda, 
         npaths = 5000, ...) 
 {
-    bootstrap <- TRUE
-    all.args <- names(formals())
-    user.args <- names(match.call())[-1L]
-    check <- user.args %in% all.args
-    if (!all(check)) {
-        error.args <- user.args[!check]
-        warning(sprintf("The non-existent %s arguments will be ignored.", 
-                error.args))
+    sim <- matrix(NA, nrow = npaths, ncol = h)
+    
+    for (i in 1:npaths) {
+        sim[i, ] <- simulate.Arima(object,
+            nsim = h)
     }
-    use.drift <- is.element("drift", names(object$coef))
-    x <- object$x <- getResponse(object)
-    usexreg <- (!is.null(xreg) | use.drift | is.element("xreg", 
-                names(object)))
-    if (!is.null(xreg)) {
-        origxreg <- xreg <- as.matrix(xreg)
-        h <- nrow(xreg)
-    }
-    else origxreg <- NULL
-    if (fan) 
-        level <- seq(51, 99, by = 3)
-    else {
-        if (min(level) > 0 & max(level) < 1) 
-            level <- 100 * level
-        else if (min(level) < 0 | max(level) > 99.99) 
-            stop("Confidence limit out of range")
-    }
-    if (use.drift) {
-        n <- length(x)
-        if (!is.null(xreg)) 
-            xreg <- cbind((1:h) + n, xreg)
-        else xreg <- as.matrix((1:h) + n)
-    }
-    if (!is.null(object$constant)) {
-        if (object$constant) 
-            pred <- list(pred = rep(x[1], h), se = rep(0, h))
-        else stop("Strange value of object$constant")
-    }
-    else if (usexreg) {
-        if (is.null(xreg)) 
-            stop("No regressors provided")
-        object$call$xreg <- getxreg(object)
-        if (ncol(xreg) != ncol(object$call$xreg)) 
-            stop("Number of regressors does not match fitted model")
-        pred <- predict(object, n.ahead = h, newxreg = xreg)
-    }
-    else pred <- predict(object, n.ahead = h)
-    if (!is.null(x)) {
-        tspx <- tsp(x)
-        nx <- max(which(!is.na(x)))
-        if (nx != length(x)) {
-            tspx[2] <- time(x)[nx]
-            start.f <- tspx[2] + 1/tspx[3]
-            pred$pred <- ts(pred$pred, frequency = tspx[3], start = start.f)
-            pred$se <- ts(pred$se, frequency = tspx[3], start = start.f)
-        }
-    }
-    nint <- length(level)
-        sim <- matrix(NA, nrow = npaths, ncol = h)
-        for (i in 1:npaths) sim[i, ] <- simulate(object, nsim = h, 
-                bootstrap = TRUE, xreg = origxreg, lambda = lambda)
-        return(sim)
+    
+    return(sim)
 }
 
 
@@ -229,6 +176,8 @@ for(analysis_time_season in analysis_seasons) {
         ## through analysis_time_ind
         new_data <- seasonally_differenced_log_prediction_target[
             seq_len(max(0, analysis_time_ind - 52))]
+        last_na_ind <- max(which(is.na(new_data)))
+        new_data <- new_data[seq(from = last_na_ind + 1, to = length(new_data))]
         updated_log_sarima_fit <- Arima(
             new_data,
             model = seasonally_differenced_log_sarima_fit)

@@ -34,7 +34,7 @@ if(identical(data_set, "ili_national")) {
     all_seasonality_values <- c("FALSE", "TRUE")
     all_bw_parameterizations <- c("diagonal", "full")
     
-    ili_incidence_bins <- data.frame(
+    incidence_bins <- data.frame(
         lower = seq(from = 0, to = 13, by = 0.5),
         upper = c(seq(from = 0.5, to = 13, by = 0.5), Inf))
     
@@ -53,6 +53,10 @@ if(identical(data_set, "ili_national")) {
     all_sim_n <- "NA"
     all_sim_families <- "NA"
     all_sim_run_inds <- 1L
+    
+    incidence_bins <- data.frame(
+        lower = seq(from = 0, to = 500, by = 50),
+        upper = c(seq(from = 50, to = 500, by = 50), Inf))
     
 #        save_path <- "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/R/application-influenza/estimation-results"
     results_path <- "/home/er71a/kcde-applied-paper/R/application-dengue/estimation-results"
@@ -206,33 +210,21 @@ junk <- foreach(case_row_ind = seq_len(nrow(case_definitions)),
             data$weighted_ili_ratio <- data$weighted_ili / lag(data$weighted_ili, 52) 
             orig_prediction_target_var <- "weighted_ili"
             prediction_target_var <- "weighted_ili_ratio"
-            train_seasons <- paste0(seq(from = 1998, to = 2009), "/", seq(from = 1999, to = 2010))
         } else {
             orig_prediction_target_var <- "weighted_ili"
             prediction_target_var <- "weighted_ili"
-            train_seasons <- paste0(seq(from = 1997, to = 2009), "/", seq(from = 1998, to = 2010))
         }
         
-        kernel_fn <- log_pdtmvn_kernel
-        rkernel_fn <- rlog_pdtmvn_kernel
-        
-        variable_selection_method <- "all_included"
-        crossval_buffer <- ymd("2010-01-01") - ymd("2009-01-01")
-        
-        season_length <- 33L
         analysis_seasons <- c("2011/2012", "2012/2013", "2013/2014")
         first_analysis_time_season_week <- 10 # == week 40 of year
         last_analysis_time_season_week <- 41 # analysis for 33-week season, consistent with flu competition -- at week 41, we do prediction for a horizon of one week ahead
     } else if(identical(data_set, "dengue_sj")) {
         ## Load data for Dengue fever in San Juan
-        data <- read.csv("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/data/San_Juan_Training_Data.csv")
-        
-        ## Restrict to data from 1990/1991 through 2008/2009 seasons
-        train_seasons <- paste0(1990:2008, "/", 1991:2009)
-        data <- data[data$season %in% train_seasons, ]
+        data <- read.csv("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/data-raw/San_Juan_Testing_Data.csv")
         
         ## Form variable with total cases + 1 which can be logged
         data$total_cases_plus_1 <- data$total_cases + 1
+        data$total_cases_plus_1_ratio <- data$total_cases_plus_1 / lag(data$total_cases_plus_1, 52)
         
         ## convert dates
         data$time <- ymd(data$week_start_date)
@@ -242,13 +234,20 @@ junk <- foreach(case_row_ind = seq_len(nrow(case_definitions)),
         ## The origin is arbitrary.
         data$time_index <- as.integer(data$time -  ymd(paste("1970", "01", "01", sep = "-")))
         
-        prediction_target_var <- "total_cases_plus_1"
+        if(differencing) {
+            orig_prediction_target_var <- "total_cases_plus_1"
+            prediction_target_var <- "total_cases_plus_1_ratio"
+        } else {
+            orig_prediction_target_var <- "total_cases_plus_1"
+            prediction_target_var <- "total_cases_plus_1"
+        }
         
-        kernel_fn <- log_pdtmvn_kernel
-        rkernel_fn <- rlog_pdtmvn_kernel
-        
-        variable_selection_method <- "all_included"
-        crossval_buffer <- ymd("2010-01-01") - ymd("2009-01-01")
+        analysis_seasons <- c("2009/2010",
+            "2010/2011",
+            "2011/2012",
+            "2012/2013")
+        first_analysis_time_season_week <- 1
+        last_analysis_time_season_week <- 51
     }
     
     results <- cbind(
@@ -274,12 +273,9 @@ junk <- foreach(case_row_ind = seq_len(nrow(case_definitions)),
                 (data[, orig_prediction_target_var] == observed_peak_height))
         observed_peak_week <- data$season_week[observed_peak_week_ind]
         
-        if(identical(data_set, "ili_national")) {
-            observed_peak_height <- which(
-                ili_incidence_bins$lower <= observed_peak_height &
-                    ili_incidence_bins$upper > observed_peak_height)
-        }
-#        observed_peak_height <- 
+        observed_peak_height <- which(
+            incidence_bins$lower <= observed_peak_height &
+                incidence_bins$upper > observed_peak_height)
         
         for(analysis_time_season_week in seq(from = first_analysis_time_season_week, to = last_analysis_time_season_week - 1)) {
             ### simulate from copula that ties the marginal predictive distributions together
@@ -364,13 +360,11 @@ junk <- foreach(case_row_ind = seq_len(nrow(case_definitions)),
                 peak_week_by_sim_ind
             
             peak_week_height_by_sim_ind <- trajectory_samples[cbind(seq_len(n_sims), peak_week_by_sim_ind)]
-            if(identical(data_set, "ili_national")) {
-                peak_week_height_by_sim_ind <- sapply(peak_week_height_by_sim_ind,
-                    function(height) {
-                        which(ili_incidence_bins$lower <= height &
-                            ili_incidence_bins$upper > height)
-                })
-            }
+            peak_week_height_by_sim_ind <- sapply(peak_week_height_by_sim_ind,
+                function(height) {
+                    which(incidence_bins$lower <= height &
+                        incidence_bins$upper > height)
+            })
             
             results[results_save_row, paste0("peak_height_", seq_len(n_sims))] <-
                 peak_week_height_by_sim_ind

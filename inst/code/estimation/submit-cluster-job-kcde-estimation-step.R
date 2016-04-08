@@ -1,27 +1,28 @@
 options(warn = 2, error = recover)
 
 #all_data_sets <- c("ili_national")
-all_data_sets <- c("sim")
+#all_data_sets <- c("sim")
+all_data_sets <- c("dengue_sj")
 
 mem_req <- "1000"
-time_req <- "72:00"
+time_req <- "600:00"
 queue_req <- "long"
 
 for(data_set in all_data_sets) {
     if(identical(data_set, "ili_national")) {
-        all_prediction_horizons <- as.character(seq_len(52))
-#        all_prediction_horizons <- as.character(9)
+#        all_prediction_horizons <- as.character(seq_len(52))
+        all_prediction_horizons <- as.character(14)
         all_max_lags <- as.character(c(1L))
-        all_max_seasonal_lags <- as.character(c(0L, 1L))
-#        all_max_seasonal_lags <- as.character(1L)
+#        all_max_seasonal_lags <- as.character(c(0L, 1L))
+        all_max_seasonal_lags <- as.character(1L)
 #        all_filtering_values <- c("FALSE", "TRUE")
         all_filtering_values <- c("FALSE")
         all_differencing_values <- c("FALSE", "TRUE")
         all_seasonality_values <- c("FALSE", "TRUE")
 #        all_differencing_values <- c("TRUE")
 #        all_seasonality_values <- c("TRUE")
-        all_bw_parameterizations <- c("diagonal", "full")
-#        all_bw_parameterizations <- "full"
+#        all_bw_parameterizations <- c("diagonal", "full")
+        all_bw_parameterizations <- "full"
         all_sim_n <- "NA"
         all_sim_families <- "NA"
         all_sim_run_inds <- 1L
@@ -35,9 +36,21 @@ for(data_set in all_data_sets) {
         all_max_seasonal_lags <- as.character(c(0L, 1L))
 #        all_filtering_values <- c("FALSE", "TRUE")
         all_filtering_values <- c("FALSE")
-        all_differencing_values <- c("FALSE", "TRUE")
+#        all_differencing_values <- c("FALSE", "TRUE")
+        all_differencing_values <- c("FALSE")
+#        all_differencing_values <- c("TRUE")
         all_seasonality_values <- c("FALSE", "TRUE")
         all_bw_parameterizations <- c("diagonal", "full")
+        
+        all_prediction_horizons <- as.character(45L)
+        all_max_lags <- as.character(c(1L))
+        all_max_seasonal_lags <- as.character(c(1L))
+#        all_filtering_values <- c("FALSE", "TRUE")
+        all_filtering_values <- c("FALSE")
+        all_differencing_values <- c("TRUE")
+        all_seasonality_values <- c("TRUE")
+        all_bw_parameterizations <- c("diagonal")
+        
         all_sim_n <- "NA"
         all_sim_families <- "NA"
         all_sim_run_inds <- 1L
@@ -60,15 +73,16 @@ for(data_set in all_data_sets) {
 #        all_sim_n <- c("100")
 #        all_sim_families <- c("bivariate-B-discretized",
 #            "bivariate-C-discretized",
-#        all_sim_families <- c("multivariate-2d-discretized",
-#            "multivariate-4d-discretized", 
-#            "multivariate-6d-discretized")
         all_sim_families <- c("multivariate-2d-discretized",
-            "multivariate-4d-discretized")
-#        all_sim_families <- c("multivariate-4d-discretized")
-#        all_sim_run_inds <- seq(from = 1, to = 100)
-#        all_sim_run_inds <- 9L
-        all_sim_run_inds <- c(seq(from = 1, to = 8), seq(from = 10, to = 100))
+            "multivariate-4d-discretized", 
+            "multivariate-6d-discretized")
+#        all_sim_families <- c("multivariate-2d-discretized")
+#            "multivariate-4d-discretized")
+#        all_sim_families <- c("multivariate-4d-discretized",
+#            "multivariate-6d-discretized")
+        all_sim_run_inds <- seq(from = 101, to = 500)
+#        all_sim_run_inds <- 1L
+#        all_sim_run_inds <- c(seq(from = 1, to = 8), seq(from = 10, to = 100))
         
 #        all_bw_parameterizations <- c("diagonal")
 #        all_sim_n <- c("100")
@@ -93,9 +107,23 @@ for(data_set in all_data_sets) {
                                 for(differencing in all_differencing_values) {
                                     for(seasonality in all_seasonality_values) {
                                         for(bw_parameterization in all_bw_parameterizations) {
-                                            if(data_set %in% c("ili_national", "dengue_sj")) {
+                                            if(identical(data_set, "ili_national")) {
                                                 data_set_and_sim_run_ind <- data_set
                                                 lsfoutfilename <- "kcde-est-applications.out"
+                                                case_descriptor <- paste0(
+                                                    data_set,
+                                                    "-prediction_horizon_", prediction_horizon,
+                                                    "-max_lag_", max_lag,
+                                                    "-max_seasonal_lag_", max_seasonal_lag,
+                                                    "-filtering_", filtering,
+                                                    "-differencing_", differencing,
+                                                    "-seasonality_", seasonality,
+                                                    "-bw_parameterization_", bw_parameterization
+                                                )
+						results_filename <- paste0(results_path, "/kcde_fit-", case_descriptor, ".rds")
+                                            } else if(identical(data_set, "dengue_sj")) {
+                                                data_set_and_sim_run_ind <- data_set
+                                                lsfoutfilename <- "kcde-est-application-dengue.out"
                                                 case_descriptor <- paste0(
                                                     data_set,
                                                     "-prediction_horizon_", prediction_horizon,

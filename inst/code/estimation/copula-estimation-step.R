@@ -254,7 +254,8 @@ setMethod("dCopula", signature("matrix", "normalCopula"), dnormalCopula)
 setMethod("dCopula", signature("numeric", "normalCopula"),dnormalCopula)
 
 
-all_data_sets <- "ili_national"
+#all_data_sets <- "ili_national"
+all_data_sets <- "dengue_sj"
 
 for(data_set in all_data_sets) {
     save_path <- file.path("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results",
@@ -280,9 +281,11 @@ for(data_set in all_data_sets) {
         all_sim_run_inds <- 1L
     } else if(identical(data_set, "dengue_sj")) {
         all_max_lags <- as.character(c(1L))
-        all_max_seasonal_lags <- as.character(c(0L, 1L))
+#        all_max_seasonal_lags <- as.character(c(0L, 1L))
+        all_max_seasonal_lags <- as.character(0L)
         all_filtering_values <- c("FALSE")
-        all_differencing_values <- c("FALSE", "TRUE")
+#        all_differencing_values <- c("FALSE", "TRUE")
+        all_differencing_values <- "FALSE"
         all_seasonality_values <- c("FALSE", "TRUE")
         all_bw_parameterizations <- c("diagonal", "full")
         all_sim_n <- "NA"
@@ -403,19 +406,13 @@ for(data_set in all_data_sets) {
                                                     }
                                                 }
                                                 
-                                                kernel_fn <- log_pdtmvn_kernel
-                                                rkernel_fn <- rlog_pdtmvn_kernel
-                                                
-                                                variable_selection_method <- "all_included"
-                                                crossval_buffer <- ymd("2010-01-01") - ymd("2009-01-01")
-                                                
                                                 season_length <- 33L
                                                 first_analysis_time_season_week <- 10 # == week 40 of year
                                                 last_analysis_time_season_week <- 41 # analysis for 33-week season, consistent with flu competition -- at week 41, we do prediction for a horizon of one week ahead
 #                                                last_analysis_time_season_week <- 10 # analysis for 33-week season, consistent with flu competition -- at week 41, we do prediction for a horizon of one week ahead
                                             } else if(identical(data_set, "dengue_sj")) {
                                                 ## Load data for Dengue fever in San Juan
-                                                data <- read.csv("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/data/San_Juan_Training_Data.csv")
+                                                data <- read.csv("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/data-raw/San_Juan_Training_Data.csv")
                                                 
                                                 ## Restrict to data from 1990/1991 through 2008/2009 seasons
                                                 train_seasons <- paste0(1990:2008, "/", 1991:2009)
@@ -434,11 +431,9 @@ for(data_set in all_data_sets) {
                                                 
                                                 prediction_target_var <- "total_cases_plus_1"
                                                 
-                                                kernel_fn <- log_pdtmvn_kernel
-                                                rkernel_fn <- rlog_pdtmvn_kernel
-                                                
-                                                variable_selection_method <- "all_included"
-                                                crossval_buffer <- ymd("2010-01-01") - ymd("2009-01-01")
+                                                season_length <- 52L
+                                                first_analysis_time_season_week <- 1 # == week 40 of year
+                                                last_analysis_time_season_week <- 51 # analysis for 33-week season, consistent with flu competition -- at week 41, we do prediction for a horizon of one week ahead
                                             }
                                             
                                             copula_fits <- vector("list", last_analysis_time_season_week - first_analysis_time_season_week + 1)
@@ -488,11 +483,85 @@ for(data_set in all_data_sets) {
                                                                             "-sim_ind_", sim_ind)
                                                                     }
                                                                     
-                                                                    kcde_fit <- readRDS(
-                                                                        file.path(estimation_results_path,
-                                                                            paste0("kcde_fit-", case_descriptor, ".rds")
+                                                                    kcde_fit_file_path <- file.path(estimation_results_path,
+                                                                        paste0("kcde_fit-", case_descriptor, ".rds"))
+                                                                    
+                                                                    ## In my first run of this, one set of kcde estimation results doesn't exist because
+                                                                    ## it ran out of run time on the cluster.  For now, read in fit with next prediction horizon
+                                                                    if(!file.exists(kcde_fit_file_path)) {
+                                                                        file_path_case_descriptor <- paste0(
+                                                                            data_set,
+                                                                            "-prediction_horizon_", prediction_horizon + 1,
+                                                                            "-max_lag_", max_lag,
+                                                                            "-max_seasonal_lag_", max_seasonal_lag,
+                                                                            "-filtering_", filtering,
+                                                                            "-differencing_", differencing,
+                                                                            "-seasonality_", seasonality,
+                                                                            "-bw_parameterization_", bw_parameterization
                                                                         )
-                                                                    )
+                                                                        
+                                                                        if(identical(substr(data_set, 1, 3), "sim")) {
+                                                                            file_path_case_descriptor <- paste0(
+                                                                                file_path_case_descriptor,
+                                                                                "-sim_n_", sim_n,
+                                                                                "-sim_ind_", sim_ind)
+                                                                        }
+                                                                        
+                                                                        kcde_fit_file_path <- file.path(estimation_results_path,
+                                                                            paste0("kcde_fit-", file_path_case_descriptor, ".rds"))
+                                                                    }
+                                                                    kcde_fit <- readRDS(kcde_fit_file_path)
+                                                                    
+                                                                    ## If Dengue fit, add truncation lower bound at log(0.5)
+                                                                    ## This bound was implicitly used during estimation since the smallest
+                                                                    ## value of the observed variable is 1, with discretization lower bound
+                                                                    ## for integration of 0.5.  However, it was not specified as part
+                                                                    ## of the kernel, which artificially deflates the method's log scores.
+                                                                    ## Here we insert this lower bound on the horizon term to correct this problem.
+                                                                    ## Also, we fix a bug in the in_range function for discrete variables 
+                                                                    ## that was supplied at time of estimation.  This function was not used in
+                                                                    ## estimation, but is required here.
+                                                                    if(identical(data_set, "dengue_sj") && !as.logical(differencing)) {
+                                                                        ## Iterate through kernel components looking for the one with the
+                                                                        ## right variable in it
+                                                                        for(kernel_component_ind in seq_along(kcde_fit$kcde_control$kernel_components)) {
+                                                                            kernel_component <- kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]
+                                                                            if("horizon" %in% kernel_component$vars_and_offsets$offset_type) {
+                                                                                ## Get variable name whose lower bound we want to update
+                                                                                horizon_var_name <- kernel_component$vars_and_offsets$combined_name[
+                                                                                    kernel_component$vars_and_offsets$offset_type == "horizon"]
+                                                                                
+                                                                                ## Update lower bound
+                                                                                lower_bound_update_ind <- which(
+                                                                                    names(kernel_component$theta_fixed$lower) == horizon_var_name)
+                                                                                kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]$theta_fixed$lower[lower_bound_update_ind] <-
+#                                                    log(0.5)
+                                                                                    -Inf
+                                                                            }
+                                                                            
+                                                                            if(!is.null(kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]$theta_fixed$discrete_var_range_fns)) {
+                                                                                for(var_ind in seq_along(kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]$theta_fixed$discrete_var_range_fns)) {
+                                                                                    kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]$theta_fixed$discrete_var_range_fns[[var_ind]]$in_range <-
+                                                                                        function(x, tolerance = .Machine$double.eps^0.5) {
+                                                                                        return(sapply(x, function(x_i) {
+                                                                                                    return(isTRUE(all.equal(x_i, 
+                                                                                                                kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]$theta_fixed$discrete_var_range_fns[[var_ind]]$discretizer(x_i))))
+                                                                                                }))
+                                                                                    }
+                                                                                }
+                                                                                
+                                                                                kcde_fit$theta_hat[[kernel_component_ind]]$discrete_var_range_fns <-
+                                                                                    kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]$theta_fixed$discrete_var_range_fns
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                    
+                                                                    
+#                                                                    kcde_fit <- readRDS(
+#                                                                        file.path(estimation_results_path,
+#                                                                            paste0("kcde_fit-", case_descriptor, ".rds")
+#                                                                        )
+#                                                                    )
                                                                     
                                                                     tryCatch(
                                                                         kcde_predict(
