@@ -1,0 +1,2967 @@
+\documentclass[Crown, sagev]{sagej}
+
+\usepackage{amssymb, amsmath, amsfonts}
+\usepackage[list=off]{caption} % list=off option prevents errors when using math environments within captions
+
+
+\include{GrandMacros}
+\newcommand{\cdf}{{c.d.f.} }
+\newcommand{\pdf}{{p.d.f.} }
+\newcommand{\ind}{\mathbb{I}}
+
+\begin{document}
+
+\title{Supplementary materials for infectious disease prediction with kernel
+conditional density estimation}
+
+\author{Evan L. Ray\affilnum{1},
+Krzysztof Sakrejda\affilnum{1},
+Stephen A. Lauer\affilnum{1},
+Nicholas G. Reich\affilnum{1}}
+
+\affiliation{\affilnum{1}Department of Biostatistics and Epidemiology,
+University of Massachusetts, Amherst}
+
+\corrauth{Evan Ray, UMass Address Here}
+
+\email{elray@umass.edu}
+
+
+\maketitle
+
+<<knitrGlobalSetup, echo = FALSE>>=
+library(cdcfluview)
+
+library(stringr)
+
+library(reshape2)
+library(plyr)
+suppressMessages(library(dplyr))
+library(tidyr)
+suppressMessages(library(lubridate))
+
+library(ggplot2)
+library(grid)
+
+library(kcde)
+suppressMessages(suppressWarnings(library(pdtmvn)))
+
+suppressMessages(library(forecast))
+
+opts_chunk$set(cache = TRUE)
+#opts_chunk$set(cache = TRUE, autodep = TRUE)
+#opts_chunk$set(cache = FALSE)
+@
+
+
+<<LoadFluData, echo = FALSE>>=
+junk <- capture.output({
+    usflu <- suppressMessages(get_flu_data("national", "ilinet", years=1997:2015))
+})
+ili_national <- suppressWarnings(transmute(usflu,
+    region.type = REGION.TYPE,
+    region = REGION,
+    year = YEAR,
+    week = WEEK,
+    weighted_ili = as.numeric(X..WEIGHTED.ILI)))
+ili_national$time <- ymd(paste(ili_national$year, "01", "01", sep = "-"))
+week(ili_national$time) <- ili_national$week
+ili_national$time_index <- seq_len(nrow(ili_national))
+
+## Season column: for example, weeks of 2010 up through and including week 30 get season 2009/2010;
+## weeks after week 30 get season 2010/2011
+ili_national$season <- ifelse(
+    ili_national$week <= 30,
+    paste0(ili_national$year - 1, "/", ili_national$year),
+    paste0(ili_national$year, "/", ili_national$year + 1)
+)
+
+## Season week column: week number within season
+ili_national$season_week <- sapply(seq_len(nrow(ili_national)), function(row_ind) {
+        sum(ili_national$season == ili_national$season[row_ind] &
+                ili_national$time_index <= ili_national$time_index[row_ind])
+    })
+
+
+## Subset to data actually used in this analysis -- up through end of 2014.
+ili_national <- ili_national[ili_national$year <= 2014, , drop = FALSE]
+
+## cutoff time for training data
+ili_train_cutoff_time <- ili_national$time[max(which(ili_national$year == 2010))]
+@
+
+<<LoadDengueData, echo = FALSE>>=
+dengue_sj <- read.csv("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/data-raw/San_Juan_Testing_Data.csv")
+
+## convert dates
+dengue_sj$time <- ymd(dengue_sj$week_start_date)
+
+## cutoff time for training data
+dengue_train_cutoff_time <- dengue_sj$time[max(which(dengue_sj$season == "2008/2009"))]
+@
+
+
+\section{Introduction}
+
+In this document we collect the supplementary materials for the article,
+following the organization of the original article.
+
+\section{Method Description}
+\label{sec:Methods}
+
+\subsection{Discretizing the Kernel Function}
+
+We obtain the discrete kernel function by discretizing an underlying continuous
+kernel function:
+\begin{align*}
+&K^{inc}_{disc}(\tilde{\bz}_{t^*}, \tilde{\bz}_{t}; \bB^h) = \int_{a_{z_{t^* - l_1}}}^{b_{z_{t^* - l_1}}} \cdots \int_{a_{z_{t^* + h}}}^{b_{z_{t^* + h}}} K^{Incidence}_{cont}(\tilde{\bz}_{t^*}, \tilde{\bz}_{t}; \bB^h) \, d z_{t^* - l_1} \cdots d z_{t^* + h}
+\end{align*}
+For each component variable in $(z_{t^* - l_1}, \ldots, z_{t^* - l_M}, z_{t^* +
+h})$, we associate lower and upper bounds of integration $a_{z_j}$ and $b_{z_j}$
+with each value in the domain of that random variable.  The value of the
+kernel function is obtained by integrating over the hyper-rectangle
+specified by these bounds.  In our application, the possible values of the
+random variables are non-negative integer case counts.  In order to facilitate use of the log-normal
+kernel, we add $0.5$ to the observed case counts; the
+corresponding integration bounds are the non-negative integers as illustrated in
+Figure~\ref{fig:IncidenceKernelPlots}.
+
+\begin{figure}
+\caption{Illustrations of $K^{\text{inc}}_{\text{cont}}$ and
+$K^{\text{inc}}_{\text{disc}}$ in the bivariate case.  Solid lines show contours of the
+continuous kernel function.  Grey dots indicate the value of the discrete kernel
+function.  The value of the discrete kernel is
+obtained by integrating the continuous kernel over regions as illustrated by the
+dashed lines in panels (a) and (b).  In all panels the kernel function is
+centered at $(2.5, 2.5)$.  In panels (a) and (b) the bandwidth matrix is 
+$\begin{bmatrix}0.2 & 0 \\ 0 & 0.2\end{bmatrix}$, and in panels (c) and (d)
+the bandwidth matrix is $\begin{bmatrix}0.2 & 0.15 \\ 0.15 & 0.2\end{bmatrix}$.
+ We illustrate each case with both linear and logarithmic scale axes.}
+\label{fig:IncidenceKernelPlots}
+<<IncidenceKernelPlots, echo = FALSE, fig.keep = "last">>=
+cont_grid_bounds <- c(0.01, 10)
+cont_grid_size <- 101
+x_cont_grid <- 
+    expand.grid(
+        seq(from = cont_grid_bounds[1], to = cont_grid_bounds[2], length = cont_grid_size),
+        seq(from = cont_grid_bounds[1], to = cont_grid_bounds[2], length = cont_grid_size)
+    ) %>%
+    `colnames<-`(c("X1", "X2"))
+disc_grid_bounds <- c(0.5, 9.5)
+x_disc_grid <-
+    expand.grid(
+        seq(from = disc_grid_bounds[1], to = disc_grid_bounds[2], by = 1),
+        seq(from = disc_grid_bounds[1], to = disc_grid_bounds[2], by = 1)
+    ) %>%
+    `colnames<-`(c("X1", "X2"))
+
+
+#' Compute log(round(exp(x))) in such a way that the rounding function
+#' always rounds up or down to an integer + 0.5, and
+#' an integer always gets rounded up.
+#' 
+#' @param x numeric
+#' 
+#' @return floor(x) - 1
+log_round_to_integer_plus_0.5_exp <- function(x) {
+    exp_x <- exp(x) + 0.5
+    
+    inds_ceil <- exp_x - floor(exp_x) >= 0.5
+    
+    exp_x[inds_ceil] <- ceiling(exp_x[inds_ceil])
+    exp_x[!inds_ceil] <- floor(exp_x[!inds_ceil])
+    
+    return(log(exp_x - 0.5))
+}
+
+
+
+
+continuous_density_df_a <- x_cont_grid %>%
+    as.data.frame() %>%
+    `$<-`("z",
+#        sapply(seq_len(nrow(x_cont_grid)), function(x_grid_row_ind) {
+#                log_pdtmvn_kernel(x = as.matrix(x_cont_grid)[x_grid_row_ind, , drop = FALSE],
+                log_pdtmvn_mode_centered_kernel(x = x_cont_grid,
+                    center = as.matrix(data.frame(X1 = 2.5, X2 = 2.5)),
+                    bw = matrix(c(.2, 0, 0, .2), nrow = 2, ncol = 2),
+                    bw_continuous = matrix(c(.2, 0, 0, .2), nrow = 2, ncol = 2),
+                    continuous_vars = c("X1", "X2"),
+                    discrete_vars = character(0),
+                    continuous_var_col_inds = 1:2,
+                    discrete_var_col_inds = integer(0),
+                    discrete_var_range_fns = NULL,
+#                    lower = c(X1 = log(0.5), X2 = log(0.5)),
+                    lower = c(X1 = -Inf, X2 = -Inf),
+                    upper = c(X1 = Inf, X2 = Inf),
+                    x_names = c("X1", "X2"),
+                    log = FALSE)
+#            })
+    )
+discrete_density_df_a <- x_disc_grid %>%
+    as.data.frame() %>%
+    `colnames<-`(c("X1", "X2")) %>%
+    `$<-`("z",
+#        sapply(seq_len(nrow(x_disc_grid)), function(x_grid_row_ind) {
+#                log_pdtmvn_kernel(x = as.matrix(x_disc_grid)[x_grid_row_ind, , drop = FALSE],
+                log_pdtmvn_mode_centered_kernel(x = x_disc_grid,
+                    center = as.matrix(data.frame(X1 = 2.5, X2 = 2.5)),
+                    bw = matrix(c(.2, 0, 0, .2), nrow = 2, ncol = 2),
+                    bw_continuous = matrix(0, nrow = 0, ncol = 0),
+                    continuous_vars = character(0),
+                    discrete_vars = c("X1", "X2"),
+                    continuous_var_col_inds = integer(0),
+                    discrete_var_col_inds = 1:2,
+                    discrete_var_range_fns = list(
+                        X1 = list(a = function(x) {
+                                return(log(exp(x) - 0.5))
+                            },
+                            b = function(x) {
+                                return(log(exp(x) + 0.5))
+                            },
+                            in_range = function(x, tolerance = .Machine$double.eps^0.5) {
+                                return(sapply(x, function(x_i) {
+                                            return(
+                                                isTRUE(all.equal(
+                                                        x_i,
+                                                        log_round_to_integer_plus_0.5_exp(x_i),
+                                                        tolerance = tolerance
+                                                    ))
+                                            )
+                                        }))
+                            },
+                            discretizer = log_round_to_integer_plus_0.5_exp),
+                        X2 = list(a = function(x) {
+                                return(log(exp(x) - 0.5))
+                            },
+                            b = function(x) {
+                                return(log(exp(x) + 0.5))
+                            },
+                            in_range = function(x, tolerance = .Machine$double.eps^0.5) {
+                                return(sapply(x, function(x_i) {
+                                            return(
+                                                isTRUE(all.equal(
+                                                        x_i,
+                                                        log_round_to_integer_plus_0.5_exp(x_i),
+                                                        tolerance = tolerance
+                                                    ))
+                                            )
+                                        }))
+                            },
+                            discretizer = log_round_to_integer_plus_0.5_exp)
+                        ),
+#                    lower = c(X1 = log(0.5), X2 = log(0.5)),
+                    lower = c(X1 = -Inf, X2 = -Inf),
+                    upper = c(X1 = Inf, X2 = Inf),
+                    x_names = c("X1", "X2"),
+                    log = FALSE)
+#            })
+    )
+
+int_area_xlim <- 1:2
+int_area_ylim <- 5:6
+integration_area_polygon_df <-
+    data.frame(id = 1,
+        value = 1,
+        x = rep(int_area_xlim, each = 2),
+        y = c(int_area_ylim, rev(int_area_ylim)))
+
+p_a_regular_scale <- ggplot() +
+    geom_polygon(aes(x = x, y = y, group = id),
+        fill = "grey",
+        data = integration_area_polygon_df) +
+    geom_hline(yintercept = int_area_ylim, linetype = 2) +
+    geom_vline(xintercept = int_area_xlim, linetype = 2) +
+    geom_contour(aes(x = X1, y = X2, z = z, colour = z), bins = 7, data = continuous_density_df_a) +
+    geom_point(aes(x = X1, y = X2, colour = z), data = discrete_density_df_a) +
+    scale_colour_gradientn("Discrete\nKernel\nValue",
+        colours = rev(c("#333333", "#777777", "#BBBBBB", "#FFFFFF")),
+#        colours = rev(c("#555555", "#666666", "#777777", "#888888", "#999999", "#AAAAAA", "#BBBBBB", "#CCCCCC", "#DDDDDD", "#EEEEEE", "#FFFFFF")),
+#        colours = rev(c("#000000", "#111111", "#222222", "#333333", "#444444", "#555555", "#666666", "#777777", "#888888", "#999999", "#AAAAAA", "#BBBBBB", "#CCCCCC", "#DDDDDD", "#EEEEEE", "#FFFFFF")),
+#        limits = c(10^{-10}, 1),
+        trans = "log",
+#        values = c(0, seq(from = exp(-10), to = 1, length = 15))) +
+#        values = c(0, exp(seq(from = log(10^-3), to = log(1), length = 15)))
+#        values = c(0, exp(seq(from = log(5 * 10^-4), to = log(1), length = 15)))
+#        values = c(0.0001, 0.001, 0.01, 0.1, 1),
+#        values = c(-4, -3, -2, -1),
+        limits = c(0.00001, 0.2),
+        breaks = c(0.0001, 0.001, 0.01, 0.1, 1),
+        labels = c(expression(10^{-4}), expression(10^{-3}), expression(10^{-2}), expression(10^{-1}), "1   "),
+#        breaks = c(0.001, 0.01, 0.1, 1),
+#        labels = c(expression(10^{-3}), expression(10^{-2}), expression(10^{-1}), "1   "),
+        na.value = "white"
+    ) +
+    xlab(expression(X[1])) +
+    ylab(expression(X[2])) +
+    ggtitle("(a) Diagonal bandwidth\nLinear axes") +
+    theme_bw()
+
+print(p_a_regular_scale)
+legend_grob <- grid.get("guide-box.3-5-3-5")
+
+## update p_a_regular_scale to not print legend
+p_a_regular_scale <- p_a_regular_scale +
+    theme(legend.position = "none")
+    
+
+p_a_log_scale <- p_a_regular_scale +
+    scale_x_log10() +
+    scale_y_log10() +
+    ggtitle("(b) Diagonal bandwidth\nLogarithmic axes")
+
+var_b <- 0.2
+covar_b <- 0.15
+
+
+continuous_density_df_b <- x_cont_grid %>%
+    as.data.frame() %>%
+    `$<-`("z",
+        log_pdtmvn_mode_centered_kernel(x = x_cont_grid,
+            center = as.matrix(data.frame(X1 = 2.5, X2 = 2.5)),
+            bw = matrix(c(var_b, covar_b, covar_b, var_b), nrow = 2, ncol = 2),
+            bw_continuous = matrix(c(var_b, covar_b, covar_b, var_b), nrow = 2, ncol = 2),
+            continuous_vars = c("X1", "X2"),
+            discrete_vars = character(0),
+            continuous_var_col_inds = 1:2,
+            discrete_var_col_inds = integer(0),
+            discrete_var_range_fns = NULL,
+            lower = c(X1 = -Inf, X2 = -Inf),
+#            lower = c(X1 = log(0.5), X2 = log(0.5)),
+            upper = c(X1 = Inf, X2 = Inf),
+            x_names = c("X1", "X2"),
+            log = FALSE)
+    )
+
+#x_disc_grid <- data.frame(X1 = c(1, 3), X2 = c(1, 3))
+#debug(pdtmvn::dpdtmvn)
+discrete_density_df_b <- x_disc_grid %>%
+    as.data.frame() %>%
+    `$<-`("z",
+#        sapply(seq_len(nrow(x_disc_grid)), function(x_grid_row_ind) {
+                log_pdtmvn_mode_centered_kernel(x = x_disc_grid,
+                    center = as.matrix(data.frame(X1 = 2.5, X2 = 2.5)),
+                    bw = matrix(c(var_b, covar_b, covar_b, var_b), nrow = 2, ncol = 2),
+                    bw_continuous = matrix(0, nrow = 0, ncol = 0),
+                    continuous_vars = character(0),
+                    discrete_vars = c("X1", "X2"),
+                    continuous_var_col_inds = integer(0),
+                    discrete_var_col_inds = 1:2,
+                    discrete_var_range_fns = list(
+                        X1 = list(a = function(x) {
+                                return(log(exp(x) - 0.5))
+                            },
+                            b = function(x) {
+                                return(log(exp(x) + 0.5))
+                            },
+                            in_range = function(x, tolerance = .Machine$double.eps^0.5) {
+                                return(sapply(x, function(x_i) {
+                                            return(
+                                                isTRUE(all.equal(
+                                                        x_i,
+                                                        log_round_to_integer_plus_0.5_exp(x_i),
+                                                        tolerance = tolerance
+                                                    ))
+                                            )
+                                        }))
+                            },
+                            discretizer = log_round_to_integer_plus_0.5_exp),
+                        X2 = list(a = function(x) {
+                                return(log(exp(x) - 0.5))
+                            },
+                            b = function(x) {
+                                return(log(exp(x) + 0.5))
+                            },
+                            in_range = function(x, tolerance = .Machine$double.eps^0.5) {
+                                return(sapply(x, function(x_i) {
+                                            return(
+                                                isTRUE(all.equal(
+                                                        x_i,
+                                                        log_round_to_integer_plus_0.5_exp(x_i),
+                                                        tolerance = tolerance
+                                                    ))
+                                            )
+                                        }))
+                            },
+                            discretizer = log_round_to_integer_plus_0.5_exp)
+                        ),
+#                    lower = c(X1 = log(0.5), X2 = log(0.5)),
+                    lower = c(X1 = -Inf, X2 = -Inf),
+                    upper = c(X1 = Inf, X2 = Inf),
+                    x_names = c("X1", "X2"),
+                    log = FALSE)
+#            })
+    )
+
+p_b_regular_scale <- ggplot() +
+    geom_contour(aes(x = X1, y = X2, z = z), bins = 7, data = continuous_density_df_b) +
+    geom_point(aes(x = X1, y = X2, colour = z), data = discrete_density_df_b) +
+#    scale_colour_gradientn("Predictive\nDistribution\nProbability",
+#        colours = rev(c("#333333", "#777777", "#BBBBBB", "#FFFFFF")),
+##        colours = rev(c("#555555", "#666666", "#777777", "#888888", "#999999", "#AAAAAA", "#BBBBBB", "#CCCCCC", "#DDDDDD", "#EEEEEE", "#FFFFFF")),
+##        colours = rev(c("#000000", "#111111", "#222222", "#333333", "#444444", "#555555", "#666666", "#777777", "#888888", "#999999", "#AAAAAA", "#BBBBBB", "#CCCCCC", "#DDDDDD", "#EEEEEE", "#FFFFFF")),
+##        limits = c(10^{-10}, 1),
+#        trans = "log",
+##        values = c(0, seq(from = exp(-10), to = 1, length = 15))) +
+##        values = c(0, exp(seq(from = log(10^-3), to = log(1), length = 15)))
+##        values = c(0, exp(seq(from = log(5 * 10^-4), to = log(1), length = 15)))
+#        values = c(0.0001, 0.001, 0.01, 0.1, 1),
+##        values = c(-4, -3, -2, -1),
+#        breaks = c(0.0001, 0.001, 0.01, 0.1, 1),
+#        labels = c(expression(10^{-4}), expression(10^{-3}), expression(10^{-2}), expression(10^{-1}), "1   "),
+##        breaks = c(0.001, 0.01, 0.1, 1),
+##        labels = c(expression(10^{-3}), expression(10^{-2}), expression(10^{-1}), "1   "),
+#        na.value = "white"
+#    ) +
+    scale_colour_gradientn("Predictive\nDistribution\nProbability",
+        colours = rev(c("#333333", "#777777", "#BBBBBB", "#FFFFFF")),
+#        colours = rev(c("#555555", "#666666", "#777777", "#888888", "#999999", "#AAAAAA", "#BBBBBB", "#CCCCCC", "#DDDDDD", "#EEEEEE", "#FFFFFF")),
+#        colours = rev(c("#000000", "#111111", "#222222", "#333333", "#444444", "#555555", "#666666", "#777777", "#888888", "#999999", "#AAAAAA", "#BBBBBB", "#CCCCCC", "#DDDDDD", "#EEEEEE", "#FFFFFF")),
+#        limits = c(10^{-10}, 1),
+        trans = "log",
+#        values = c(0, seq(from = exp(-10), to = 1, length = 15))) +
+#        values = c(0, exp(seq(from = log(10^-3), to = log(1), length = 15)))
+#        values = c(0, exp(seq(from = log(5 * 10^-4), to = log(1), length = 15)))
+#        values = c(0.0001, 0.001, 0.01, 0.1, 1),
+#        values = c(-4, -3, -2, -1),
+        limits = c(0.00001, 0.2),
+        breaks = c(0.0001, 0.001, 0.01, 0.1, 1),
+        labels = c(expression(10^{-4}), expression(10^{-3}), expression(10^{-2}), expression(10^{-1}), "1   "),
+#        breaks = c(0.001, 0.01, 0.1, 1),
+#        labels = c(expression(10^{-3}), expression(10^{-2}), expression(10^{-1}), "1   "),
+        na.value = "white"
+    ) +
+    #    geom_point(aes(x = exp(log(3) - var_b - covar_b), y = exp(log(3) - var_b - covar_b)), colour = "red") +
+    xlab(expression(X[1])) +
+    ylab(expression(X[2])) +
+    ggtitle("(c) Non-diagonal bandwidth\nLinear axes") +
+    theme_bw() +
+    theme(legend.position = "none")
+
+p_b_log_scale <- p_b_regular_scale +
+    scale_x_log10() +
+    scale_y_log10() +
+    ggtitle("(c) Non-diagonal bandwidth\nLogarithmic axes")
+
+grid.newpage()
+#grid.layout(nrow = 2, ncol = 2, heights = unit(rep(1, 2), c("null", "lines")))
+pushViewport(viewport(layout = grid.layout(nrow = 2, ncol = 3,
+            heights = unit(rep(1, 2), c("null", "null")),
+            widths = unit(c(1, 1, 0.3), c("null", "null", "null")))))
+pushViewport(viewport(layout.pos.row = 1:2, layout.pos.col = 3))
+grid.draw(legend_grob)
+upViewport()
+print(p_a_regular_scale, vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
+print(p_a_log_scale, vp = viewport(layout.pos.row = 1, layout.pos.col = 2))
+print(p_b_regular_scale, vp = viewport(layout.pos.row = 2, layout.pos.col = 1))
+print(p_b_log_scale, vp = viewport(layout.pos.row = 2, layout.pos.col = 2))
+@
+\end{figure}
+
+
+\section{Simulation Study}
+\label{sec:SimStudy}
+
+\subsection{Simulation Distributions}
+
+In the simulation study, we simulate data from discretized multivariate normal
+distributions.  The method for discretizing the underlying multivariate normal
+is the same as we described above for descritizing the kernel function.  As
+we discussed in the paper, the normal distribution has mean $\b0$ and covariance
+matrix with $1$ on the diagonal and $0.9$ off of the diagonal.  This
+multivariate normal distribution was used in one of the simulation studies
+conducted by Duong and
+Hazelton\cite{duong2005crossvalidationBandwidthMultivariateKDE} demonstrating
+that a fully parameterized bandwidth matrix could yield improved density
+estimates for joint density estimation with continuous distributions.
+We discretize this distribution at the half-integers as illustrated for the
+two-dimensional case in Figure~\ref{fig:SimStudyDistribution}.
+
+\begin{figure}
+\caption{The distribution that we simulate data from in the simulation study,
+for the case of $D = 2$.}
+\label{fig:SimStudyDistribution}
+<<SimStudyDistributionsDiscretizedDuongHazelton, echo = FALSE, fig.height = 6>>=
+library(ggplot2)
+library(grid)
+library(plyr)
+library(dplyr)
+library(tidyr)
+library(pdtmvn)
+library(kcde)
+source("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/code/sim-densities-sim-study-discretized-Duong-Hazelton.R")
+
+## Density family multivariate-2d
+n_sim <- 10000
+discrete_sample <- sim_from_pdtmvn_mixt(n = n_sim, sim_family = "multivariate-2d-discretized") %>%
+    as.data.frame()
+continuous_sample <- sim_from_pdtmvn_mixt(n = n_sim, sim_family = "multivariate-2d") %>%
+    as.data.frame()
+discrete_sample_counts <- discrete_sample %>%
+    count(X1, X2)
+
+cont_grid_bounds <- c(-4, 4)
+cont_grid_size <- 101
+x_cont_grid <- 
+    expand.grid(
+        seq(from = cont_grid_bounds[1], to = cont_grid_bounds[2], length = cont_grid_size),
+        seq(from = cont_grid_bounds[1], to = cont_grid_bounds[2], length = cont_grid_size)
+    ) %>%
+    `colnames<-`(c("X1", "X2"))
+disc_grid_bounds <- c(-4, 4)
+x_disc_grid <-
+    expand.grid(
+        seq(from = disc_grid_bounds[1], to = disc_grid_bounds[2], by = 0.5),
+        seq(from = disc_grid_bounds[1], to = disc_grid_bounds[2], by = 0.5)
+    ) %>%
+    `colnames<-`(c("X1", "X2"))
+
+x_disc_grid$density <- d_pdtmvn_mixt_conditional(X = x_disc_grid,
+    sim_family = "multivariate-2d-discretized",
+    conditional = FALSE,
+    log = FALSE)
+
+ggplot() +
+#    geom_contour(aes(x = X1, y = X2, z = density), bins = 7, data = continuous_density_df_b) +
+    geom_point(aes(x = X1, y = X2, colour = density), data = x_disc_grid) +
+    scale_colour_gradientn("Distribution\nProbability",
+        colours = rev(c("#333333", "#777777", "#BBBBBB", "#FFFFFF")),
+#        colours = rev(c("#555555", "#666666", "#777777", "#888888", "#999999", "#AAAAAA", "#BBBBBB", "#CCCCCC", "#DDDDDD", "#EEEEEE", "#FFFFFF")),
+#        colours = rev(c("#000000", "#111111", "#222222", "#333333", "#444444", "#555555", "#666666", "#777777", "#888888", "#999999", "#AAAAAA", "#BBBBBB", "#CCCCCC", "#DDDDDD", "#EEEEEE", "#FFFFFF")),
+#        limits = c(10^{-10}, 1),
+        trans = "log",
+#        values = c(0, seq(from = exp(-10), to = 1, length = 15))) +
+#        values = c(0, exp(seq(from = log(10^-3), to = log(1), length = 15)))
+#        values = c(0, exp(seq(from = log(5 * 10^-4), to = log(1), length = 15)))
+#        values = c(0.0001, 0.001, 0.01, 0.1, 1),
+#        values = c(-4, -3, -2, -1),
+        limits = c(0.00001, 0.2),
+        breaks = c(0.0001, 0.001, 0.01, 0.1, 1),
+        labels = c(expression(10^{-4}), expression(10^{-3}), expression(10^{-2}), expression(10^{-1}), "1   "),
+#        breaks = c(0.001, 0.01, 0.1, 1),
+#        labels = c(expression(10^{-3}), expression(10^{-2}), expression(10^{-1}), "1   "),
+        na.value = "white"
+    ) +
+    #    geom_point(aes(x = exp(log(3) - var_b - covar_b), y = exp(log(3) - var_b - covar_b)), colour = "red") +
+    xlab(expression(X[1])) +
+    ylab(expression(X[2])) +
+    ggtitle("Simulation Density for D = 2") +
+    theme_bw()# +
+#    theme(legend.position = "none")
+@
+\end{figure}
+
+\subsection{Hellinger Distance}
+
+The Hellinger distance of the estimated density
+$\widehat{f}(x)$ from the true density $f(x)$ is given by
+\begin{align*}
+\text{Hellinger}(f, \widehat{f}) = \left[ 1 - \int \left\{ f(x)\widehat{f}(x) \right\}^{\frac{1}{2}} \, d x \right]^{\frac{1}{2}}
+\end{align*}
+
+In the simulation study, we measure the quality of a conditional density
+estimate by integrating the Hellinger distance over the range of the
+conditioning variables, weighting according to the density of those
+conditioning variables:
+\begin{align}
+&\text{Score}\{\widehat{f}(x_1 | x_2, \ldots, x_D)\} \nonumber \\
+&\qquad = \int \cdots \int \left[\text{Hellinger} \{ f(x_1 | x_2, \ldots, x_D), \widehat{f}(x_1 | x_2, \ldots, x_D) \}\right] f(x_2, \ldots, x_D) d x_2 \cdots d x_D \nonumber \\
+&\qquad = \int \cdots \int \left[ 1 - \int \left\{ f(x_1 | x_2, \ldots, x_D)\widehat{f}(x_1 | x_2, \ldots, x_D) \right\}^{\frac{1}{2}} \, d x_1 \right]^{\frac{1}{2}} f(x_2, \ldots, x_D) d x_2 \cdots d x_D \nonumber \\
+&\qquad = \int \cdots \int \left[ 1 - \int \left\{ \frac{\widehat{f}(x_1 | x_2, \ldots, x_D)}{f(x_1 | x_2, \ldots, x_D)} \right\}^{\frac{1}{2}} f(x_1 | x_2, \ldots, x_D) \, d x_1 \right]^{\frac{1}{2}} f(x_2, \ldots, x_D) d x_2 \cdots d x_D \label{eqn:ScoreLastEqn}
+\end{align}
+
+We perform Monte Carlo integration to evaluate the integrals in
+Equation~\eqref{eqn:ScoreLastEqn} by sampling observations
+$(x_{i,1}, \ldots, x_{i,D})$ from the joint distribution of $\bX$.
+
+
+\section{Applications}
+\label{sec:Applications}
+
+\subsection{Prediction Targets}
+
+As we discussed in the main article, there are three prediction targets for
+each data set:
+\begin{enumerate}
+\item For each week in the test data, we obtain a
+predictive distribution for the incidence measure in that week at each prediction horizon
+from 1 to 52 weeks ahead.
+\item In each week of the test data set, we make
+predictions for the timing of the peak week of the corresponding season.
+\item In each week of the test data set we predict incidence in the peak
+week for the corresponding season.  Following the precedent set in the
+competitions, we make predictions for \textit{binned} incidence in the peak
+week.
+\end{enumerate}
+These prediction targets are illustrated in
+Figure~\ref{fig:PredictionTargetsIllustration}.
+
+
+\begin{figure}
+\caption{Illustration of the prediction targets using one season of the dengue
+data.  The solid vertical line indicates the timing of the peak week.  The solid
+horizontal line indicates the incidence at the peak week.  The points
+along the vertical axis indicate the incidence
+at every week for the 52 weeks after the time at which predictions are made.}
+\label{fig:PredictionTargetsIllustration}
+<<FigPredictionTargetsIllustration, echo = FALSE, fig.height = 4>>=
+targets_illustration_df <- dengue_sj[seq(from = which(dengue_sj$time == dengue_train_cutoff_time) + 52, length = 52), ]
+
+ind_max <- which.max(targets_illustration_df$total_cases)
+
+peak_time_df <- data.frame(
+    x1 = as.Date(targets_illustration_df$time[ind_max]),
+    x2 = as.Date(targets_illustration_df$time[ind_max]),
+    y1 = 0,
+    y2 = targets_illustration_df$total_cases[ind_max])
+
+peak_inc_df <- data.frame(
+    x1 = as.Date(targets_illustration_df$time[1]),
+    x2 = as.Date(targets_illustration_df$time[ind_max]),
+    y1 = targets_illustration_df$total_cases[ind_max],
+    y2 = targets_illustration_df$total_cases[ind_max])
+
+weekly_inc_df <- data.frame(
+    x1 = rep(as.Date(targets_illustration_df$time[1]), 52),
+    x2 = as.Date(targets_illustration_df$time),
+    y1 = targets_illustration_df$total_cases,
+    y2 = targets_illustration_df$total_cases)
+
+weekly_inc_df <- data.frame(
+    x1 = rep(as.Date(targets_illustration_df$time[1]), 52),
+    x2 = as.Date(targets_illustration_df$time),
+    y1 = targets_illustration_df$total_cases,
+    y2 = targets_illustration_df$total_cases,
+    shape = "Incidence in\nIndividual Weeks")
+
+p <- ggplot() +
+    geom_segment(aes(x = x1,
+            y = y1,
+            xend = x2,
+            yend = y2),
+        data = peak_time_df) +
+    geom_segment(aes(x = x1,
+            y = y1,
+            xend = x2,
+            yend = y2),
+        data = peak_inc_df) +
+    geom_segment(aes(x = x1,
+            y = y1,
+            xend = x2,
+            yend = y2),
+        linetype = 2,
+        colour = "lightgrey",
+        data = weekly_inc_df) +
+    geom_line(aes(x = as.Date(time), y = total_cases),
+        data = targets_illustration_df) +
+    geom_point(aes(x = x1,
+            y = y2,
+            shape = shape),
+        data = weekly_inc_df) +
+    scale_shape("") +
+    scale_x_date(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0), limits = c(0, 300)) +
+#    geom_line(aes(x = as.Date(time), y = weighted_ili),
+#        data = ili_national[seq(from = which(ili_national$time == ili_train_cutoff_time), length = 104), ]) +
+#    geom_vline(aes(xintercept = as.numeric(as.Date(time))),
+#        colour = "grey",
+#        data = ili_national[is.na(ili_national$weighted_ili), ]) +
+#    geom_vline(aes(xintercept = as.numeric(as.Date(ili_train_cutoff_time))),
+#        colour = "red", linetype = 2) +
+#    scale_x_date() +
+#    scale_x_date(limits = time_limits, expand = c(0, 0)) +
+    xlab("Time") +
+    ylab("Reported Cases\n") +
+    ggtitle("Illustration of Prediction Targets") +
+    theme_bw(base_size = 11) +
+    theme(plot.margin = unit(c(6, 6, 6, 18), "points"))
+
+print(p)
+
+grid_list <- capture.output(grid.ls())
+
+xlab_grob_name <- str_trim(grid_list[grep("xlab", grid_list)])
+downViewport(xlab_grob_name)
+grid.text("Peak Week",
+    x = unit(0.31, "npc"),
+    y = unit(1, "npc"),
+    gp = gpar(fontsize = 9))
+upViewport(0)
+
+ylab_grob_name <- str_trim(grid_list[grep("ylab", grid_list)])
+downViewport(ylab_grob_name)
+grid.text("Incidence at\nPeak Week",
+    x = unit(1.6, "npc"),
+    y = unit(0.925, "npc"),
+    just = "right",
+    gp = gpar(fontsize = 9))
+upViewport(0)
+@
+\end{figure}
+
+
+\subsection{Baseline SARIMA Model}
+
+We use a SARIMA model as a baseline to compare our approach to.  In
+fitting this model, we first transformed the observed incidence measure to the
+log scale (after adding $1$ in the Dengue data set, which included some
+observations of $0$ cases); this transformation makes the normality assumptions
+of the SARIMA model more plausible.  We then performed first-order seasonal
+differencing, and obtained the final model fits
+using the {\tt auto.arima} function in {\tt R}'s {\tt forecast}
+package\cite{hyndmanRForecastPackage}; this function uses a stepwise
+procedure to determine the terms to include in the model.
+This procedure resulted in a 
+<<ILISarimaModelFitSummary, echo = FALSE, results = "asis">>=
+ili_sarima_fit <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/ili_national/estimation-results/sarima-fit.rds")
+temp <- capture.output(summary(ili_sarima_fit))
+cat(paste0("SARIMA(", substr(temp[2], 7, 15), as.integer(substr(temp[2], 16,16)) + 1, substr(temp[2], 17, 18), ")$_{52}$")) 
+@
+model for the influenza data and a 
+<<DengueSarimaModelFitSummary, echo = FALSE, results = "asis">>=
+dengue_sarima_fit <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/dengue_sj/estimation-results/sarima-fit.rds")
+temp <- capture.output(summary(dengue_sarima_fit))
+cat(paste0("SARIMA(", substr(temp[2], 7, 15), as.integer(substr(temp[2], 16, 16)) + 1, substr(temp[2], 17, 18), ")$_{52}$")) 
+@
+model for the Dengue data.  We note that a different SARIMA model was
+used as a baseline in the Dengue competition.
+
+\subsection{Predictive Distributions for Individual Weeks}
+
+
+
+<<DengueDataMergePredictionResults, echo = FALSE>>=
+dengue_prediction_results_sarima <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/dengue_sj/prediction-results/sarima-predictions.rds")
+dengue_prediction_results_kcde <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/dengue_sj/prediction-results/kcde-predictions.rds")
+dengue_prediction_results_kcde$model <- "KCDE"
+dengue_prediction_results <- rbind.fill(dengue_prediction_results_sarima[!is.na(dengue_prediction_results_sarima$log_score), ],
+    dengue_prediction_results_kcde)
+dengue_prediction_results$AE <- unlist(dengue_prediction_results$AE)
+     
+dengue_prediction_results$full_model_descriptor <- paste0(dengue_prediction_results$model,
+    "-seasonal_lag_", dengue_prediction_results$max_seasonal_lag,
+#    "-filtering_", dengue_prediction_results$filtering,
+    "-differencing_", dengue_prediction_results$differencing,
+    "-periodic_", dengue_prediction_results$seasonality,
+    "-bw_", dengue_prediction_results$bw_parameterization)
+
+dengue_prediction_log_score_diffs_from_sarima_wide <- dengue_prediction_results %>%
+    select(full_model_descriptor, prediction_time, prediction_horizon, log_score) %>%
+    spread(full_model_descriptor, log_score)
+
+dengue_prediction_log_score_diffs_from_sarima_wide[, unique(dengue_prediction_results$full_model_descriptor)] <-
+    dengue_prediction_log_score_diffs_from_sarima_wide[, unique(dengue_prediction_results$full_model_descriptor)] -
+    dengue_prediction_log_score_diffs_from_sarima_wide[, "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"]
+
+dengue_prediction_log_score_diffs_from_sarima_long <- dengue_prediction_log_score_diffs_from_sarima_wide %>%
+    gather_("model", "log_score_difference", unique(dengue_prediction_results$full_model_descriptor)) %>%
+    mutate(
+        seasonal_lag = grepl("seasonal_lag_1", model),
+        differencing = grepl("differencing_TRUE", model),
+        periodic = grepl("periodic_TRUE", model),
+        bw_full = grepl("bw_full", model)
+    )
+dengue_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor <- "Null Model"
+dengue_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    dengue_prediction_log_score_diffs_from_sarima_long$periodic & !dengue_prediction_log_score_diffs_from_sarima_long$bw_full] <-
+    "Periodic Kernel"
+dengue_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    !dengue_prediction_log_score_diffs_from_sarima_long$periodic & dengue_prediction_log_score_diffs_from_sarima_long$bw_full] <-
+    "Full Bandwidth"
+dengue_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    dengue_prediction_log_score_diffs_from_sarima_long$periodic & dengue_prediction_log_score_diffs_from_sarima_long$bw_full] <-
+    "Periodic Kernel,\nFull Bandwidth"
+dengue_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor <-
+    factor(dengue_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor,
+        levels = c("Null Model", "Full Bandwidth", "Periodic Kernel", "Periodic Kernel,\nFull Bandwidth"))
+@
+
+<<FluDataMergePredictionResults, echo = FALSE>>=
+ili_prediction_results_sarima <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/ili_national/prediction-results/sarima-predictions.rds")
+ili_prediction_results_kcde <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/ili_national/prediction-results/kcde-predictions.rds")
+ili_prediction_results_kcde$model <- "KCDE"
+ili_prediction_results <- rbind.fill(ili_prediction_results_sarima[!is.na(ili_prediction_results_sarima$log_score), ],
+    ili_prediction_results_kcde)
+ili_prediction_results$AE <- unlist(ili_prediction_results$AE)
+
+ili_prediction_results$full_model_descriptor <- paste0(ili_prediction_results$model,
+    "-seasonal_lag_", ili_prediction_results$max_seasonal_lag,
+#    "-filtering_", ili_prediction_results$filtering,
+    "-differencing_", ili_prediction_results$differencing,
+    "-periodic_", ili_prediction_results$seasonality,
+    "-bw_", ili_prediction_results$bw_parameterization)
+
+ili_prediction_log_score_diffs_from_sarima_wide <- ili_prediction_results %>%
+    select(full_model_descriptor, prediction_time, prediction_horizon, log_score) %>%
+    spread(full_model_descriptor, log_score)
+
+ili_prediction_log_score_diffs_from_sarima_wide[, unique(ili_prediction_results$full_model_descriptor)] <-
+    ili_prediction_log_score_diffs_from_sarima_wide[, unique(ili_prediction_results$full_model_descriptor)] -
+    ili_prediction_log_score_diffs_from_sarima_wide[, "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"]
+
+ili_prediction_log_score_diffs_from_sarima_long <- ili_prediction_log_score_diffs_from_sarima_wide %>%
+    gather_("model", "log_score_difference", unique(ili_prediction_results$full_model_descriptor)) %>%
+    mutate(
+        seasonal_lag = grepl("seasonal_lag_1", model),
+        differencing = grepl("differencing_TRUE", model),
+        periodic = grepl("periodic_TRUE", model),
+        bw_full = grepl("bw_full", model)
+    )
+ili_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor <- "Null Model"
+ili_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    ili_prediction_log_score_diffs_from_sarima_long$periodic & !ili_prediction_log_score_diffs_from_sarima_long$bw_full] <-
+    "Periodic Kernel"
+ili_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    !ili_prediction_log_score_diffs_from_sarima_long$periodic & ili_prediction_log_score_diffs_from_sarima_long$bw_full] <-
+    "Full Bandwidth"
+ili_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    ili_prediction_log_score_diffs_from_sarima_long$periodic & ili_prediction_log_score_diffs_from_sarima_long$bw_full] <-
+    "Periodic Kernel,\nFull Bandwidth"
+ili_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor <-
+    factor(ili_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor,
+        levels = c("Null Model", "Full Bandwidth", "Periodic Kernel", "Periodic Kernel,\nFull Bandwidth"))
+@
+
+\begin{figure}
+\caption{Differences in log scores for the weekly predictive distributions among
+pairs of models across all combinations of prediction horizon and prediction time in the test period.
+In panel (a) positive values indicate cases when KCDE outperformed SARIMA.  In panel
+(b) positive values indicate cases when the specification of KCDE with the
+periodic kernel outperformed the corresponding specification without the periodic kernel.
+In panel (c) positive values indicate cases when the specification of KCDE with
+a fully parameterized bandwidth outperformed the KCDE specification with a diagonal
+bandwidth matrix.}
+\label{fig:AggregatedFluResultsBoxPlots}
+<<FluDataResultsAggregatedBoxplots, echo = FALSE>>=
+models_used <- unique(ili_prediction_results$full_model_descriptor[
+    !ili_prediction_results$differencing & !(ili_prediction_results$max_seasonal_lag == 1)])
+
+dengue_prediction_log_score_diffs_from_sarima_long$data_set <- "Dengue"
+ili_prediction_log_score_diffs_from_sarima_long$data_set <- "Influenza"
+combined_prediction_log_score_diffs_from_sarima_long <-
+    rbind(dengue_prediction_log_score_diffs_from_sarima_long,
+        ili_prediction_log_score_diffs_from_sarima_long)
+
+boxplot_sarima_contrasts <- ggplot() +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(y = log_score_difference, x = reduced_model_descriptor, colour = data_set),
+        data = combined_prediction_log_score_diffs_from_sarima_long[combined_prediction_log_score_diffs_from_sarima_long$model %in% models_used, ]) +
+#        data = ili_prediction_log_score_diffs_from_sarima_long[ili_prediction_log_score_diffs_from_sarima_long$model %in% models_used, ]) +
+#    ylim(c(-4, 4)) +
+    scale_colour_discrete("Data Set") +
+    ggtitle("(a) Comparison of KCDE with SARIMA") +
+#    xlab("Model") +
+    xlab("") +
+    ylab("Log Score Difference") +
+#    ylab("Log Score KCDE -\nLog Score SARIMA") +
+    theme_bw(base_size = 11)# +
+#    theme(axis.text.x=element_text(angle = -90, hjust = 0))
+
+
+
+ili_contrast_periodic_kernel <- ili_prediction_log_score_diffs_from_sarima_long %>%
+    filter(model %in% models_used) %>%
+    select_("prediction_time", "prediction_horizon", "log_score_difference",
+        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
+    spread_("periodic",
+        "log_score_difference") %>%
+    mutate(
+        contrast_value = `TRUE` - `FALSE`)
+ili_contrast_periodic_kernel$fixed_values <- "Null Model"
+ili_contrast_periodic_kernel$fixed_values[ili_contrast_periodic_kernel$bw_full] <-
+    "Full Bandwidth"
+ili_contrast_periodic_kernel$fixed_values <-
+    factor(ili_contrast_periodic_kernel$fixed_values,
+        levels = c("Null Model", "Full Bandwidth"))
+
+combined_contrast_periodic_kernel <- combined_prediction_log_score_diffs_from_sarima_long %>%
+    filter(model %in% models_used) %>%
+    select_("prediction_time", "prediction_horizon", "log_score_difference",
+        "seasonal_lag", "differencing", "periodic", "bw_full", "data_set") %>%
+    spread_("periodic",
+        "log_score_difference") %>%
+    mutate(
+        contrast_value = `TRUE` - `FALSE`)
+combined_contrast_periodic_kernel$fixed_values <- "Null Model"
+combined_contrast_periodic_kernel$fixed_values[ili_contrast_periodic_kernel$bw_full] <-
+    "Full Bandwidth"
+combined_contrast_periodic_kernel$fixed_values <-
+    factor(ili_contrast_periodic_kernel$fixed_values,
+        levels = c("Null Model", "Full Bandwidth"))
+
+
+#boxplot_periodic_kernel_contrasts <- ggplot(ili_contrast_periodic_kernel) +
+boxplot_periodic_kernel_contrasts <- ggplot(combined_contrast_periodic_kernel) +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value, colour = data_set)) +
+#    facet_wrap( ~ fixed_values, ncol = 1) +
+    scale_colour_discrete("Data Set") +
+    ggtitle("(b) Effect of Adding Periodic Kernel to Model") +
+#    xlab("Base Model") +
+    xlab("") +
+    ylab("Log Score Difference") +
+#    ylab("Log Score Model With Periodic Kernel -\nLog Score Model Without Periodic Kernel") +
+    theme_bw(base_size = 11)
+
+
+
+ili_contrast_bw_full <- ili_prediction_log_score_diffs_from_sarima_long %>%
+    filter(model %in% models_used) %>%
+    select_("prediction_time", "prediction_horizon", "log_score_difference",
+        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
+    spread_("bw_full",
+        "log_score_difference") %>%
+    mutate(
+        contrast_value = `TRUE` - `FALSE`)
+ili_contrast_bw_full$fixed_values <- "Null Model"
+ili_contrast_bw_full$fixed_values[ili_contrast_bw_full$periodic] <-
+    "Periodic Kernel"
+ili_contrast_bw_full$fixed_values <-
+    factor(ili_contrast_bw_full$fixed_values,
+        levels = c("Null Model", "Periodic Kernel"))
+
+combined_contrast_bw_full <- combined_prediction_log_score_diffs_from_sarima_long %>%
+    filter(model %in% models_used) %>%
+    select_("prediction_time", "prediction_horizon", "log_score_difference",
+        "seasonal_lag", "differencing", "periodic", "bw_full", "data_set") %>%
+    spread_("bw_full",
+        "log_score_difference") %>%
+    mutate(
+        contrast_value = `TRUE` - `FALSE`)
+combined_contrast_bw_full$fixed_values <- "Null Model"
+combined_contrast_bw_full$fixed_values[combined_contrast_bw_full$periodic] <-
+    "Periodic Kernel"
+combined_contrast_bw_full$fixed_values <-
+    factor(combined_contrast_bw_full$fixed_values,
+        levels = c("Null Model", "Periodic Kernel"))
+
+#boxplot_bw_full_contrasts <- ggplot(ili_contrast_bw_full) +
+boxplot_bw_full_contrasts <- ggplot(combined_contrast_bw_full) +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value, colour = data_set)) +
+#    facet_wrap( ~ fixed_values, ncol = 1) +
+    scale_colour_discrete("Data Set") +
+    ggtitle("(c) Effect of Adding Fully Parameterized BW to Model") +
+#    xlab("Base Model") +
+    xlab("") +
+    ylab("Log Score Difference") +
+#    ylab("Log Score Model With Full Bandwidth -\nLog Score Model With Diagonal Bandwidth") +
+    theme_bw(base_size = 11)
+
+
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(nrow = 3, ncol = 1)))
+print(boxplot_sarima_contrasts, vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
+print(boxplot_periodic_kernel_contrasts, vp = viewport(layout.pos.row = 2, layout.pos.col = 1))
+print(boxplot_bw_full_contrasts, vp = viewport(layout.pos.row = 3, layout.pos.col = 1))
+@
+\end{figure}
+
+\lboxit{to do: christmas effect plot in supplemental materials}
+
+
+\begin{figure}
+\caption{Differences in log scores for the weekly predictive distributions from
+the KCDE specification with a periodic kernel component and fully parameterized
+bandwidth and the SARIMA model.  Each point corresponds to a unique combination
+of prediction target week and prediction horizon.}
+\label{fig:DengueLogScoreDifferencesVsObsIncidence}
+<<DengueLogScoreDifferencesVsObsIncidence, echo = FALSE>>=
+#ili_prediction_log_score_diffs_from_sarima_long$fixed_values <-
+#    as.character(ili_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor)
+#ili_prediction_log_score_diffs_from_sarima_long$contrast_value <-
+#    ili_prediction_log_score_diffs_from_sarima_long$log_score_difference
+#ili_prediction_log_score_diffs_from_sarima_long$contrast_type <- "Difference from SARIMA"
+#ili_contrast_periodic_kernel$contrast_type <- "Effect of Adding Periodic Kernel"
+#ili_contrast_bw_full$contrast_type <- "Effect of Adding Full Bandwidth"
+#
+#ili_contrasts_merged <- rbind.fill(
+#    ili_prediction_log_score_diffs_from_sarima_long[ili_prediction_log_score_diffs_from_sarima_long$model %in% models_used, ],
+#    ili_contrast_periodic_kernel,
+#    ili_contrast_bw_full)
+#
+#ggplot(ili_contrasts_merged) +
+#    geom_hline(yintercept = 0) +
+#    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value)) +
+#    facet_wrap( ~ contrast_type, ncol = 1) +
+##    ggtitle("Effect of Adding Fully Parameterized BW to Model") +
+#    xlab("") +
+#    ylab("Log Score Difference") +
+#    theme_bw()
+
+temp <- dengue_sj[, c("time", "total_cases", "season")]
+colnames(temp) <- c("prediction_time", "total_cases", "season")
+
+dengue_prediction_log_score_diffs_from_sarima_long_test <-
+    dengue_prediction_log_score_diffs_from_sarima_long %>%
+    left_join(temp, by = "prediction_time")
+
+#ggplot() +
+#    geom_point(aes(x = total_cases, y = log_score_difference),
+#        data = dengue_prediction_log_score_diffs_from_sarima_long_test) +
+#    facet_wrap( ~ model, ncol = 1) +
+#    theme_bw()
+
+ggplot() +
+    geom_point(aes(x = total_cases, y = log_score_difference),
+        data = dengue_prediction_log_score_diffs_from_sarima_long_test[dengue_prediction_log_score_diffs_from_sarima_long_test$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full", ]) +
+    geom_hline(yintercept = 0) +
+    geom_smooth(aes(x = total_cases, y = log_score_difference),
+        method = lm,
+        data = dengue_prediction_log_score_diffs_from_sarima_long_test[dengue_prediction_log_score_diffs_from_sarima_long_test$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full", ]) +
+    facet_wrap( ~ season, ncol = 1) +
+    xlab("Observed Cases in Prediction Target Week") +
+    ylab("Log Score Difference") +
+    theme_bw()
+@
+\end{figure}
+
+\begin{figure}
+\caption{Plots of point and interval predictions from SARIMA and KCDE.}
+\label{fig:FluRibbonsPredictions}
+<<FluDataRibbonsPredictionPlot95Intervals, echo = FALSE>>=
+ribbons_df <- ili_prediction_results %>%
+    select(prediction_time,
+        prediction_horizon,
+        full_model_descriptor,
+        model,
+        interval_pred_lb_95:interval_pred_ub_50) %>%
+    gather("bound_type", "predictive_value", interval_pred_lb_95:interval_pred_ub_50) %>%
+    mutate(interval_type = ifelse(grepl("50", bound_type), "50", "95"),
+        bound_type = ifelse(grepl("lb", bound_type), "lower", "upper")) %>%
+    spread(bound_type, predictive_value)
+
+phs_used <- c(1, 6, 13, 26)
+models_used <- c("SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
+
+ggplot() +
+    geom_ribbon(aes(x = prediction_time, ymin = lower, ymax = upper, colour = model, fill = model),
+        alpha = 0.4,
+        size = 0,
+        data = ribbons_df[ribbons_df$prediction_horizon %in% phs_used &
+                ribbons_df$full_model_descriptor %in% models_used &
+                ribbons_df$interval_type == "95", ]) +
+    geom_line(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
+#    geom_point(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
+    geom_line(aes(x = prediction_time, y = pt_pred, colour = model, linetype = model),
+        size = 1,
+        data = ili_prediction_results[ili_prediction_results$prediction_horizon %in% phs_used &
+                ili_prediction_results$full_model_descriptor %in% models_used, ]) +
+#    scale_alpha_discrete("Prediction\nInterval\nCoverage",
+#        labels = c("50 Percent", "95 Percent"),
+#        limits = c("50", "95"),
+#        range = c(0.4, 0.2)) +
+#    scale_fill_manual("Model", values = c("#0072B2", "#E69F00")) +
+#    scale_colour_manual("Model", values = c("#0072B2", "#E69F00")) +
+    scale_fill_manual("Model", values = c("#E69F00", "#0072B2")) +
+    scale_colour_manual("Model", values = c("#E69F00", "#0072B2")) +
+    scale_linetype("Model") +
+    facet_wrap( ~ prediction_horizon, ncol = 1) +
+    xlab("Prediction Time") +
+    ylab("Weighted Influenza-like Illness") +
+#    ggtitle("Point and 95% Interval Predictions") +
+    theme_bw()
+@
+\end{figure}
+
+
+
+
+
+\begin{figure}
+\caption{Differences in log scores for the weekly predictive distributions for
+Dengue among pairs of models across all combinations of prediction horizon and
+prediction time in the test period.
+In panel (a) positive values indicate cases when KCDE outperformed SARIMA.  In panel
+(b) positive values indicate cases when the specification of KCDE with the
+periodic kernel outperformed the corresponding specification without the periodic kernel.
+In panel (c) positive values indicate cases when the specification of KCDE with
+a fully parameterized bandwidth outperformed the KCDE specification with a diagonal
+bandwidth matrix.}
+\label{fig:AggregatedDengueResultsBoxPlots}
+<<DengueDataResultsAggregatedBoxplots, echo = FALSE>>=
+models_used <- unique(dengue_prediction_results$full_model_descriptor[
+    !dengue_prediction_results$differencing & !(dengue_prediction_results$max_seasonal_lag == 1)])
+
+boxplot_sarima_contrasts <- ggplot() +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(y = log_score_difference, x = reduced_model_descriptor),
+        data = dengue_prediction_log_score_diffs_from_sarima_long[dengue_prediction_log_score_diffs_from_sarima_long$model %in% models_used, ]) +
+#    ylim(c(-4, 4)) +
+    ggtitle("(a) Comparison of KCDE with SARIMA") +
+#    xlab("Model") +
+    xlab("") +
+    ylab("Log Score Difference") +
+#    ylab("Log Score KCDE -\nLog Score SARIMA") +
+    theme_bw(base_size = 11)# +
+#    theme(axis.text.x=element_text(angle = -90, hjust = 0))
+
+
+
+dengue_contrast_periodic_kernel <- dengue_prediction_log_score_diffs_from_sarima_long %>%
+    filter(model %in% models_used) %>%
+    select_("prediction_time", "prediction_horizon", "log_score_difference",
+        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
+    spread_("periodic",
+        "log_score_difference") %>%
+    mutate(
+        contrast_value = `TRUE` - `FALSE`)
+dengue_contrast_periodic_kernel$fixed_values <- "Null Model"
+dengue_contrast_periodic_kernel$fixed_values[dengue_contrast_periodic_kernel$bw_full] <-
+    "Full Bandwidth"
+dengue_contrast_periodic_kernel$fixed_values <-
+    factor(dengue_contrast_periodic_kernel$fixed_values,
+        levels = c("Null Model", "Full Bandwidth"))
+
+boxplot_periodic_kernel_contrasts <- ggplot(dengue_contrast_periodic_kernel) +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value)) +
+#    facet_wrap( ~ fixed_values, ncol = 1) +
+    ggtitle("(b) Effect of Adding Periodic Kernel to Model") +
+#    xlab("Base Model") +
+    xlab("") +
+    ylab("Log Score Difference") +
+#    ylab("Log Score Model With Periodic Kernel -\nLog Score Model Without Periodic Kernel") +
+    theme_bw(base_size = 11)
+
+
+
+dengue_contrast_bw_full <- dengue_prediction_log_score_diffs_from_sarima_long %>%
+    filter(model %in% models_used) %>%
+    select_("prediction_time", "prediction_horizon", "log_score_difference",
+        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
+    spread_("bw_full",
+        "log_score_difference") %>%
+    mutate(
+        contrast_value = `TRUE` - `FALSE`)
+dengue_contrast_bw_full$fixed_values <- "Null Model"
+dengue_contrast_bw_full$fixed_values[dengue_contrast_bw_full$periodic] <-
+    "Periodic Kernel"
+dengue_contrast_bw_full$fixed_values <-
+    factor(dengue_contrast_bw_full$fixed_values,
+        levels = c("Null Model", "Periodic Kernel"))
+
+boxplot_bw_full_contrasts <- ggplot(dengue_contrast_bw_full) +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value)) +
+#    facet_wrap( ~ fixed_values, ncol = 1) +
+    ggtitle("(c) Effect of Adding Fully Parameterized BW to Model") +
+#    xlab("Base Model") +
+    xlab("") +
+    ylab("Log Score Difference") +
+#    ylab("Log Score Model With Full Bandwidth -\nLog Score Model With Diagonal Bandwidth") +
+    theme_bw(base_size = 11)
+
+
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(nrow = 3, ncol = 1)))
+print(boxplot_sarima_contrasts, vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
+print(boxplot_periodic_kernel_contrasts, vp = viewport(layout.pos.row = 2, layout.pos.col = 1))
+print(boxplot_bw_full_contrasts, vp = viewport(layout.pos.row = 3, layout.pos.col = 1))
+
+
+#dengue_prediction_log_score_diffs_from_sarima_long$fixed_values <-
+#    as.character(dengue_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor)
+#dengue_prediction_log_score_diffs_from_sarima_long$contrast_value <-
+#    dengue_prediction_log_score_diffs_from_sarima_long$log_score_difference
+#dengue_prediction_log_score_diffs_from_sarima_long$contrast_type <- "Difference from SARIMA"
+#dengue_contrast_periodic_kernel$contrast_type <- "Effect of Adding Periodic Kernel"
+#dengue_contrast_bw_full$contrast_type <- "Effect of Adding Full Bandwidth"
+#
+#dengue_contrasts_merged <- rbind.fill(
+#    dengue_prediction_log_score_diffs_from_sarima_long[dengue_prediction_log_score_diffs_from_sarima_long$model %in% models_used, ],
+#    dengue_contrast_periodic_kernel,
+#    dengue_contrast_bw_full)
+#
+#ggplot(dengue_contrasts_merged) +
+#    geom_hline(yintercept = 0) +
+#    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value)) +
+#    facet_wrap( ~ contrast_type, ncol = 1) +
+##    ggtitle("Effect of Adding Fully Parameterized BW to Model") +
+#    xlab("") +
+#    ylab("Log Score Difference") +
+#    theme_bw()
+@
+\end{figure}
+
+\begin{figure}
+\caption{Plots of point and interval predictions from SARIMA and KCDE for
+Dengue.}
+\label{fig:DengueRibbonsPredictions}
+<<DengueDataRibbonsPredictionPlot95Intervals, echo = FALSE>>=
+ribbons_df <- dengue_prediction_results %>%
+    select(prediction_time,
+        prediction_horizon,
+        full_model_descriptor,
+        model,
+        interval_pred_lb_95:interval_pred_ub_50) %>%
+    gather("bound_type", "predictive_value", interval_pred_lb_95:interval_pred_ub_50) %>%
+    mutate(interval_type = ifelse(grepl("50", bound_type), "50", "95"),
+        bound_type = ifelse(grepl("lb", bound_type), "lower", "upper")) %>%
+    spread(bound_type, predictive_value)
+
+phs_used <- c(1, 5, 6, 13, 26)
+models_used <- c("SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
+#models_used <- c("SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+#    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_diagonal")
+
+ggplot() +
+    geom_ribbon(aes(x = prediction_time, ymin = lower, ymax = upper, colour = model, fill = model),
+        alpha = 0.4,
+        size = 0,
+        data = ribbons_df[ribbons_df$prediction_horizon %in% phs_used &
+                ribbons_df$full_model_descriptor %in% models_used &
+                ribbons_df$interval_type == "50", ]) +
+    geom_line(aes(x = time, y = total_cases), data = dengue_sj[dengue_sj$season %in% paste0(2009:2012, "/", 2010:2013), ]) +
+#    geom_point(aes(x = time, y = total_cases), data = dengue_sj[dengue_sj$year %in% 2010:2014, ]) +
+    geom_line(aes(x = prediction_time, y = pt_pred, colour = model, linetype = model),
+        size = 1,
+        data = dengue_prediction_results[dengue_prediction_results$prediction_horizon %in% phs_used &
+                dengue_prediction_results$full_model_descriptor %in% models_used, ]) +
+#    scale_alpha_discrete("Prediction\nInterval\nCoverage",
+#        labels = c("50 Percent", "95 Percent"),
+#        limits = c("50", "95"),
+#        range = c(0.4, 0.2)) +
+#    scale_fill_manual("Model", values = c("#0072B2", "#E69F00")) +
+#    scale_colour_manual("Model", values = c("#0072B2", "#E69F00")) +
+    scale_fill_manual("Model", values = c("#E69F00", "#0072B2")) +
+    scale_colour_manual("Model", values = c("#E69F00", "#0072B2")) +
+    scale_linetype("Model") +
+    facet_wrap( ~ prediction_horizon, ncol = 1) +
+    xlab("Prediction Time") +
+    ylab("Weighted Influenza-like Illness") +
+#    ggtitle("Point and 95% Interval Predictions") +
+    theme_bw()
+@
+\end{figure}
+
+
+
+
+\subsection{Predictive Distributions for Peak Week and Peak Incidence}
+
+<<FluDataMergePeakWeekPredictionResults, echo = FALSE>>=
+data_set <- "ili_national"
+
+prediction_save_path <- file.path("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results",
+    data_set,
+    "prediction-results")
+
+all_max_lags <- as.character(c(1L))
+all_max_seasonal_lags <- as.character(c(0L, 1L))
+all_filtering_values <- c("FALSE")
+all_differencing_values <- c("FALSE", "TRUE")
+all_seasonality_values <- c("FALSE", "TRUE")
+all_bw_parameterizations <- c("diagonal", "full")
+
+case_definitions <- expand.grid(
+        data_set,
+        all_max_lags,
+        all_max_seasonal_lags,
+        all_filtering_values,
+        all_differencing_values,
+        all_seasonality_values,
+        all_bw_parameterizations,
+        stringsAsFactors = FALSE) %>%
+    `colnames<-`(c("data_set",
+            "max_lag",
+            "max_seasonal_lag",
+            "filtering",
+            "differencing",
+            "seasonality",
+            "bw_parameterization"))
+ 
+ili_peak_week_results <- rbind.fill(
+    c(
+        list(
+            readRDS(file.path(prediction_save_path,
+                        paste0("peak-week-sarima-", data_set, ".rds"))) %>%
+                mutate(model = "SARIMA")
+        ),
+        lapply(seq_len(nrow(case_definitions)), function(case_row_ind) {
+                max_lag <- case_definitions$max_lag[case_row_ind]
+                max_seasonal_lag <- case_definitions$max_seasonal_lag[case_row_ind]
+                filtering <- case_definitions$filtering[case_row_ind]
+                differencing <- case_definitions$differencing[case_row_ind]
+                seasonality <- case_definitions$seasonality[case_row_ind]
+                bw_parameterization <- case_definitions$bw_parameterization[case_row_ind]
+                
+                case_descriptor <- paste0(
+                    data_set,
+                    "-max_lag_", max_lag,
+                    "-max_seasonal_lag_", max_seasonal_lag,
+                    "-filtering_", filtering,
+                    "-differencing_", differencing,
+                    "-seasonality_", seasonality,
+                    "-bw_parameterization_", bw_parameterization
+                )
+                
+                readRDS(file.path(prediction_save_path,
+                            paste0("peak-week-", case_descriptor, ".rds"))) %>%
+                    mutate(model = "KCDE",
+                        max_lag = max_lag,
+                        max_seasonal_lag = max_seasonal_lag,
+                        filtering = filtering,
+                        differencing = differencing,
+                        seasonality = seasonality,
+                        bw_parameterization = bw_parameterization)
+            })
+    )
+)
+
+ili_peak_week_results$full_model_descriptor <- paste0(ili_peak_week_results$model,
+    "-seasonal_lag_", ili_peak_week_results$max_seasonal_lag,
+#    "-filtering_", ili_prediction_results$filtering,
+    "-differencing_", ili_peak_week_results$differencing,
+    "-periodic_", ili_peak_week_results$seasonality,
+    "-bw_", ili_peak_week_results$bw_parameterization)
+
+ili_peak_week_results$peak_week_log_score[ili_peak_week_results$peak_week_log_score < -50] <- -50
+ili_peak_week_results$peak_height_log_score[ili_peak_week_results$peak_height_log_score < -50] <- -50
+@
+
+
+\begin{figure}
+\caption{Differences in log scores for the predictive distributions for the peak
+week and incidence at the peak week among pairs of models across all analysis
+times in the test period.
+In panel (a) positive values indicate cases when KCDE outperformed SARIMA.  In panel
+(b) positive values indicate cases when the specification of KCDE with the
+periodic kernel outperformed the corresponding specification without the periodic kernel.
+In panel (c) positive values indicate cases when the specification of KCDE with
+a fully parameterized bandwidth outperformed the KCDE specification with a diagonal
+bandwidth matrix.  In the plot for peak week timing in panel (a), the log score
+differences are not displayed for one analysis time when none of the simulated
+trajectories from SARIMA peaked at the true peak week.  In that case, our
+monte carlo estimate of the difference in log scores is infinity.}
+\label{fig:FluPeakWeekPredictions}
+<<FluDataPeakWeekPredictionBoxPlots, echo = FALSE>>=
+ili_peak_week_times <- data.frame(
+    analysis_time_season = unique(ili_peak_week_results$analysis_time_season),
+    peak_week = sapply(unique(ili_peak_week_results$analysis_time_season),
+        function(season_val) {
+            max_incidence_in_season <-
+                max(ili_national$weighted_ili[ili_national$season == season_val])
+            return(ili_national$season_week[ili_national$season == season_val &
+                        ili_national$weighted_ili == max_incidence_in_season])
+        })
+)
+
+ili_peak_week_heights <- data.frame(
+    analysis_time_season = unique(ili_peak_week_results$analysis_time_season),
+    peak_height = sapply(unique(ili_peak_week_results$analysis_time_season),
+        function(season_val) {
+            return(max(ili_national$weighted_ili[ili_national$season == season_val]))
+        })
+)
+
+## Contrasts with SARIMA for peak week timing
+ili_peak_timing_log_score_diffs_from_sarima_wide <- ili_peak_week_results %>%
+    select(full_model_descriptor, analysis_time_season, analysis_time_season_week, peak_week_log_score) %>%
+    spread(full_model_descriptor, peak_week_log_score)
+
+ili_peak_timing_log_score_diffs_from_sarima_wide[, unique(ili_peak_week_results$full_model_descriptor)] <-
+    ili_peak_timing_log_score_diffs_from_sarima_wide[, unique(ili_peak_week_results$full_model_descriptor)] -
+    ili_peak_timing_log_score_diffs_from_sarima_wide[, "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"]
+
+ili_peak_timing_log_score_diffs_from_sarima_long <- ili_peak_timing_log_score_diffs_from_sarima_wide %>%
+    gather_("model", "log_score_difference", unique(ili_peak_week_results$full_model_descriptor)) %>%
+    mutate(
+        seasonal_lag = as.logical(grepl("seasonal_lag_1", model)),
+        differencing = as.logical(grepl("differencing_TRUE", model)),
+        periodic = as.logical(grepl("periodic_TRUE", model)),
+        bw_full = as.logical(grepl("bw_full", model))
+    )
+ili_peak_timing_log_score_diffs_from_sarima_long$reduced_model_descriptor <- "Null Model"
+ili_peak_timing_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    ili_peak_timing_log_score_diffs_from_sarima_long$periodic & !ili_peak_timing_log_score_diffs_from_sarima_long$bw_full] <-
+    "Periodic Kernel"
+ili_peak_timing_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    !ili_peak_timing_log_score_diffs_from_sarima_long$periodic & ili_peak_timing_log_score_diffs_from_sarima_long$bw_full] <-
+    "Full Bandwidth"
+ili_peak_timing_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    ili_peak_timing_log_score_diffs_from_sarima_long$periodic & ili_peak_timing_log_score_diffs_from_sarima_long$bw_full] <-
+    "Periodic Kernel,\nFull Bandwidth"
+ili_peak_timing_log_score_diffs_from_sarima_long$reduced_model_descriptor <-
+    factor(ili_peak_timing_log_score_diffs_from_sarima_long$reduced_model_descriptor,
+        levels = c("Null Model", "Full Bandwidth", "Periodic Kernel", "Periodic Kernel,\nFull Bandwidth"))
+
+ili_peak_timing_log_score_diffs_from_sarima_long$leq_peak_week <-
+    ili_peak_timing_log_score_diffs_from_sarima_long$analysis_time_season_week <=
+    ili_peak_week_times$peak_week[
+        sapply(ili_peak_timing_log_score_diffs_from_sarima_long$analysis_time_season,
+            function(season_val) which(ili_peak_week_times$analysis_time_season == season_val))]
+
+models_used <- unique(ili_peak_week_results$full_model_descriptor[
+        !as.logical(ili_peak_week_results$differencing) & !(ili_peak_week_results$max_seasonal_lag == 1)])
+
+boxplot_timing_sarima_contrasts <- ggplot() +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(y = log_score_difference, x = reduced_model_descriptor, colour = leq_peak_week),
+        data = ili_peak_timing_log_score_diffs_from_sarima_long[
+            ili_peak_timing_log_score_diffs_from_sarima_long$model %in% models_used & 
+                ili_peak_timing_log_score_diffs_from_sarima_long$log_score_difference < 40, ]) +
+#    ylim(c(-4, 4)) +
+    ggtitle("Peak Week Timing") +
+#    xlab("Model") +
+    xlab("") +
+    ylab("Log Score Difference") +
+#    ylab("Log Score KCDE -\nLog Score SARIMA") +
+    theme_bw(base_size = 11)# +
+
+
+
+## Contrasts with SARIMA for peak week height
+ili_peak_height_log_score_diffs_from_sarima_wide <- ili_peak_week_results %>%
+    select(full_model_descriptor, analysis_time_season, analysis_time_season_week, peak_height_log_score) %>%
+    spread(full_model_descriptor, peak_height_log_score)
+
+ili_peak_height_log_score_diffs_from_sarima_wide[, unique(ili_peak_week_results$full_model_descriptor)] <-
+    ili_peak_height_log_score_diffs_from_sarima_wide[, unique(ili_peak_week_results$full_model_descriptor)] -
+    ili_peak_height_log_score_diffs_from_sarima_wide[, "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"]
+
+ili_peak_height_log_score_diffs_from_sarima_long <- ili_peak_height_log_score_diffs_from_sarima_wide %>%
+    gather_("model", "log_score_difference", unique(ili_peak_week_results$full_model_descriptor)) %>%
+    mutate(
+        seasonal_lag = as.logical(grepl("seasonal_lag_1", model)),
+        differencing = as.logical(grepl("differencing_TRUE", model)),
+        periodic = as.logical(grepl("periodic_TRUE", model)),
+        bw_full = as.logical(grepl("bw_full", model))
+    )
+ili_peak_height_log_score_diffs_from_sarima_long$reduced_model_descriptor <- "Null Model"
+ili_peak_height_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    ili_peak_height_log_score_diffs_from_sarima_long$periodic & !ili_peak_height_log_score_diffs_from_sarima_long$bw_full] <-
+    "Periodic Kernel"
+ili_peak_height_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    !ili_peak_height_log_score_diffs_from_sarima_long$periodic & ili_peak_height_log_score_diffs_from_sarima_long$bw_full] <-
+    "Full Bandwidth"
+ili_peak_height_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    ili_peak_height_log_score_diffs_from_sarima_long$periodic & ili_peak_height_log_score_diffs_from_sarima_long$bw_full] <-
+    "Periodic Kernel,\nFull Bandwidth"
+ili_peak_height_log_score_diffs_from_sarima_long$reduced_model_descriptor <-
+    factor(ili_peak_height_log_score_diffs_from_sarima_long$reduced_model_descriptor,
+        levels = c("Null Model", "Full Bandwidth", "Periodic Kernel", "Periodic Kernel,\nFull Bandwidth"))
+
+ili_peak_height_log_score_diffs_from_sarima_long$leq_peak_week <-
+    ili_peak_height_log_score_diffs_from_sarima_long$analysis_time_season_week <=
+    ili_peak_week_times$peak_week[
+        sapply(ili_peak_height_log_score_diffs_from_sarima_long$analysis_time_season,
+            function(season_val) which(ili_peak_week_times$analysis_time_season == season_val))]
+
+models_used <- unique(ili_peak_week_results$full_model_descriptor[
+        !as.logical(ili_peak_week_results$differencing) & !(ili_peak_week_results$max_seasonal_lag == 1)])
+
+boxplot_height_sarima_contrasts <- ggplot() +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(y = log_score_difference, x = reduced_model_descriptor, colour = leq_peak_week),
+        data = ili_peak_height_log_score_diffs_from_sarima_long[ili_peak_height_log_score_diffs_from_sarima_long$model %in% models_used, ]) +
+#    ylim(c(-4, 4)) +
+    ggtitle("Peak Week Incidence") +
+#    xlab("Model") +
+    xlab("") +
+    ylab("") +
+#    ylab("Log Score KCDE -\nLog Score SARIMA") +
+    theme_bw(base_size = 11)# +
+
+
+
+ili_timing_contrast_periodic_kernel <- ili_peak_timing_log_score_diffs_from_sarima_long %>%
+    filter(model %in% models_used) %>%
+    select_("analysis_time_season", "analysis_time_season_week", "log_score_difference",
+        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
+    spread_("periodic",
+        "log_score_difference") %>%
+    mutate(
+        contrast_value = `TRUE` - `FALSE`)
+ili_timing_contrast_periodic_kernel$fixed_values <- "Null Model"
+ili_timing_contrast_periodic_kernel$fixed_values[ili_timing_contrast_periodic_kernel$bw_full] <-
+    "Full Bandwidth"
+ili_timing_contrast_periodic_kernel$fixed_values <-
+    factor(ili_timing_contrast_periodic_kernel$fixed_values,
+        levels = c("Null Model", "Full Bandwidth"))
+
+ili_timing_contrast_periodic_kernel$leq_peak_week <-
+    ili_timing_contrast_periodic_kernel$analysis_time_season_week <=
+    ili_peak_week_times$peak_week[
+        sapply(ili_timing_contrast_periodic_kernel$analysis_time_season,
+            function(season_val) which(ili_peak_week_times$analysis_time_season == season_val))]
+
+
+ili_height_contrast_periodic_kernel <- ili_peak_height_log_score_diffs_from_sarima_long %>%
+    filter(model %in% models_used) %>%
+    select_("analysis_time_season", "analysis_time_season_week", "log_score_difference",
+        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
+    spread_("periodic",
+        "log_score_difference") %>%
+    mutate(
+        contrast_value = `TRUE` - `FALSE`)
+ili_height_contrast_periodic_kernel$fixed_values <- "Null Model"
+ili_height_contrast_periodic_kernel$fixed_values[ili_height_contrast_periodic_kernel$bw_full] <-
+    "Full Bandwidth"
+ili_height_contrast_periodic_kernel$fixed_values <-
+    factor(ili_height_contrast_periodic_kernel$fixed_values,
+        levels = c("Null Model", "Full Bandwidth"))
+
+ili_height_contrast_periodic_kernel$leq_peak_week <-
+    ili_height_contrast_periodic_kernel$analysis_time_season_week <=
+    ili_peak_week_times$peak_week[
+        sapply(ili_height_contrast_periodic_kernel$analysis_time_season,
+            function(season_val) which(ili_peak_week_times$analysis_time_season == season_val))]
+
+
+boxplot_timing_periodic_kernel_contrasts <- ggplot(ili_timing_contrast_periodic_kernel) +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value, colour = leq_peak_week)) +
+#    facet_wrap( ~ fixed_values, ncol = 1) +
+    ggtitle("Peak Week Timing") +
+#    xlab("Base Model") +
+    xlab("") +
+    ylab("Log Score Difference") +
+#    ylab("Log Score Model With Periodic Kernel -\nLog Score Model Without Periodic Kernel") +
+    theme_bw(base_size = 11)
+
+
+boxplot_height_periodic_kernel_contrasts <- ggplot(ili_height_contrast_periodic_kernel) +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value, colour = leq_peak_week)) +
+#    facet_wrap( ~ fixed_values, ncol = 1) +
+    ggtitle("Peak Week Incidence") +
+#    xlab("Base Model") +
+    xlab("") +
+    ylab("") +
+#    ylab("Log Score Model With Periodic Kernel -\nLog Score Model Without Periodic Kernel") +
+    theme_bw(base_size = 11)
+
+
+ili_timing_contrast_bw_full <- ili_peak_timing_log_score_diffs_from_sarima_long %>%
+    filter(model %in% models_used) %>%
+    select_("analysis_time_season", "analysis_time_season_week", "log_score_difference",
+        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
+    spread_("bw_full",
+        "log_score_difference") %>%
+    mutate(
+        contrast_value = `TRUE` - `FALSE`)
+ili_timing_contrast_bw_full$fixed_values <- "Null Model"
+ili_timing_contrast_bw_full$fixed_values[ili_timing_contrast_bw_full$periodic] <-
+    "Periodic Kernel"
+ili_timing_contrast_bw_full$fixed_values <-
+    factor(ili_timing_contrast_bw_full$fixed_values,
+        levels = c("Null Model", "Periodic Kernel"))
+
+ili_timing_contrast_bw_full$leq_peak_week <-
+    ili_timing_contrast_bw_full$analysis_time_season_week <=
+    ili_peak_week_times$peak_week[
+        sapply(ili_timing_contrast_bw_full$analysis_time_season,
+            function(season_val) which(ili_peak_week_times$analysis_time_season == season_val))]
+
+
+ili_height_contrast_bw_full <- ili_peak_height_log_score_diffs_from_sarima_long %>%
+    filter(model %in% models_used) %>%
+    select_("analysis_time_season", "analysis_time_season_week", "log_score_difference",
+        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
+    spread_("bw_full",
+        "log_score_difference") %>%
+    mutate(
+        contrast_value = `TRUE` - `FALSE`)
+ili_height_contrast_bw_full$fixed_values <- "Null Model"
+ili_height_contrast_bw_full$fixed_values[ili_height_contrast_bw_full$periodic] <-
+    "Periodic Kernel"
+ili_height_contrast_bw_full$fixed_values <-
+    factor(ili_height_contrast_bw_full$fixed_values,
+        levels = c("Null Model", "Periodic Kernel"))
+
+ili_height_contrast_bw_full$leq_peak_week <-
+    ili_height_contrast_bw_full$analysis_time_season_week <=
+    ili_peak_week_times$peak_week[
+        sapply(ili_height_contrast_bw_full$analysis_time_season,
+            function(season_val) which(ili_peak_week_times$analysis_time_season == season_val))]
+
+
+boxplot_timing_bw_full_contrasts <- ggplot(ili_timing_contrast_bw_full) +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value, colour = leq_peak_week)) +
+#    facet_wrap( ~ fixed_values, ncol = 1) +
+    ggtitle("Peak Week Timing") +
+#    xlab("Base Model") +
+    xlab("") +
+    ylab("Log Score Difference") +
+#    ylab("Log Score Model With Full Bandwidth -\nLog Score Model With Diagonal Bandwidth") +
+    theme_bw(base_size = 11)
+
+boxplot_height_bw_full_contrasts <- ggplot(ili_height_contrast_bw_full) +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value, colour = leq_peak_week)) +
+#    facet_wrap( ~ fixed_values, ncol = 1) +
+    ggtitle("Peak Week Incidence") +
+#    xlab("Base Model") +
+    xlab("") +
+    ylab("") +
+#    ylab("Log Score Model With Full Bandwidth -\nLog Score Model With Diagonal Bandwidth") +
+    theme_bw(base_size = 11)
+
+
+grid.newpage()
+pushViewport(viewport(layout =
+    grid.layout(nrow = 6, ncol = 2, heights = unit(rep(1, 6), rep(c("lines", "null"), times = 3)))))
+grid.text("(a) Comparison of KCDE with SARIMA",
+    gp = gpar(fontsize = 12),
+    vp = viewport(layout.pos.row = 1, layout.pos.col = 1:2))
+print(boxplot_timing_sarima_contrasts, vp = viewport(layout.pos.row = 2, layout.pos.col = 1))
+print(boxplot_height_sarima_contrasts, vp = viewport(layout.pos.row = 2, layout.pos.col = 2))
+grid.text("(b) Effect of Adding Periodic Kernel to Model",
+    gp = gpar(fontsize = 12),
+    vp = viewport(layout.pos.row = 3, layout.pos.col = 1:2))
+print(boxplot_timing_periodic_kernel_contrasts, vp = viewport(layout.pos.row = 4, layout.pos.col = 1))
+print(boxplot_height_periodic_kernel_contrasts, vp = viewport(layout.pos.row = 4, layout.pos.col = 2))
+grid.text("(c) Effect of Adding Fully Parameterized BW to Model",
+    gp = gpar(fontsize = 12),
+    vp = viewport(layout.pos.row = 5, layout.pos.col = 1:2))
+print(boxplot_timing_bw_full_contrasts, vp = viewport(layout.pos.row = 6, layout.pos.col = 1))
+print(boxplot_height_bw_full_contrasts, vp = viewport(layout.pos.row = 6, layout.pos.col = 2))
+@
+\end{figure}
+
+\begin{figure}
+\caption{Differences in log scores for the predictive distributions for the peak
+week and incidence at the peak week for Dengue among pairs of models across all
+analysis times in the test period.
+In panel (a) positive values indicate cases when KCDE outperformed SARIMA.  In panel
+(b) positive values indicate cases when the specification of KCDE with the
+periodic kernel outperformed the corresponding specification without the periodic kernel.
+In panel (c) positive values indicate cases when the specification of KCDE with
+a fully parameterized bandwidth outperformed the KCDE specification with a diagonal
+bandwidth matrix.  In the plot for peak week timing in panel (a), the log score
+differences are not displayed for one analysis time when none of the simulated
+trajectories from SARIMA peaked at the true peak week.  In that case, our
+monte carlo estimate of the difference in log scores is infinity.}
+\label{fig:DenguePeakWeekPredictions}
+<<DengueDataPeakWeekPredictionBoxPlots, echo = FALSE, dependson = c("DengueDataMergePeakWeekPredictionResults")>>=
+dengue_peak_week_times <- data.frame(
+    analysis_time_season = unique(dengue_peak_week_results$analysis_time_season),
+    peak_week = sapply(unique(dengue_peak_week_results$analysis_time_season),
+        function(season_val) {
+            max_incidence_in_season <-
+                max(dengue_sj$total_cases[dengue_sj$season == season_val])
+            return(dengue_sj$season_week[dengue_sj$season == season_val &
+                        dengue_sj$total_cases == max_incidence_in_season])
+        })
+)
+
+dengue_peak_week_heights <- data.frame(
+    analysis_time_season = unique(dengue_peak_week_results$analysis_time_season),
+    peak_height = sapply(unique(dengue_peak_week_results$analysis_time_season),
+        function(season_val) {
+            return(max(dengue_sj$total_cases[dengue_sj$season == season_val]))
+        })
+)
+
+## Contrasts with SARIMA for peak week timing
+dengue_peak_timing_log_score_diffs_from_sarima_wide <- dengue_peak_week_results %>%
+    select(full_model_descriptor, analysis_time_season, analysis_time_season_week, peak_week_log_score) %>%
+    spread(full_model_descriptor, peak_week_log_score)
+
+dengue_peak_timing_log_score_diffs_from_sarima_wide[, unique(dengue_peak_week_results$full_model_descriptor)] <-
+    dengue_peak_timing_log_score_diffs_from_sarima_wide[, unique(dengue_peak_week_results$full_model_descriptor)] -
+    dengue_peak_timing_log_score_diffs_from_sarima_wide[, "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"]
+
+dengue_peak_timing_log_score_diffs_from_sarima_long <- dengue_peak_timing_log_score_diffs_from_sarima_wide %>%
+    gather_("model", "log_score_difference", unique(dengue_peak_week_results$full_model_descriptor)) %>%
+    mutate(
+        seasonal_lag = as.logical(grepl("seasonal_lag_1", model)),
+        differencing = as.logical(grepl("differencing_TRUE", model)),
+        periodic = as.logical(grepl("periodic_TRUE", model)),
+        bw_full = as.logical(grepl("bw_full", model))
+    )
+dengue_peak_timing_log_score_diffs_from_sarima_long$reduced_model_descriptor <- "Null Model"
+dengue_peak_timing_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    dengue_peak_timing_log_score_diffs_from_sarima_long$periodic & !dengue_peak_timing_log_score_diffs_from_sarima_long$bw_full] <-
+    "Periodic Kernel"
+dengue_peak_timing_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    !dengue_peak_timing_log_score_diffs_from_sarima_long$periodic & dengue_peak_timing_log_score_diffs_from_sarima_long$bw_full] <-
+    "Full Bandwidth"
+dengue_peak_timing_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    dengue_peak_timing_log_score_diffs_from_sarima_long$periodic & dengue_peak_timing_log_score_diffs_from_sarima_long$bw_full] <-
+    "Periodic Kernel,\nFull Bandwidth"
+dengue_peak_timing_log_score_diffs_from_sarima_long$reduced_model_descriptor <-
+    factor(dengue_peak_timing_log_score_diffs_from_sarima_long$reduced_model_descriptor,
+        levels = c("Null Model", "Full Bandwidth", "Periodic Kernel", "Periodic Kernel,\nFull Bandwidth"))
+
+dengue_peak_timing_log_score_diffs_from_sarima_long$leq_peak_week <-
+    dengue_peak_timing_log_score_diffs_from_sarima_long$analysis_time_season_week <=
+    dengue_peak_week_times$peak_week[
+        sapply(dengue_peak_timing_log_score_diffs_from_sarima_long$analysis_time_season,
+            function(season_val) which(dengue_peak_week_times$analysis_time_season == season_val))]
+
+models_used <- unique(dengue_peak_week_results$full_model_descriptor[
+        !as.logical(dengue_peak_week_results$differencing) & !(dengue_peak_week_results$max_seasonal_lag == 1)])
+
+boxplot_timing_sarima_contrasts <- ggplot() +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(y = log_score_difference, x = reduced_model_descriptor, colour = leq_peak_week),
+        data = dengue_peak_timing_log_score_diffs_from_sarima_long[
+            dengue_peak_timing_log_score_diffs_from_sarima_long$model %in% models_used & 
+                dengue_peak_timing_log_score_diffs_from_sarima_long$log_score_difference < 40, ]) +
+#    ylim(c(-4, 4)) +
+    ggtitle("Peak Week Timing") +
+#    xlab("Model") +
+    xlab("") +
+    ylab("Log Score Difference") +
+#    ylab("Log Score KCDE -\nLog Score SARIMA") +
+    theme_bw(base_size = 11)# +
+
+
+
+## Contrasts with SARIMA for peak week height
+dengue_peak_height_log_score_diffs_from_sarima_wide <- dengue_peak_week_results %>%
+    select(full_model_descriptor, analysis_time_season, analysis_time_season_week, peak_height_log_score) %>%
+    spread(full_model_descriptor, peak_height_log_score)
+
+dengue_peak_height_log_score_diffs_from_sarima_wide[, unique(dengue_peak_week_results$full_model_descriptor)] <-
+    dengue_peak_height_log_score_diffs_from_sarima_wide[, unique(dengue_peak_week_results$full_model_descriptor)] -
+    dengue_peak_height_log_score_diffs_from_sarima_wide[, "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"]
+
+dengue_peak_height_log_score_diffs_from_sarima_long <- dengue_peak_height_log_score_diffs_from_sarima_wide %>%
+    gather_("model", "log_score_difference", unique(dengue_peak_week_results$full_model_descriptor)) %>%
+    mutate(
+        seasonal_lag = as.logical(grepl("seasonal_lag_1", model)),
+        differencing = as.logical(grepl("differencing_TRUE", model)),
+        periodic = as.logical(grepl("periodic_TRUE", model)),
+        bw_full = as.logical(grepl("bw_full", model))
+    )
+dengue_peak_height_log_score_diffs_from_sarima_long$reduced_model_descriptor <- "Null Model"
+dengue_peak_height_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    dengue_peak_height_log_score_diffs_from_sarima_long$periodic & !dengue_peak_height_log_score_diffs_from_sarima_long$bw_full] <-
+    "Periodic Kernel"
+dengue_peak_height_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    !dengue_peak_height_log_score_diffs_from_sarima_long$periodic & dengue_peak_height_log_score_diffs_from_sarima_long$bw_full] <-
+    "Full Bandwidth"
+dengue_peak_height_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    dengue_peak_height_log_score_diffs_from_sarima_long$periodic & dengue_peak_height_log_score_diffs_from_sarima_long$bw_full] <-
+    "Periodic Kernel,\nFull Bandwidth"
+dengue_peak_height_log_score_diffs_from_sarima_long$reduced_model_descriptor <-
+    factor(dengue_peak_height_log_score_diffs_from_sarima_long$reduced_model_descriptor,
+        levels = c("Null Model", "Full Bandwidth", "Periodic Kernel", "Periodic Kernel,\nFull Bandwidth"))
+
+dengue_peak_height_log_score_diffs_from_sarima_long$leq_peak_week <-
+    dengue_peak_height_log_score_diffs_from_sarima_long$analysis_time_season_week <=
+    dengue_peak_week_times$peak_week[
+        sapply(dengue_peak_height_log_score_diffs_from_sarima_long$analysis_time_season,
+            function(season_val) which(dengue_peak_week_times$analysis_time_season == season_val))]
+
+models_used <- unique(dengue_peak_week_results$full_model_descriptor[
+        !as.logical(dengue_peak_week_results$differencing) & !(dengue_peak_week_results$max_seasonal_lag == 1)])
+
+boxplot_height_sarima_contrasts <- ggplot() +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(y = log_score_difference, x = reduced_model_descriptor, colour = leq_peak_week),
+        data = dengue_peak_height_log_score_diffs_from_sarima_long[dengue_peak_height_log_score_diffs_from_sarima_long$model %in% models_used, ]) +
+#    ylim(c(-4, 4)) +
+    ggtitle("Peak Week Incidence") +
+#    xlab("Model") +
+    xlab("") +
+    ylab("") +
+#    ylab("Log Score KCDE -\nLog Score SARIMA") +
+    theme_bw(base_size = 11)# +
+
+
+
+dengue_timing_contrast_periodic_kernel <- dengue_peak_timing_log_score_diffs_from_sarima_long %>%
+    filter(model %in% models_used) %>%
+    select_("analysis_time_season", "analysis_time_season_week", "log_score_difference",
+        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
+    spread_("periodic",
+        "log_score_difference") %>%
+    mutate(
+        contrast_value = `TRUE` - `FALSE`)
+dengue_timing_contrast_periodic_kernel$fixed_values <- "Null Model"
+dengue_timing_contrast_periodic_kernel$fixed_values[dengue_timing_contrast_periodic_kernel$bw_full] <-
+    "Full Bandwidth"
+dengue_timing_contrast_periodic_kernel$fixed_values <-
+    factor(dengue_timing_contrast_periodic_kernel$fixed_values,
+        levels = c("Null Model", "Full Bandwidth"))
+
+dengue_timing_contrast_periodic_kernel$leq_peak_week <-
+    dengue_timing_contrast_periodic_kernel$analysis_time_season_week <=
+    dengue_peak_week_times$peak_week[
+        sapply(dengue_timing_contrast_periodic_kernel$analysis_time_season,
+            function(season_val) which(dengue_peak_week_times$analysis_time_season == season_val))]
+
+
+dengue_height_contrast_periodic_kernel <- dengue_peak_height_log_score_diffs_from_sarima_long %>%
+    filter(model %in% models_used) %>%
+    select_("analysis_time_season", "analysis_time_season_week", "log_score_difference",
+        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
+    spread_("periodic",
+        "log_score_difference") %>%
+    mutate(
+        contrast_value = `TRUE` - `FALSE`)
+dengue_height_contrast_periodic_kernel$fixed_values <- "Null Model"
+dengue_height_contrast_periodic_kernel$fixed_values[dengue_height_contrast_periodic_kernel$bw_full] <-
+    "Full Bandwidth"
+dengue_height_contrast_periodic_kernel$fixed_values <-
+    factor(dengue_height_contrast_periodic_kernel$fixed_values,
+        levels = c("Null Model", "Full Bandwidth"))
+
+dengue_height_contrast_periodic_kernel$leq_peak_week <-
+    dengue_height_contrast_periodic_kernel$analysis_time_season_week <=
+    dengue_peak_week_times$peak_week[
+        sapply(dengue_height_contrast_periodic_kernel$analysis_time_season,
+            function(season_val) which(dengue_peak_week_times$analysis_time_season == season_val))]
+
+
+boxplot_timing_periodic_kernel_contrasts <- ggplot(dengue_timing_contrast_periodic_kernel) +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value, colour = leq_peak_week)) +
+#    facet_wrap( ~ fixed_values, ncol = 1) +
+    ggtitle("Peak Week Timing") +
+#    xlab("Base Model") +
+    xlab("") +
+    ylab("Log Score Difference") +
+#    ylab("Log Score Model With Periodic Kernel -\nLog Score Model Without Periodic Kernel") +
+    theme_bw(base_size = 11)
+
+
+boxplot_height_periodic_kernel_contrasts <- ggplot(dengue_height_contrast_periodic_kernel) +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value, colour = leq_peak_week)) +
+#    facet_wrap( ~ fixed_values, ncol = 1) +
+    ggtitle("Peak Week Incidence") +
+#    xlab("Base Model") +
+    xlab("") +
+    ylab("") +
+#    ylab("Log Score Model With Periodic Kernel -\nLog Score Model Without Periodic Kernel") +
+    theme_bw(base_size = 11)
+
+
+dengue_timing_contrast_bw_full <- dengue_peak_timing_log_score_diffs_from_sarima_long %>%
+    filter(model %in% models_used) %>%
+    select_("analysis_time_season", "analysis_time_season_week", "log_score_difference",
+        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
+    spread_("bw_full",
+        "log_score_difference") %>%
+    mutate(
+        contrast_value = `TRUE` - `FALSE`)
+dengue_timing_contrast_bw_full$fixed_values <- "Null Model"
+dengue_timing_contrast_bw_full$fixed_values[dengue_timing_contrast_bw_full$periodic] <-
+    "Periodic Kernel"
+dengue_timing_contrast_bw_full$fixed_values <-
+    factor(dengue_timing_contrast_bw_full$fixed_values,
+        levels = c("Null Model", "Periodic Kernel"))
+
+dengue_timing_contrast_bw_full$leq_peak_week <-
+    dengue_timing_contrast_bw_full$analysis_time_season_week <=
+    dengue_peak_week_times$peak_week[
+        sapply(dengue_timing_contrast_bw_full$analysis_time_season,
+            function(season_val) which(dengue_peak_week_times$analysis_time_season == season_val))]
+
+
+dengue_height_contrast_bw_full <- dengue_peak_height_log_score_diffs_from_sarima_long %>%
+    filter(model %in% models_used) %>%
+    select_("analysis_time_season", "analysis_time_season_week", "log_score_difference",
+        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
+    spread_("bw_full",
+        "log_score_difference") %>%
+    mutate(
+        contrast_value = `TRUE` - `FALSE`)
+dengue_height_contrast_bw_full$fixed_values <- "Null Model"
+dengue_height_contrast_bw_full$fixed_values[dengue_height_contrast_bw_full$periodic] <-
+    "Periodic Kernel"
+dengue_height_contrast_bw_full$fixed_values <-
+    factor(dengue_height_contrast_bw_full$fixed_values,
+        levels = c("Null Model", "Periodic Kernel"))
+
+dengue_height_contrast_bw_full$leq_peak_week <-
+    dengue_height_contrast_bw_full$analysis_time_season_week <=
+    dengue_peak_week_times$peak_week[
+        sapply(dengue_height_contrast_bw_full$analysis_time_season,
+            function(season_val) which(dengue_peak_week_times$analysis_time_season == season_val))]
+
+
+boxplot_timing_bw_full_contrasts <- ggplot(dengue_timing_contrast_bw_full) +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value, colour = leq_peak_week)) +
+#    facet_wrap( ~ fixed_values, ncol = 1) +
+    ggtitle("Peak Week Timing") +
+#    xlab("Base Model") +
+    xlab("") +
+    ylab("Log Score Difference") +
+#    ylab("Log Score Model With Full Bandwidth -\nLog Score Model With Diagonal Bandwidth") +
+    theme_bw(base_size = 11)
+
+boxplot_height_bw_full_contrasts <- ggplot(dengue_height_contrast_bw_full) +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value, colour = leq_peak_week)) +
+#    facet_wrap( ~ fixed_values, ncol = 1) +
+    ggtitle("Peak Week Incidence") +
+#    xlab("Base Model") +
+    xlab("") +
+    ylab("") +
+#    ylab("Log Score Model With Full Bandwidth -\nLog Score Model With Diagonal Bandwidth") +
+    theme_bw(base_size = 11)
+
+
+grid.newpage()
+pushViewport(viewport(layout =
+    grid.layout(nrow = 6, ncol = 2, heights = unit(rep(1, 6), rep(c("lines", "null"), times = 3)))))
+grid.text("(a) Comparison of KCDE with SARIMA",
+    gp = gpar(fontsize = 12),
+    vp = viewport(layout.pos.row = 1, layout.pos.col = 1:2))
+print(boxplot_timing_sarima_contrasts, vp = viewport(layout.pos.row = 2, layout.pos.col = 1))
+print(boxplot_height_sarima_contrasts, vp = viewport(layout.pos.row = 2, layout.pos.col = 2))
+grid.text("(b) Effect of Adding Periodic Kernel to Model",
+    gp = gpar(fontsize = 12),
+    vp = viewport(layout.pos.row = 3, layout.pos.col = 1:2))
+print(boxplot_timing_periodic_kernel_contrasts, vp = viewport(layout.pos.row = 4, layout.pos.col = 1))
+print(boxplot_height_periodic_kernel_contrasts, vp = viewport(layout.pos.row = 4, layout.pos.col = 2))
+grid.text("(c) Effect of Adding Fully Parameterized BW to Model",
+    gp = gpar(fontsize = 12),
+    vp = viewport(layout.pos.row = 5, layout.pos.col = 1:2))
+print(boxplot_timing_bw_full_contrasts, vp = viewport(layout.pos.row = 6, layout.pos.col = 1))
+print(boxplot_height_bw_full_contrasts, vp = viewport(layout.pos.row = 6, layout.pos.col = 2))
+@
+\end{figure}
+
+
+\begin{figure}
+\caption{Log scores for predictions of peak week timing by predictive
+model and analysis time.  The vertical gray line is placed at the peak week for
+each season.}
+\label{fig:FluPeakWeekTimingPredictionLogScores}
+<<PeakWeekTimingLogScoreByAnalysisTime, echo = FALSE>>=
+## Add season and season week columns to data so that we can get from
+## analysis_time_season and analysis_time_season_week to analysis_time
+#ili_national$season <- ifelse(
+#    ili_national$week <= 30,
+#    paste0(ili_national$year - 1, "/", ili_national$year),
+#    paste0(ili_national$year, "/", ili_national$year + 1)
+#)
+#
+## Season week column: week number within season
+#ili_national$season_week <- sapply(seq_len(nrow(ili_national)), function(row_ind) {
+#    sum(ili_national$season == ili_national$season[row_ind] & ili_national$time_index <= ili_national$time_index[row_ind])
+#})
+#
+#
+#ili_peak_week_results$analysis_time <- ili_peak_week_results$analysis_time_season_week
+
+#ili_peak_week_results_for_plot
+
+models_used <- c(
+    "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_diagonal",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_full",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_diagonal",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full",
+    "Equal Bin Probabilities")
+reduced_models_used <- c(
+    "SARIMA",
+    "Null KCDE Model",
+    "Full Bandwidth",
+    "Periodic Kernel",
+    "Periodic Kernel,\nFull Bandwidth",
+    "Equal Bin Probabilities"
+)
+
+ili_peak_week_results$reduced_model_descriptor <- "Null KCDE Model"
+ili_peak_week_results$reduced_model_descriptor[
+    as.logical(ili_peak_week_results$seasonality) & !(ili_peak_week_results$bw_parameterization == "full")] <-
+    "Periodic Kernel"
+ili_peak_week_results$reduced_model_descriptor[
+    !as.logical(ili_peak_week_results$seasonality) & (ili_peak_week_results$bw_parameterization == "full")] <-
+    "Full Bandwidth"
+ili_peak_week_results$reduced_model_descriptor[
+    as.logical(ili_peak_week_results$seasonality) & (ili_peak_week_results$bw_parameterization == "full")] <-
+    "Periodic Kernel,\nFull Bandwidth"
+ili_peak_week_results$reduced_model_descriptor[
+    ili_peak_week_results$model == "SARIMA"] <-
+    "SARIMA"
+
+num_analysis_time_season_values <- length(unique(ili_peak_week_results$analysis_time_season))
+num_analysis_time_season_week_values <- length(unique(ili_peak_week_results$analysis_time_season_week))
+ili_peak_week_results <- rbind.fill(ili_peak_week_results,
+    data.frame(
+        full_model_descriptor = rep("Equal Bin Probabilities", num_analysis_time_season_week_values * num_analysis_time_season_values),
+        reduced_model_descriptor = rep("Equal Bin Probabilities", num_analysis_time_season_week_values * num_analysis_time_season_values),
+        analysis_time_season = rep(unique(ili_peak_week_results$analysis_time_season), each = num_analysis_time_season_week_values),
+        analysis_time_season_week = rep(unique(ili_peak_week_results$analysis_time_season_week), times = num_analysis_time_season_values),
+        peak_week_log_score = rep(log(1/52), num_analysis_time_season_week_values * num_analysis_time_season_values),
+        peak_height_log_score = rep(log(1/27), num_analysis_time_season_week_values * num_analysis_time_season_values)
+))
+    
+    
+ili_peak_week_results$reduced_model_descriptor <-
+    factor(ili_peak_week_results$reduced_model_descriptor,
+        levels = c("SARIMA", "Null KCDE Model", "Full Bandwidth", "Periodic Kernel",
+            "Periodic Kernel,\nFull Bandwidth",
+            "Equal Bin Probabilities"
+        ))
+    
+#geom_hline(yintercept = log(1/31), colour = "grey", linetype = 2)
+
+ili_peak_week_times <- data.frame(
+    analysis_time_season = unique(ili_peak_week_results$analysis_time_season),
+    peak_week = sapply(unique(ili_peak_week_results$analysis_time_season),
+        function(season_val) {
+            max_incidence_in_season <-
+                max(ili_national$weighted_ili[ili_national$season == season_val])
+            return(ili_national$season_week[ili_national$season == season_val &
+                ili_national$weighted_ili == max_incidence_in_season])
+        })
+)
+
+ili_peak_week_results$peak_week_log_score[ili_peak_week_results$peak_week_log_score == -50] <- NA
+p <- ggplot(ili_peak_week_results[ili_peak_week_results$full_model_descriptor %in% models_used, ]) +
+    geom_line(aes(x = analysis_time_season_week, y = peak_week_log_score, colour = reduced_model_descriptor, linetype = reduced_model_descriptor)) +
+    geom_point(aes(x = analysis_time_season_week, y = peak_week_log_score, colour = reduced_model_descriptor, shape = reduced_model_descriptor)) +
+    scale_colour_manual("Model", breaks = reduced_models_used, values = c("#E69F00", "#56B4E9", "#009E73", "#D55E00", "#0072B2", "#999999")) +
+    scale_linetype_manual("Model", breaks = reduced_models_used, values = c(1:5, 1)) +
+    scale_shape_manual("Model", breaks = reduced_models_used, values = c(0:4, 45)) +
+    geom_vline(aes(xintercept = peak_week), colour = "red", linetype = 2, data = ili_peak_week_times) +
+    facet_wrap( ~ analysis_time_season, ncol = 1) +
+    xlab("Season Week at Analysis Time") +
+    ylab("Log Score") +
+    theme_bw()
+
+suppressWarnings(print(p))
+@
+\end{figure}
+
+
+
+\begin{figure}
+\caption{Log scores for predictions of incidence in the peak week by predictive
+model and analysis time.  The vertical gray line is placed at the peak week for
+each season.}
+\label{fig:FluPeakWeekIncidencePredictionLogScores}
+<<FluPeakWeekIncidenceLogScoreByAnalysisTime, echo = FALSE>>=
+## Add season and season week columns to data so that we can get from
+## analysis_time_season and analysis_time_season_week to analysis_time
+#ili_national$season <- ifelse(
+#    ili_national$week <= 30,
+#    paste0(ili_national$year - 1, "/", ili_national$year),
+#    paste0(ili_national$year, "/", ili_national$year + 1)
+#)
+#
+## Season week column: week number within season
+#ili_national$season_week <- sapply(seq_len(nrow(ili_national)), function(row_ind) {
+#    sum(ili_national$season == ili_national$season[row_ind] & ili_national$time_index <= ili_national$time_index[row_ind])
+#})
+#
+#
+#ili_peak_week_results$analysis_time <- ili_peak_week_results$analysis_time_season_week
+
+#ili_peak_week_results_for_plot
+
+models_used <- c(
+    "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_diagonal",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_full",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_diagonal",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full",
+    "Equal Bin Probabilities")
+reduced_models_used <- c(
+    "SARIMA",
+    "Null KCDE Model",
+    "Full Bandwidth",
+    "Periodic Kernel",
+    "Periodic Kernel,\nFull Bandwidth",
+    "Equal Bin Probabilities")
+
+ili_peak_week_results$peak_height_log_score[ili_peak_week_results$peak_height_log_score == -50] <- NA
+ggplot(ili_peak_week_results[ili_peak_week_results$full_model_descriptor %in% models_used, ]) +
+    geom_line(aes(x = analysis_time_season_week, y = peak_height_log_score, colour = reduced_model_descriptor, linetype = reduced_model_descriptor)) +
+    geom_point(aes(x = analysis_time_season_week, y = peak_height_log_score, colour = reduced_model_descriptor, shape = reduced_model_descriptor)) +
+    scale_colour_manual("Model", breaks = reduced_models_used, values = c("#E69F00", "#56B4E9", "#009E73", "#D55E00", "#0072B2", "#999999")) +
+    scale_linetype_manual("Model", breaks = reduced_models_used, values = c(1:5, 1)) +
+    scale_shape_manual("Model", breaks = reduced_models_used, values = c(0:4, 45)) +
+    geom_vline(aes(xintercept = peak_week), colour = "red", linetype = 2, data = ili_peak_week_times) +
+    facet_wrap( ~ analysis_time_season, ncol = 1) +
+#    geom_raster(aes(x = analysis_time_season_week, y = log_score),
+#        data = ili_peak_week_results) +
+    xlab("Season Week at Analysis Time") +
+    ylab("Log Score") +
+    theme_bw()
+@
+\end{figure}
+
+
+<<FluObtainPeakWeekTimingPredictiveDistributionsByAnalysisTime, echo = FALSE>>=
+ili_incidence_bins <- data.frame(
+    lower = seq(from = 0, to = 13, by = 0.5),
+    upper = c(seq(from = 0.5, to = 13, by = 0.5), Inf))
+
+for(bin_num in seq(from = 9, to = 41)) {
+    ili_peak_week_results[, paste0("est_prob_bin_", bin_num)] <-
+        apply(ili_peak_week_results[, paste0("peak_week_", seq_len(10000))],
+            1,
+            function(x) {sum(x == bin_num) / length(x)})
+}
+
+peak_timing_pred_dist_by_analysis_time <- ili_peak_week_results %>%
+    select(full_model_descriptor,
+            analysis_time_season,
+            analysis_time_season_week,
+            starts_with("est_prob_bin_")) %>%
+    gather_("bin", "est_prob", paste0("est_prob_bin_", seq(from = 9, to = 41)))
+peak_timing_pred_dist_by_analysis_time$bin <-
+    as.integer(substr(peak_timing_pred_dist_by_analysis_time$bin, 14, 15))
+
+
+#junkjunkjunk <-    peak_timing_pred_dist_by_analysis_time[
+#        peak_timing_pred_dist_by_analysis_time$full_model_descriptor == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full" &
+#        peak_timing_pred_dist_by_analysis_time$bin ==
+#            peak_week_times$peak_week[
+#                sapply(peak_timing_pred_dist_by_analysis_time$analysis_time_season,
+#                    function(season_val) {
+#                        which(peak_week_times$analysis_time_season == season_val)
+#                    })
+#        ],
+#        c("est_prob", "analysis_time_season", "analysis_time_season_week")
+#    ] %>%
+#    mutate(log_score = log(est_prob))
+#
+#junkjunkjunk <- 
+#    junkjunkjunk[
+#        order(junkjunkjunk$analysis_time_season,
+#            junkjunkjunk$analysis_time_season_week), ]
+#
+#junkjunkjunkjunk <- ili_peak_week_results[
+#    ili_peak_week_results$full_model_descriptor == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full",
+#    c("peak_week_log_score", "analysis_time_season", "analysis_time_season_week")
+#]
+#
+#junkjunkjunkjunk <- 
+#    junkjunkjunkjunk[
+#        order(junkjunkjunkjunk$analysis_time_season,
+#            junkjunkjunkjunk$analysis_time_season_week), ]
+#
+#tapply(peak_timing_pred_dist_by_analysis_time$est_prob,
+#    peak_timing_pred_dist_by_analysis_time[,
+#        c("full_model_descriptor", "analysis_time_season", "analysis_time_season_week")],
+#    sum)
+ 
+peak_timing_and_height_pred_dist_means_by_analysis_time <- 
+    ili_peak_week_results %>%
+    select(full_model_descriptor,
+        analysis_time_season,
+        analysis_time_season_week,
+        starts_with("est_prob_bin_")) %>%
+    mutate(
+        mean_peak_week = apply(ili_peak_week_results[, paste0("peak_week_", seq_len(10000))],
+            1,
+            mean),
+        median_peak_week = apply(ili_peak_week_results[, paste0("peak_week_", seq_len(10000))],
+            1,
+            median),
+        mean_peak_height = apply(ili_peak_week_results[, paste0("unbinned_peak_height_", seq_len(10000))],
+            1,
+            mean),
+        median_peak_height = apply(ili_peak_week_results[, paste0("unbinned_peak_height_", seq_len(10000))],
+            1,
+            median)
+    )
+
+#peak_timing_pred_dist_by_analysis_time <- ili_peak_week_results %>%
+#    mutate(count_)
+#    select_(c("full_model_descriptor", "analysis_time_season", "analysis_time_season_week"))
+#
+#
+#
+#peak_timing_pred_dist_by_analysis_time <-
+#    as.data.frame(expand.grid(
+#            model = c(
+#                "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+#                "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full"),
+#            analysis_time_season = unique(ili_peak_week_results$analysis_time_season),
+#            analysis_time_season_week = seq(from = 10, to = 40),
+#            bin_number = seq(from = 10, to = 40),
+##        incidence_bin = seq_len(nrow(ili_incidence_bins)),
+#            stringsAsFactors = FALSE
+#        ))
+#peak_timing_pred_dist_by_analysis_time$est_bin_prob <- sapply(
+#    seq_len(nrow(peak_timing_pred_dist_by_analysis_time)),
+#    function(row_ind) {
+#        sum(ili_peak_week_results[
+#                    ili_peak_week_results$full_model_descriptor == peak_timing_pred_dist_by_analysis_time$model[row_ind] &
+#                        ili_peak_week_results$analysis_time_season == peak_timing_pred_dist_by_analysis_time$analysis_time_season[row_ind] &
+#                        ili_peak_week_results$analysis_time_season_week == peak_timing_pred_dist_by_analysis_time$analysis_time_season_week[row_ind],
+#                    paste0("peak_week_", seq_len(10000))] ==
+#                peak_timing_pred_dist_by_analysis_time$bin_number[row_ind]) / 10000
+#    })
+#
+#
+#
+@
+
+\begin{figure}
+\caption{Predictive distributions for predictions of peak week timing.  The
+horizontal and vertical dashed lines are at the observed peak week for the
+season.}
+\label{fig:FluPeakWeekTimingPredictiveDistributions}
+<<FluPlotPeakWeekTimingPredictiveDistributionsByAnalysisTime, echo = FALSE>>=
+models_used <- c(
+    "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_diagonal",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_full",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_diagonal",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
+models_used <- c(
+    "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
+
+#peak_timing_pred_dist_by_analysis_time$est_prob[
+#    peak_timing_pred_dist_by_analysis_time$est_prob == 0] <- 10^{-20}
+#peak_timing_pred_dist_by_analysis_time$est_prob[
+#    peak_timing_pred_dist_by_analysis_time$est_prob == 10^{-20}] <- 0
+
+#min(
+#    peak_timing_pred_dist_by_analysis_time$est_prob[
+#        peak_timing_pred_dist_by_analysis_time$est_prob != 0 &
+#            peak_timing_pred_dist_by_analysis_time$full_model_descriptor %in% models_used]
+#)
+
+ggplot() +
+    geom_raster(aes(x = analysis_time_season_week, y = bin, fill = est_prob),
+        data = peak_timing_pred_dist_by_analysis_time[peak_timing_pred_dist_by_analysis_time$full_model_descriptor %in% models_used, ]) +
+    geom_vline(aes(xintercept = peak_week), colour = "red", linetype = 2, data = ili_peak_week_times) +
+    geom_hline(aes(yintercept = peak_week), colour = "red", linetype = 2, data = ili_peak_week_times) +
+    geom_point(aes(x = analysis_time_season_week, y = median_peak_week),
+        colour = "red",
+        data = peak_timing_and_height_pred_dist_means_by_analysis_time[peak_timing_and_height_pred_dist_means_by_analysis_time$full_model_descriptor %in% models_used, ]) +
+    scale_fill_gradientn("Predictive\nDistribution\nProbability",
+        colours = rev(c("#000000", "#111111", "#222222", "#333333", "#444444", "#555555", "#666666", "#777777", "#888888", "#999999", "#AAAAAA", "#BBBBBB", "#CCCCCC", "#DDDDDD", "#EEEEEE", "#FFFFFF")),
+#        limits = c(10^{-10}, 1),
+        trans = "log",
+#        values = c(0, seq(from = exp(-10), to = 1, length = 15))) +
+#        values = c(0, exp(seq(from = log(10^-3), to = log(1), length = 15)))
+#        values = c(0, exp(seq(from = log(5 * 10^-4), to = log(1), length = 15)))
+        breaks = c(0.0001, 0.001, 0.01, 0.1, 1),
+#        labels = c(0.0001, 0.001, 0.01, 0.1, 1),
+        labels = c(expression(10^{-4}), expression(10^{-3}), expression(10^{-2}), expression(10^{-1}), "1   "),
+        na.value = "white"
+    ) +
+    facet_grid(analysis_time_season ~ full_model_descriptor,
+        labeller = as_labeller(function(labels, ...) {
+            labels[labels == "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"] <- "SARIMA"
+            labels[labels == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full"] <- "KCDE"
+            return(labels)
+        })) +
+    xlab("Season Week at Analysis Time") +
+    ylab("Season Week at Peak Incidence") +
+    theme_bw()
+@
+\end{figure}
+
+
+
+
+<<FluObtainPeakWeekHeightPredictiveDistributionsByAnalysisTime, echo = FALSE>>=
+ili_incidence_bins <- data.frame(
+    lower = seq(from = 0, to = 13, by = 0.5),
+    upper = c(seq(from = 0.5, to = 13, by = 0.5), Inf),
+    center = seq(from = 0.25, to = 13.25, by = 0.5))
+
+for(bin_num in seq_len(nrow(ili_incidence_bins))) {
+    ili_peak_week_results[, paste0("est_prob_bin_", bin_num)] <-
+        apply(ili_peak_week_results[, paste0("peak_height_", seq_len(10000))],
+            1,
+            function(x) {sum(x == bin_num) / length(x)})
+}
+
+peak_height_pred_dist_by_analysis_time <- ili_peak_week_results %>%
+    select(full_model_descriptor,
+            analysis_time_season,
+            analysis_time_season_week,
+            starts_with("est_prob_bin_")) %>%
+    gather_("bin", "est_prob", paste0("est_prob_bin_", seq_len(nrow(ili_incidence_bins))))
+peak_height_pred_dist_by_analysis_time$bin <-
+    as.integer(substr(peak_height_pred_dist_by_analysis_time$bin, 14, 15))
+peak_height_pred_dist_by_analysis_time$bin_center <-
+    ili_incidence_bins$center[peak_height_pred_dist_by_analysis_time$bin]
+
+
+#peak_timing_pred_dist_by_analysis_time <- ili_peak_week_results %>%
+#    mutate(count_)
+#    select_(c("full_model_descriptor", "analysis_time_season", "analysis_time_season_week"))
+#
+#
+#
+#peak_timing_pred_dist_by_analysis_time <-
+#    as.data.frame(expand.grid(
+#            model = c(
+#                "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+#                "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full"),
+#            analysis_time_season = unique(ili_peak_week_results$analysis_time_season),
+#            analysis_time_season_week = seq(from = 10, to = 40),
+#            bin_number = seq(from = 10, to = 40),
+##        incidence_bin = seq_len(nrow(ili_incidence_bins)),
+#            stringsAsFactors = FALSE
+#        ))
+#peak_timing_pred_dist_by_analysis_time$est_bin_prob <- sapply(
+#    seq_len(nrow(peak_timing_pred_dist_by_analysis_time)),
+#    function(row_ind) {
+#        sum(ili_peak_week_results[
+#                    ili_peak_week_results$full_model_descriptor == peak_timing_pred_dist_by_analysis_time$model[row_ind] &
+#                        ili_peak_week_results$analysis_time_season == peak_timing_pred_dist_by_analysis_time$analysis_time_season[row_ind] &
+#                        ili_peak_week_results$analysis_time_season_week == peak_timing_pred_dist_by_analysis_time$analysis_time_season_week[row_ind],
+#                    paste0("peak_week_", seq_len(10000))] ==
+#                peak_timing_pred_dist_by_analysis_time$bin_number[row_ind]) / 10000
+#    })
+#
+#
+#
+@
+
+\begin{figure}
+\caption{Predictive distributions for predictions of peak week incidence.  The
+horizontal dashed line is at the observed peak incidence for the season.  The
+vertical dashed line is at the observed peak week for the season.}
+\label{fig:FluPeakWeekHeightPredictiveDistributions}
+<<FluPlotPeakWeekHeightPredictiveDistributionsByAnalysisTime, echo = FALSE>>=
+models_used <- c(
+    "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_diagonal",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_full",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_diagonal",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
+models_used <- c(
+    "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
+
+ggplot() +
+    geom_raster(aes(x = analysis_time_season_week, y = bin_center, fill = est_prob),
+        data = peak_height_pred_dist_by_analysis_time[peak_height_pred_dist_by_analysis_time$full_model_descriptor %in% models_used, ]) +
+    geom_vline(aes(xintercept = peak_week), colour = "red", linetype = 2, data = ili_peak_week_times) +
+    geom_hline(aes(yintercept = peak_height), colour = "red", linetype = 2, data = ili_peak_week_heights) +
+    geom_point(aes(x = analysis_time_season_week, y = median_peak_height),
+        colour = "red",
+        data = peak_timing_and_height_pred_dist_means_by_analysis_time[peak_timing_and_height_pred_dist_means_by_analysis_time$full_model_descriptor %in% models_used, ]) +
+    scale_fill_gradientn("Predictive\nDistribution\nProbability",
+        colours = rev(c("#000000", "#111111", "#222222", "#333333", "#444444", "#555555", "#666666", "#777777", "#888888", "#999999", "#AAAAAA", "#BBBBBB", "#CCCCCC", "#DDDDDD", "#EEEEEE", "#FFFFFF")),
+#        limits = c(10^{-10}, 1),
+        trans = "log",
+#        values = c(0, seq(from = exp(-10), to = 1, length = 15))) +
+#        values = c(0, exp(seq(from = log(10^-3), to = log(1), length = 15)))
+#        values = c(0, exp(seq(from = log(5 * 10^-4), to = log(1), length = 15)))
+        breaks = c(0.0001, 0.001, 0.01, 0.1, 1),
+        labels = c(expression(10^{-4}), expression(10^{-3}), expression(10^{-2}), expression(10^{-1}), "1   "),
+        na.value = "white"
+    ) +
+    facet_grid(analysis_time_season ~ full_model_descriptor,
+        labeller = as_labeller(function(labels, ...) {
+                labels[labels == "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"] <- "SARIMA"
+                labels[labels == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full"] <- "KCDE"
+                return(labels)
+            })) +
+    ylab("Peak Incidence") +
+    xlab("Season Week at Analysis Time") +
+    theme_bw()
+@
+\end{figure}
+
+
+
+
+
+
+
+
+
+
+
+
+<<DengueDataMergePeakWeekPredictionResults, echo = FALSE>>=
+data_set <- "dengue_sj"
+    
+prediction_save_path <- file.path("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results",
+    data_set,
+    "prediction-results")
+
+all_max_lags <- as.character(c(1L))
+#all_max_seasonal_lags <- as.character(c(0L, 1L))
+all_max_seasonal_lags <- as.character(c(0L))
+all_filtering_values <- c("FALSE")
+#all_differencing_values <- c("FALSE", "TRUE")
+all_differencing_values <- "FALSE"
+all_seasonality_values <- c("FALSE", "TRUE")
+all_bw_parameterizations <- c("diagonal", "full")
+
+case_definitions <- expand.grid(
+        data_set,
+        all_max_lags,
+        all_max_seasonal_lags,
+        all_filtering_values,
+        all_differencing_values,
+        all_seasonality_values,
+        all_bw_parameterizations,
+        stringsAsFactors = FALSE) %>%
+    `colnames<-`(c("data_set",
+            "max_lag",
+            "max_seasonal_lag",
+            "filtering",
+            "differencing",
+            "seasonality",
+            "bw_parameterization"))
+ 
+dengue_peak_week_results <- rbind.fill(
+    c(
+        list(
+            readRDS(file.path(prediction_save_path,
+                        paste0("peak-week-sarima-", data_set, ".rds"))) %>%
+                mutate(model = "SARIMA")
+        ),
+        lapply(seq_len(nrow(case_definitions)), function(case_row_ind) {
+                max_lag <- case_definitions$max_lag[case_row_ind]
+                max_seasonal_lag <- case_definitions$max_seasonal_lag[case_row_ind]
+                filtering <- case_definitions$filtering[case_row_ind]
+                differencing <- case_definitions$differencing[case_row_ind]
+                seasonality <- case_definitions$seasonality[case_row_ind]
+                bw_parameterization <- case_definitions$bw_parameterization[case_row_ind]
+                
+                case_descriptor <- paste0(
+                    data_set,
+                    "-max_lag_", max_lag,
+                    "-max_seasonal_lag_", max_seasonal_lag,
+                    "-filtering_", filtering,
+                    "-differencing_", differencing,
+                    "-seasonality_", seasonality,
+                    "-bw_parameterization_", bw_parameterization
+                )
+                
+                readRDS(file.path(prediction_save_path,
+                            paste0("peak-week-", case_descriptor, ".rds"))) %>%
+                    mutate(model = "KCDE",
+                        max_lag = max_lag,
+                        max_seasonal_lag = max_seasonal_lag,
+                        filtering = filtering,
+                        differencing = differencing,
+                        seasonality = seasonality,
+                        bw_parameterization = bw_parameterization)
+            })
+    )
+)
+
+dengue_peak_week_results$full_model_descriptor <- paste0(dengue_peak_week_results$model,
+    "-seasonal_lag_", dengue_peak_week_results$max_seasonal_lag,
+#    "-filtering_", dengue_prediction_results$filtering,
+    "-differencing_", dengue_peak_week_results$differencing,
+    "-periodic_", dengue_peak_week_results$seasonality,
+    "-bw_", dengue_peak_week_results$bw_parameterization)
+
+dengue_peak_week_results$peak_week_log_score[dengue_peak_week_results$peak_week_log_score < -50] <- -50
+dengue_peak_week_results$peak_height_log_score[dengue_peak_week_results$peak_height_log_score < -50] <- -50
+@
+
+
+
+
+
+\begin{figure}
+\caption{Log scores for predictions of peak week timing by predictive
+model and analysis time.  The vertical gray line is placed at the peak week for
+each season.}
+\label{fig:DenguePeakWeekTimingPredictionLogScores}
+<<DenguePeakWeekTimingLogScoreByAnalysisTime, echo = FALSE, dependson = c("DengueDataMergePeakWeekPredictionResults", "DengueDataPeakWeekPredictionBoxPlots")>>=
+## Add season and season week columns to data so that we can get from
+## analysis_time_season and analysis_time_season_week to analysis_time
+#dengue_sj$season <- ifelse(
+#    dengue_sj$week <= 30,
+#    paste0(dengue_sj$year - 1, "/", dengue_sj$year),
+#    paste0(dengue_sj$year, "/", dengue_sj$year + 1)
+#)
+#
+## Season week column: week number within season
+#dengue_sj$season_week <- sapply(seq_len(nrow(dengue_sj)), function(row_ind) {
+#    sum(dengue_sj$season == dengue_sj$season[row_ind] & dengue_sj$time_index <= dengue_sj$time_index[row_ind])
+#})
+#
+#
+#dengue_peak_week_results$analysis_time <- dengue_peak_week_results$analysis_time_season_week
+
+#dengue_peak_week_results_for_plot
+
+models_used <- c(
+    "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_diagonal",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_full",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_diagonal",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full",
+    "Equal Bin Probabdengueties")
+reduced_models_used <- c(
+    "SARIMA",
+    "Null KCDE Model",
+    "Full Bandwidth",
+    "Periodic Kernel",
+    "Periodic Kernel,\nFull Bandwidth",
+    "Equal Bin Probabdengueties"
+)
+
+dengue_peak_week_results$reduced_model_descriptor <- "Null KCDE Model"
+dengue_peak_week_results$reduced_model_descriptor[
+    as.logical(dengue_peak_week_results$seasonality) & !(dengue_peak_week_results$bw_parameterization == "full")] <-
+    "Periodic Kernel"
+dengue_peak_week_results$reduced_model_descriptor[
+    !as.logical(dengue_peak_week_results$seasonality) & (dengue_peak_week_results$bw_parameterization == "full")] <-
+    "Full Bandwidth"
+dengue_peak_week_results$reduced_model_descriptor[
+    as.logical(dengue_peak_week_results$seasonality) & (dengue_peak_week_results$bw_parameterization == "full")] <-
+    "Periodic Kernel,\nFull Bandwidth"
+dengue_peak_week_results$reduced_model_descriptor[
+    dengue_peak_week_results$model == "SARIMA"] <-
+    "SARIMA"
+
+num_analysis_time_season_values <- length(unique(dengue_peak_week_results$analysis_time_season))
+num_analysis_time_season_week_values <- length(unique(dengue_peak_week_results$analysis_time_season_week))
+dengue_peak_week_results <- rbind.fill(dengue_peak_week_results,
+    data.frame(
+        full_model_descriptor = rep("Equal Bin Probabdengueties", num_analysis_time_season_week_values * num_analysis_time_season_values),
+        reduced_model_descriptor = rep("Equal Bin Probabdengueties", num_analysis_time_season_week_values * num_analysis_time_season_values),
+        analysis_time_season = rep(unique(dengue_peak_week_results$analysis_time_season), each = num_analysis_time_season_week_values),
+        analysis_time_season_week = rep(unique(dengue_peak_week_results$analysis_time_season_week), times = num_analysis_time_season_values),
+        peak_week_log_score = rep(log(1/52), num_analysis_time_season_week_values * num_analysis_time_season_values),
+        peak_height_log_score = rep(log(1/27), num_analysis_time_season_week_values * num_analysis_time_season_values)
+))
+    
+    
+dengue_peak_week_results$reduced_model_descriptor <-
+    factor(dengue_peak_week_results$reduced_model_descriptor,
+        levels = c("SARIMA", "Null KCDE Model", "Full Bandwidth", "Periodic Kernel",
+            "Periodic Kernel,\nFull Bandwidth",
+            "Equal Bin Probabdengueties"
+        ))
+    
+#geom_hline(yintercept = log(1/31), colour = "grey", linetype = 2)
+
+dengue_peak_week_times <- data.frame(
+    analysis_time_season = unique(dengue_peak_week_results$analysis_time_season),
+    peak_week = sapply(unique(dengue_peak_week_results$analysis_time_season),
+        function(season_val) {
+            max_incidence_in_season <-
+                max(dengue_sj$total_cases[dengue_sj$season == season_val])
+            return(dengue_sj$season_week[dengue_sj$season == season_val &
+                dengue_sj$total_cases == max_incidence_in_season])
+        })
+)
+
+dengue_peak_week_results$peak_week_log_score[dengue_peak_week_results$peak_week_log_score == -50] <- NA
+p <- ggplot(dengue_peak_week_results[dengue_peak_week_results$full_model_descriptor %in% models_used, ]) +
+    geom_line(aes(x = analysis_time_season_week, y = peak_week_log_score, colour = reduced_model_descriptor, linetype = reduced_model_descriptor)) +
+    geom_point(aes(x = analysis_time_season_week, y = peak_week_log_score, colour = reduced_model_descriptor, shape = reduced_model_descriptor)) +
+    scale_colour_manual("Model", breaks = reduced_models_used, values = c("#E69F00", "#56B4E9", "#009E73", "#D55E00", "#0072B2", "#999999")) +
+    scale_linetype_manual("Model", breaks = reduced_models_used, values = c(1:5, 1)) +
+    scale_shape_manual("Model", breaks = reduced_models_used, values = c(0:4, 45)) +
+    geom_vline(aes(xintercept = peak_week), colour = "red", linetype = 2, data = dengue_peak_week_times) +
+    facet_wrap( ~ analysis_time_season, ncol = 1) +
+    xlab("Season Week at Analysis Time") +
+    ylab("Log Score") +
+    theme_bw()
+
+suppressWarnings(print(p))
+@
+\end{figure}
+
+
+
+\begin{figure}
+\caption{Log scores for predictions of incidence in the peak week for Dengue by
+predictive model and analysis time.  The vertical gray line is placed at the peak week for
+each season.}
+\label{fig:DenguePeakWeekIncidencePredictionLogScores}
+<<DenguePeakWeekIncidenceLogScoreByAnalysisTime, echo = FALSE, dependson = c("DengueDataMergePeakWeekPredictionResults", "DengueDataPeakWeekPredictionBoxPlots")>>=
+## Add season and season week columns to data so that we can get from
+## analysis_time_season and analysis_time_season_week to analysis_time
+#dengue_sj$season <- ifelse(
+#    dengue_sj$week <= 30,
+#    paste0(dengue_sj$year - 1, "/", dengue_sj$year),
+#    paste0(dengue_sj$year, "/", dengue_sj$year + 1)
+#)
+#
+## Season week column: week number within season
+#dengue_sj$season_week <- sapply(seq_len(nrow(dengue_sj)), function(row_ind) {
+#    sum(dengue_sj$season == dengue_sj$season[row_ind] & dengue_sj$time_index <= dengue_sj$time_index[row_ind])
+#})
+#
+#
+#dengue_peak_week_results$analysis_time <- dengue_peak_week_results$analysis_time_season_week
+
+#dengue_peak_week_results_for_plot
+ 
+models_used <- c(
+    "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_diagonal",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_full",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_diagonal",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full",
+    "Equal Bin Probabdengueties")
+reduced_models_used <- c(
+    "SARIMA",
+    "Null KCDE Model",
+    "Full Bandwidth",
+    "Periodic Kernel",
+    "Periodic Kernel,\nFull Bandwidth",
+    "Equal Bin Probabdengueties")
+
+dengue_peak_week_results$peak_height_log_score[dengue_peak_week_results$peak_height_log_score == -50] <- NA
+ggplot(dengue_peak_week_results[dengue_peak_week_results$full_model_descriptor %in% models_used, ]) +
+    geom_line(aes(x = analysis_time_season_week, y = peak_height_log_score, colour = reduced_model_descriptor, linetype = reduced_model_descriptor)) +
+    geom_point(aes(x = analysis_time_season_week, y = peak_height_log_score, colour = reduced_model_descriptor, shape = reduced_model_descriptor)) +
+    scale_colour_manual("Model", breaks = reduced_models_used, values = c("#E69F00", "#56B4E9", "#009E73", "#D55E00", "#0072B2", "#999999")) +
+    scale_linetype_manual("Model", breaks = reduced_models_used, values = c(1:5, 1)) +
+    scale_shape_manual("Model", breaks = reduced_models_used, values = c(0:4, 45)) +
+    geom_vline(aes(xintercept = peak_week), colour = "red", linetype = 2, data = dengue_peak_week_times) +
+    facet_wrap( ~ analysis_time_season, ncol = 1) +
+#    geom_raster(aes(x = analysis_time_season_week, y = log_score),
+#        data = dengue_peak_week_results) +
+    xlab("Season Week at Analysis Time") +
+    ylab("Log Score") +
+    theme_bw()
+@
+\end{figure}
+
+
+<<DengueObtainPeakWeekTimingPredictiveDistributionsByAnalysisTime, echo = FALSE, dependson = c("DengueDataMergePeakWeekPredictionResults", "DengueDataPeakWeekPredictionBoxPlots")>>=
+dengue_incidence_bins <- data.frame(
+    lower = seq(from = 0, to = 500, by = 50),
+    upper = c(seq(from = 50, to = 500, by = 50), Inf))
+
+for(bin_num in seq(from = 1, to = 52)) {
+    dengue_peak_week_results[, paste0("est_prob_bin_", bin_num)] <-
+        apply(dengue_peak_week_results[, paste0("peak_week_", seq_len(10000))],
+            1,
+            function(x) {sum(x == bin_num) / length(x)})
+}
+
+peak_timing_pred_dist_by_analysis_time_dengue <- dengue_peak_week_results %>%
+    select(full_model_descriptor,
+            analysis_time_season,
+            analysis_time_season_week,
+            starts_with("est_prob_bin_")) %>%
+    gather_("bin", "est_prob", paste0("est_prob_bin_", seq(from = 1, to = 52)))
+peak_timing_pred_dist_by_analysis_time_dengue$bin <-
+    as.integer(substr(peak_timing_pred_dist_by_analysis_time_dengue$bin, 14, 15))
+
+
+#junkjunkjunk <-    peak_timing_pred_dist_by_analysis_time[
+#        peak_timing_pred_dist_by_analysis_time$full_model_descriptor == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full" &
+#        peak_timing_pred_dist_by_analysis_time$bin ==
+#            peak_week_times$peak_week[
+#                sapply(peak_timing_pred_dist_by_analysis_time$analysis_time_season,
+#                    function(season_val) {
+#                        which(peak_week_times$analysis_time_season == season_val)
+#                    })
+#        ],
+#        c("est_prob", "analysis_time_season", "analysis_time_season_week")
+#    ] %>%
+#    mutate(log_score = log(est_prob))
+#
+#junkjunkjunk <- 
+#    junkjunkjunk[
+#        order(junkjunkjunk$analysis_time_season,
+#            junkjunkjunk$analysis_time_season_week), ]
+#
+#junkjunkjunkjunk <- dengue_peak_week_results[
+#    dengue_peak_week_results$full_model_descriptor == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full",
+#    c("peak_week_log_score", "analysis_time_season", "analysis_time_season_week")
+#]
+#
+#junkjunkjunkjunk <- 
+#    junkjunkjunkjunk[
+#        order(junkjunkjunkjunk$analysis_time_season,
+#            junkjunkjunkjunk$analysis_time_season_week), ]
+#
+#tapply(peak_timing_pred_dist_by_analysis_time$est_prob,
+#    peak_timing_pred_dist_by_analysis_time[,
+#        c("full_model_descriptor", "analysis_time_season", "analysis_time_season_week")],
+#    sum)
+ 
+peak_timing_and_height_pred_dist_means_by_analysis_time_dengue <- 
+    dengue_peak_week_results %>%
+    select(full_model_descriptor,
+        analysis_time_season,
+        analysis_time_season_week,
+        starts_with("est_prob_bin_")) %>%
+    mutate(
+        mean_peak_week = apply(dengue_peak_week_results[, paste0("peak_week_", seq_len(10000))],
+            1,
+            mean),
+        median_peak_week = apply(dengue_peak_week_results[, paste0("peak_week_", seq_len(10000))],
+            1,
+            median),
+        mean_peak_height = apply(dengue_peak_week_results[, paste0("unbinned_peak_height_", seq_len(10000))],
+            1,
+            mean),
+        median_peak_height = apply(dengue_peak_week_results[, paste0("unbinned_peak_height_", seq_len(10000))],
+            1,
+            median)
+    )
+
+#peak_timing_pred_dist_by_analysis_time <- dengue_peak_week_results %>%
+#    mutate(count_)
+#    select_(c("full_model_descriptor", "analysis_time_season", "analysis_time_season_week"))
+#
+#
+#
+#peak_timing_pred_dist_by_analysis_time <-
+#    as.data.frame(expand.grid(
+#            model = c(
+#                "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+#                "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full"),
+#            analysis_time_season = unique(dengue_peak_week_results$analysis_time_season),
+#            analysis_time_season_week = seq(from = 10, to = 40),
+#            bin_number = seq(from = 10, to = 40),
+##        incidence_bin = seq_len(nrow(dengue_incidence_bins)),
+#            stringsAsFactors = FALSE
+#        ))
+#peak_timing_pred_dist_by_analysis_time$est_bin_prob <- sapply(
+#    seq_len(nrow(peak_timing_pred_dist_by_analysis_time)),
+#    function(row_ind) {
+#        sum(dengue_peak_week_results[
+#                    dengue_peak_week_results$full_model_descriptor == peak_timing_pred_dist_by_analysis_time$model[row_ind] &
+#                        dengue_peak_week_results$analysis_time_season == peak_timing_pred_dist_by_analysis_time$analysis_time_season[row_ind] &
+#                        dengue_peak_week_results$analysis_time_season_week == peak_timing_pred_dist_by_analysis_time$analysis_time_season_week[row_ind],
+#                    paste0("peak_week_", seq_len(10000))] ==
+#                peak_timing_pred_dist_by_analysis_time$bin_number[row_ind]) / 10000
+#    })
+#
+#
+#
+@
+
+\begin{figure}
+\caption{Predictive distributions for predictions of peak week timing for
+Dengue.
+The horizontal and vertical dashed lines are at the observed peak week for the
+season.}
+\label{fig:DenguePeakWeekTimingPredictiveDistributions}
+<<DenguePlotPeakWeekTimingPredictiveDistributionsByAnalysisTime, echo = FALSE, dependson = c("DengueDataMergePeakWeekPredictionResults", "DengueDataPeakWeekPredictionBoxPlots")>>=
+models_used <- c(
+    "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_diagonal",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_full",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_diagonal",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
+models_used <- c(
+    "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
+
+#peak_timing_pred_dist_by_analysis_time$est_prob[
+#    peak_timing_pred_dist_by_analysis_time$est_prob == 0] <- 10^{-20}
+#peak_timing_pred_dist_by_analysis_time$est_prob[
+#    peak_timing_pred_dist_by_analysis_time$est_prob == 10^{-20}] <- 0
+
+#min(
+#    peak_timing_pred_dist_by_analysis_time$est_prob[
+#        peak_timing_pred_dist_by_analysis_time$est_prob != 0 &
+#            peak_timing_pred_dist_by_analysis_time$full_model_descriptor %in% models_used]
+#)
+
+ggplot() +
+    geom_raster(aes(x = analysis_time_season_week, y = bin, fill = est_prob),
+        data = peak_timing_pred_dist_by_analysis_time_dengue[peak_timing_pred_dist_by_analysis_time_dengue$full_model_descriptor %in% models_used, ]) +
+    geom_vline(aes(xintercept = peak_week), colour = "red", linetype = 2, data = dengue_peak_week_times) +
+    geom_hline(aes(yintercept = peak_week), colour = "red", linetype = 2, data = dengue_peak_week_times) +
+    geom_point(aes(x = analysis_time_season_week, y = median_peak_week),
+        colour = "red",
+        data = peak_timing_and_height_pred_dist_means_by_analysis_time_dengue[peak_timing_and_height_pred_dist_means_by_analysis_time_dengue$full_model_descriptor %in% models_used, ]) +
+    scale_fill_gradientn("Predictive\nDistribution\nProbability",
+        colours = rev(c("#000000", "#111111", "#222222", "#333333", "#444444", "#555555", "#666666", "#777777", "#888888", "#999999", "#AAAAAA", "#BBBBBB", "#CCCCCC", "#DDDDDD", "#EEEEEE", "#FFFFFF")),
+#        limits = c(10^{-10}, 1),
+        trans = "log",
+#        values = c(0, seq(from = exp(-10), to = 1, length = 15))) +
+#        values = c(0, exp(seq(from = log(10^-3), to = log(1), length = 15)))
+#        values = c(0, exp(seq(from = log(5 * 10^-4), to = log(1), length = 15)))
+        breaks = c(0.0001, 0.001, 0.01, 0.1, 1),
+#        labels = c(0.0001, 0.001, 0.01, 0.1, 1),
+        labels = c(expression(10^{-4}), expression(10^{-3}), expression(10^{-2}), expression(10^{-1}), "1   "),
+        na.value = "white"
+    ) +
+    facet_grid(analysis_time_season ~ full_model_descriptor,
+        labeller = as_labeller(function(labels, ...) {
+            labels[labels == "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"] <- "SARIMA"
+            labels[labels == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full"] <- "KCDE"
+            return(labels)
+        })) +
+    xlab("Season Week at Analysis Time") +
+    ylab("Season Week at Peak Incidence") +
+    theme_bw()
+@
+\end{figure}
+
+
+
+
+<<DengueObtainPeakWeekHeightPredictiveDistributionsByAnalysisTime, echo = FALSE, dependson = c("DengueDataMergePeakWeekPredictionResults", "DengueDataPeakWeekPredictionBoxPlots")>>=
+dengue_incidence_bins <- data.frame(
+    lower = seq(from = 0, to = 500, by = 50),
+    upper = c(seq(from = 50, to = 500, by = 50), Inf),
+    center = seq(from = 25, to = 525, by = 50))
+
+for(bin_num in seq_len(nrow(dengue_incidence_bins))) {
+    dengue_peak_week_results[, paste0("est_prob_bin_", bin_num)] <-
+        apply(dengue_peak_week_results[, paste0("peak_height_", seq_len(10000))],
+            1,
+            function(x) {sum(x == bin_num) / length(x)})
+}
+
+peak_height_pred_dist_by_analysis_time_dengue <- dengue_peak_week_results %>%
+    select(full_model_descriptor,
+            analysis_time_season,
+            analysis_time_season_week,
+            starts_with("est_prob_bin_")) %>%
+    gather_("bin", "est_prob", paste0("est_prob_bin_", seq_len(nrow(dengue_incidence_bins))))
+peak_height_pred_dist_by_analysis_time_dengue$bin <-
+    as.integer(substr(peak_height_pred_dist_by_analysis_time_dengue$bin, 14, 15))
+peak_height_pred_dist_by_analysis_time_dengue$bin_center <-
+    dengue_incidence_bins$center[peak_height_pred_dist_by_analysis_time_dengue$bin]
+
+
+#peak_timing_pred_dist_by_analysis_time <- dengue_peak_week_results %>%
+#    mutate(count_)
+#    select_(c("full_model_descriptor", "analysis_time_season", "analysis_time_season_week"))
+#
+#
+#
+#peak_timing_pred_dist_by_analysis_time <-
+#    as.data.frame(expand.grid(
+#            model = c(
+#                "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+#                "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full"),
+#            analysis_time_season = unique(dengue_peak_week_results$analysis_time_season),
+#            analysis_time_season_week = seq(from = 10, to = 40),
+#            bin_number = seq(from = 10, to = 40),
+##        incidence_bin = seq_len(nrow(dengue_incidence_bins)),
+#            stringsAsFactors = FALSE
+#        ))
+#peak_timing_pred_dist_by_analysis_time$est_bin_prob <- sapply(
+#    seq_len(nrow(peak_timing_pred_dist_by_analysis_time)),
+#    function(row_ind) {
+#        sum(dengue_peak_week_results[
+#                    dengue_peak_week_results$full_model_descriptor == peak_timing_pred_dist_by_analysis_time$model[row_ind] &
+#                        dengue_peak_week_results$analysis_time_season == peak_timing_pred_dist_by_analysis_time$analysis_time_season[row_ind] &
+#                        dengue_peak_week_results$analysis_time_season_week == peak_timing_pred_dist_by_analysis_time$analysis_time_season_week[row_ind],
+#                    paste0("peak_week_", seq_len(10000))] ==
+#                peak_timing_pred_dist_by_analysis_time$bin_number[row_ind]) / 10000
+#    })
+#
+#
+#
+@
+
+\begin{figure}
+\caption{Predictive distributions for predictions of peak week incidence for
+Dengue.
+The horizontal dashed line is at the observed peak incidence for the season.  The
+vertical dashed line is at the observed peak week for the season.}
+\label{fig:DenguePeakWeekHeightPredictiveDistributions}
+<<DenguePlotPeakWeekHeightPredictiveDistributionsByAnalysisTime, echo = FALSE, dependson = c("DengueDataMergePeakWeekPredictionResults", "DengueDataPeakWeekPredictionBoxPlots", "DengueObtainPeakWeekHeightPredictiveDistributionsByAnalysisTime")>>=
+models_used <- c(
+    "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_diagonal",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_full",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_diagonal",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
+models_used <- c(
+    "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
+
+ggplot() +
+    geom_raster(aes(x = analysis_time_season_week, y = bin_center, fill = est_prob),
+        data = peak_height_pred_dist_by_analysis_time_dengue[peak_height_pred_dist_by_analysis_time_dengue$full_model_descriptor %in% models_used, ]) +
+    geom_vline(aes(xintercept = peak_week), colour = "red", linetype = 2, data = dengue_peak_week_times) +
+    geom_hline(aes(yintercept = peak_height), colour = "red", linetype = 2, data = dengue_peak_week_heights) +
+    geom_point(aes(x = analysis_time_season_week, y = median_peak_height),
+        colour = "red",
+        data = peak_timing_and_height_pred_dist_means_by_analysis_time_dengue[peak_timing_and_height_pred_dist_means_by_analysis_time_dengue$full_model_descriptor %in% models_used, ]) +
+    scale_fill_gradientn("Predictive\nDistribution\nProbability",
+        colours = rev(c("#000000", "#111111", "#222222", "#333333", "#444444", "#555555", "#666666", "#777777", "#888888", "#999999", "#AAAAAA", "#BBBBBB", "#CCCCCC", "#DDDDDD", "#EEEEEE", "#FFFFFF")),
+#        limits = c(10^{-10}, 1),
+        trans = "log",
+#        values = c(0, seq(from = exp(-10), to = 1, length = 15))) +
+#        values = c(0, exp(seq(from = log(10^-3), to = log(1), length = 15)))
+#        values = c(0, exp(seq(from = log(5 * 10^-4), to = log(1), length = 15)))
+        breaks = c(0.0001, 0.001, 0.01, 0.1, 1),
+        labels = c(expression(10^{-4}), expression(10^{-3}), expression(10^{-2}), expression(10^{-1}), "1   "),
+        na.value = "white"
+    ) +
+    facet_grid(analysis_time_season ~ full_model_descriptor,
+        labeller = as_labeller(function(labels, ...) {
+                labels[labels == "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"] <- "SARIMA"
+                labels[labels == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full"] <- "KCDE"
+                return(labels)
+            })) +
+    ylab("Peak Incidence") +
+    xlab("Season Week at Analysis Time") +
+    theme_bw()
+@
+\end{figure}
+
+
+
+
+
+
+\section{Conclusions}
+
+Prediction of infectious disease incidence at horizons of more than a few weeks
+is a challenging task.  We have presented one approach to doing this and found
+that it is a viable method that yields improved predictions relative to
+commonly employed methods in some applications.  In an application to
+predicting Dengue fever, we saw that our approach offered consistent performance
+gains relative to a SARIMA model in predicting incidence in individual weeks. 
+For predicting influenza-like illness, we saw that our approach did not pick up
+some features of the data generating process, such as the Christmas-week effect, that
+a SARIMA model did capture.  For some prediction targets, this meant that SARIMA
+outperformed our method.  On the other hand, our method rarely performed worse
+than a very naive baseline of equal bin probabilities; the same cannot be said
+for the SARIMA model.
+
+There is much room for extensions and improvements to the methods we have
+outlined in this article.  Hall, Racine, and Li\cite{hall2004crossvalidationKCDE} show that when
+cross-validation is used to select the bandwidth parameters in KCDE using
+product kernels, the estimated bandwidths corresponding to irrelevant conditioning variables tend to
+infinity asymptotically as the sample size increases.  They discuss the fact
+that similar results could be obtained for linear combinations of
+continuous variables if a full bandwidth matrix were used.  Our approach for
+obtaining kernels that can be used with mixed discrete and continuous variables
+opens up an opportunity to extend this analysis to that case; we have not
+pursued this mathematical analysis here.
+
+The above results regarding the inclusion of irrelevant conditioning variables
+hold asymptotically as the sample size increases.  However, in practice, data
+set sizes are often limited.  A major limitation of our current implementation
+of KCDE is that we do not have a good solution to the problem of
+determining which variables to condition on.  In our current application, we
+allow for a variety of . selection problem.
+We explored a stepwise variable selection procedure, but found that this was too
+time-consuming to be practical.
+
+In other modeling settings where some conditioning
+variables may not be informative, shrinkage methods are often helpful.  These
+methods could be incorporated into a kernel-based approach by imposing a penalty
+on the elements of the bandwidth matrix; in particular, we suggest that a
+penalty on the inverse of the bandwidth matrix encouraging it to have small
+eigenvalues could be helpful.  Another alternative would be to pursue the
+Bayesian framework, using Dirichlet process mixtures with an informative prior
+on the mixture component covariance matrices.
+
+We could also make some tweaks to our implementation of KCDE.  One major
+limitation of our current implementation is its sensitivity to edge
+effects.  One possibility for addressing this would be to adopt locally linear
+or polynomial mean functions.
+Cite Hyndman, Bashtannyk, Grunwald - "Estimating and Visualizing Conditional Densities", maybe also Fan and Yim - "A crossvaildation
+method for estimating conditional densities" and Fan et al. 1996 "Estimation of
+conditional densities and sensitivity measures in nonlinear dynamical systems."
+
+Another limitation to our current approach is in We also plan to include a
+KCDE-based prediction method as one component in an ensemble-based approach to prediction.  There are several avenues  --
+either ensembles of KCDE and/or include as a component in an ensemble.  Also Bayesian model averaging.  Return to discussion of bias/variance trade-off?
+
+Other covariates
+
+\bibliographystyle{plainnat}
+\bibliography{kde-bib}
+
+
+\end{document}
