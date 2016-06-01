@@ -391,9 +391,11 @@ the integrals in Equations \eqref{eqn:PeakPredTimingIntegral} and
 \eqref{eqn:PeakPredIncidenceIntegral} by sampling incidence trajectories from
 the joint predictive distribution.
 
-At time $t^*$, our model approximates $f(\bz_{(t^* + 1):(t^* + H_{t^*})} | t^*, \bz_{1:t^*})$
-by conditioning only on the time at which we are making the predictions and observed incidence at
-a few recent time points with lags given by the non-negative integers $l_1, \ldots, l_M$:
+We will introduce the overall structure of our model here and describe its
+components in more detail in the following subsections.  At time $t^*$, our
+model approximates $f(\bz_{(t^* + 1):(t^* + H_{t^*})} | t^*, \bz_{1:t^*})$
+by conditioning only on the time at which we are making the predictions and
+observed incidence at a few recent time points with lags given by the non-negative integers $l_1, \ldots, l_M$:
 $f(\bz_{(t^* + 1):(t^* + H_{t^*})} | t^*, z_{t^* - l_1}, \ldots, z_{t^* -
 l_M})$.  For notational simplicity, we take $l_M$ to be the largest of these
 lags.  The model represents this density as follows:
@@ -489,7 +491,7 @@ distribution of $(\bX, Y^h)$ and estimate the conditional distribution of $Y^h |
 % \bx_t; \btheta^h) K^{\bX}(\bx_{t^*}, \bx_t; \btheta^h)}{\sum_{t \in \btau} K^{\bX}(\bx_{t^*}, \bx_t; \btheta^h) } \label{eqn:KDESubKDEJtMarginal} \\
 
 Here we are working with a slightly restricted specification in which
-the kernel function $K^{\bX, Y}$ can be written as the product of $K^{\bX}$ and a ``conditional kernel'' $K^{\bY|\bX}$.
+the kernel function $K^{\bX, Y}$ can be written as the product of $K^{\bX}$ and $K^{\bY|\bX}$.
 With this restriction, we can
 interpret $K^{\bX}$ as a weighting function determining how much each observation
 $(\bx_t, y^h_t)$ contributes to our final density estimate according to how
@@ -1405,8 +1407,12 @@ scott1981MonteCarloStudyNonparDensityEstimators}.
 We use copulas (cite cite) to tie the marginal predictive distributions for individual
 prediction horizons obtained from KCDE together into a joint predictive
 distribution for the trajectory of incidence over multiple time points. 
-In order to describe our methods for both continuous and discrete distributions, it is most convenient to
-frame the discussion in this section in terms of {c.d.f.}s instead of density
+The copula is a parametric function that captures
+the dependence relations among a collection of random variables and allows us
+to compute the joint distribution from the marginal distributions.
+
+In order to describe our methods for both continuous and discrete distributions, it is
+most convenient to frame the discussion in this section in terms of {c.d.f.}s instead of density
 functions.
 We will use a capital $C$ to denote the copula function for {c.d.f.}s and a
 lower case $c$ to denote the copula function for densities.  Similarly, the predictive
@@ -1559,88 +1565,6 @@ ggplot() +
 @
 \end{figure}
 
-%<<SimStudyDistributionsDiscretizedDuongHazelton>>=
-%library(ggplot2)
-%library(grid)
-%library(plyr)
-%library(dplyr)
-%library(tidyr)
-%library(pdtmvn)
-%library(kcde)
-%source("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/code/sim-densities-sim-study-discretized-Duong-Hazelton.R")
-%
-%## Density family bivariate-A
-%n_sim <- 10000
-%discrete_sample <- sim_from_pdtmvn_mixt(n = n_sim, sim_family = "bivariate-A-discretized") %>%
-%    as.data.frame()
-%continuous_sample <- sim_from_pdtmvn_mixt(n = n_sim, sim_family = "bivariate-A") %>%
-%    as.data.frame()
-%discrete_sample_counts <- discrete_sample %>%
-%    count(X1, X2)
-%
-%pa <- ggplot() +
-%    geom_density_2d(aes(x = X1, y = X2), data = continuous_sample) +
-%    geom_point(aes(x = X1, y = X2, colour = n), data = discrete_sample_counts)
-%pa
-%
-%## Density family bivariate-B
-%n_sim <- 10000
-%discrete_sample <- sim_from_pdtmvn_mixt(n = n_sim, sim_family = "bivariate-B-discretized") %>%
-%    as.data.frame()
-%continuous_sample <- sim_from_pdtmvn_mixt(n = n_sim, sim_family = "bivariate-B") %>%
-%    as.data.frame()
-%discrete_sample_counts <- discrete_sample %>%
-%    count(X1, X2)
-%
-%pb <- ggplot() +
-%    geom_density_2d(aes(x = X1, y = X2), data = continuous_sample) +
-%    geom_point(aes(x = X1, y = X2, colour = n), data = discrete_sample_counts)
-%pb
-%
-%## Density family bivariate-C
-%n_sim <- 10000
-%discrete_sample <- sim_from_pdtmvn_mixt(n = n_sim, sim_family = "bivariate-C-discretized") %>%
-%    as.data.frame()
-%continuous_sample <- sim_from_pdtmvn_mixt(n = n_sim, sim_family = "bivariate-C") %>%
-%    as.data.frame()
-%discrete_sample_counts <- discrete_sample %>%
-%    count(X1, X2)
-%
-%pc <- ggplot() +
-%    geom_density_2d(aes(x = X1, y = X2), data = continuous_sample) +
-%    geom_point(aes(x = X1, y = X2, colour = n), data = discrete_sample_counts)
-%pc
-%
-%## Density family bivariate-D
-%n_sim <- 10000
-%discrete_sample <- sim_from_pdtmvn_mixt(n = n_sim, sim_family = "bivariate-D-discretized") %>%
-%    as.data.frame()
-%continuous_sample <- sim_from_pdtmvn_mixt(n = n_sim, sim_family = "bivariate-D") %>%
-%    as.data.frame()
-%discrete_sample_counts <- discrete_sample %>%
-%    count(X1, X2)
-%
-%pd <- ggplot() +
-%    geom_density_2d(aes(x = X1, y = X2), data = continuous_sample) +
-%    geom_point(aes(x = X1, y = X2, colour = n), data = discrete_sample_counts)
-%pd
-%
-%## Density family multivariate-2d
-%n_sim <- 10000
-%discrete_sample <- sim_from_pdtmvn_mixt(n = n_sim, sim_family = "multivariate-2d-discretized") %>%
-%    as.data.frame()
-%continuous_sample <- sim_from_pdtmvn_mixt(n = n_sim, sim_family = "multivariate-2d") %>%
-%    as.data.frame()
-%discrete_sample_counts <- discrete_sample %>%
-%    count(X1, X2)
-%
-%pd <- ggplot() +
-%    geom_density_2d(aes(x = X1, y = X2), data = continuous_sample) +
-%    geom_point(aes(x = X1, y = X2, colour = n), data = discrete_sample_counts)
-%pd
-%
-%@
-
 \section{Applications}
 \label{sec:Applications}
 
@@ -1659,10 +1583,12 @@ proportion of doctor visits with influenza-like illness.
 Figure~\ref{fig:IntialDataPlots} displays each time series.  As indicated in the
 figure, we have divided each data set into two subsets.  The first period is used as a training set in
 estimating the model parameters.  The last four years of each data set are
-reserved as a test set for evaluating model performance.  All predictions are
-made as though in real time assuming that once cases are reported, they are
-never revised.  Specifically, we use only data up through a given week in
-order to make predictions for incidence after that week.
+reserved as a test set for evaluating model performance.  The length of
+the testing set was selected for use with the dengue data by the competition
+administrators, and we have adopted that convention for use with the influenza
+data as well.  All predictions are made as though in real time assuming that
+once cases are reported, they are never revised.  Specifically, we use only data up
+through a given week in order to make predictions for incidence after that week.
 
 \begin{figure}
 \caption{Plots of the data sets we apply our methods to.  In each case, the last
@@ -1746,7 +1672,11 @@ matrix specification.
 %obtained by adding the periodic kernel component to this null KCDE model, using
 %a fully parameterized bandwidth matrix for the incidence kernel, or both.  
 We use a seasonal autoregressive integrated moving average (SARIMA) model for
-the log-transformed incidence measure as a baseline to compare our methods to.  We obtained a 
+the log-transformed incidence measure as a baseline to compare our methods to.  
+We obtained the final model fits using the {\tt auto.arima} function in {\tt
+R}'s {\tt forecast} package\cite{hyndmanRForecastPackage}; this function uses a stepwise
+procedure to determine the terms to include in the model.
+This procedure resulted in a
 <<ILISarimaModelFitSummary, echo = FALSE, results = "asis">>=
 ili_sarima_fit <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/ili_national/estimation-results/sarima-fit.rds")
 temp <- capture.output(summary(ili_sarima_fit)) 
@@ -1759,7 +1689,7 @@ temp <- capture.output(summary(dengue_sarima_fit))
 cat(paste0("SARIMA(", substr(temp[2], 7, 15), as.integer(substr(temp[2], 16, 16)) + 1, substr(temp[2], 17, 18), ")$_{52}$"))
 @
 model for the dengue data.  Details of the SARIMA model specification and
-estimation procedure are in the supplemental materials.
+estimation procedure are in the supplement.
 
 We begin with a discussion of predictive distributions for incidence
 at individual time points.  Figure~\ref{fig:DengueRibbonsPredictions} displays
@@ -2134,17 +2064,51 @@ periodic kernel component had slightly larger log scores than the SARIMA model
 on average, with many outlying cases where KCDE did much better than SARIMA.
 For the specifications without the periodic kernel component, the median
 performance was similar to the SARIMA model, but again there were outlying
-cases where KCDE did much better than SARIMA. 
+cases where KCDE did much better than SARIMA.
 Figure~\ref{fig:AggregatedFluResultsBoxPlots} (b) shows that KCDE particularly
 outperformed SARIMA in its predictions for times of high incidence near the season peaks.
+In weeks with fewer than 93 reported cases (roughly one third of the maximum
+weekly case count in the testing period), the average log score difference
+between the predictions from the Periodic, Full Bandwidth KCDE Model and the
+SARIMA model was about 0.25 with a standard deviation of 0.73.  In weeks with
+more than 184 reported cases, in the upper third, the mean difference in log
+scores was about 1.59 with a standard deviation of 1.6.  Translating to a
+probability scale, in these periods of high incidence the predictive
+distributions from KCDE assigned about 5 times as much probability to the
+observed outcome as the predictive distributions from SARIMA on average, with
+outlying cases where KCDE assigned up to about 450 times as much probability to
+the realized outcome.
+
+%% Code to get the numbers in the paragraph above
+%lower_cutoff <- max(dengue_prediction_log_score_diffs_from_sarima_long_test$total_cases) / 3
+%upper_cutoff <- 2 * lower_cutoff
+%
+%temp <- dengue_prediction_log_score_diffs_from_sarima_long_test[
+%    dengue_prediction_log_score_diffs_from_sarima_long_test$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full" &
+%        dengue_prediction_log_score_diffs_from_sarima_long_test$total_cases <= lower_cutoff,
+%    "log_score_difference"]
+%
+%mean(temp)
+%sd(temp)
+%summary(temp)
+%
+%temp <- dengue_prediction_log_score_diffs_from_sarima_long_test[
+%    dengue_prediction_log_score_diffs_from_sarima_long_test$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full" &
+%        dengue_prediction_log_score_diffs_from_sarima_long_test$total_cases >= upper_cutoff,
+%    "log_score_difference"]
+%
+%mean(temp)
+%sd(temp)
+%summary(temp)
+
+
 In the application to predicting influenza, the KCDE specifications including a
 periodic kernel did about as well as the SARIMA model, while the median
 performance of the specifications without a periodic kernel was slightly worse
 than SARIMA.  In both applications, including the periodic kernel component led
 to improved predictions; this can be seen directly in Figure *** of the
-supplement. Using the fully parameterized bandwidth matrix generally
-had little impact on the quality of the predictive distributions as measured by
-the log score.
+supplement. Using the fully parameterized bandwidth matrix generally had little
+impact on the quality of the predictive distributions as measured by the log score.
 
 %  For that data set, the average difference in log scores
 % is slightly positive (indicating slightly improved performance relative to SARIMA)
@@ -2318,6 +2282,7 @@ dengue_prediction_log_score_diffs_from_sarima_long_test <-
     dengue_prediction_log_score_diffs_from_sarima_long %>%
     left_join(temp, by = "prediction_time")
 
+
 scatterplot_dengue_by_obs_cases <- ggplot() +
     geom_point(aes(x = total_cases, y = log_score_difference),
         data = dengue_prediction_log_score_diffs_from_sarima_long_test[dengue_prediction_log_score_diffs_from_sarima_long_test$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full", ]) +
@@ -2327,9 +2292,9 @@ scatterplot_dengue_by_obs_cases <- ggplot() +
         colour = "#56B4E9",
         data = dengue_prediction_log_score_diffs_from_sarima_long_test[dengue_prediction_log_score_diffs_from_sarima_long_test$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full", ]) +
     facet_wrap( ~ season, ncol = 1) +
-    xlab("Observed Total Dengue Fever Cases in Prediction Target Week") +
+    xlab("Reported Dengue Cases in Prediction Target Week") +
     ylab("Log Score Difference") +
-    ggtitle("(b) Log Score Difference from SARIMA vs. Observed Dengue Fever Cases\nPeriodic, Full Bandwidth KCDE Model") +
+    ggtitle("(b) Log Score Difference from SARIMA vs. Reported Dengue Fever Cases\nPeriodic, Full Bandwidth KCDE Model") +
     theme_bw(base_size = 11)
 
 grid.newpage()
@@ -2428,122 +2393,6 @@ print(scatterplot_dengue_by_obs_cases, vp = viewport(layout.pos.row = 2, layout.
 
 
 
-
-%\begin{figure}
-%\caption{Differences in log scores for the weekly predictive distributions for
-%Dengue among pairs of models across all combinations of prediction horizon and
-%prediction time in the test period.
-%In panel (a) positive values indicate cases when KCDE outperformed SARIMA.  In panel
-%(b) positive values indicate cases when the specification of KCDE with the
-%periodic kernel outperformed the corresponding specification without the periodic kernel.
-%In panel (c) positive values indicate cases when the specification of KCDE with
-%a fully parameterized bandwidth outperformed the KCDE specification with a diagonal
-%bandwidth matrix.}
-%\label{fig:AggregatedDengueResultsBoxPlots}
-%<<DengueDataResultsAggregatedBoxplots, echo = FALSE>>=
-%models_used <- unique(dengue_prediction_results$full_model_descriptor[
-%    !dengue_prediction_results$differencing & !(dengue_prediction_results$max_seasonal_lag == 1)])
-%
-%boxplot_sarima_contrasts <- ggplot() +
-%    geom_hline(yintercept = 0) +
-%    geom_boxplot(aes(y = log_score_difference, x = reduced_model_descriptor),
-%        data = dengue_prediction_log_score_diffs_from_sarima_long[dengue_prediction_log_score_diffs_from_sarima_long$model %in% models_used, ]) +
-%#    ylim(c(-4, 4)) +
-%    ggtitle("(a) Comparison of KCDE with SARIMA") +
-%#    xlab("Model") +
-%    xlab("") +
-%    ylab("Log Score Difference") +
-%#    ylab("Log Score KCDE -\nLog Score SARIMA") +
-%    theme_bw(base_size = 11)# +
-%#    theme(axis.text.x=element_text(angle = -90, hjust = 0))
-%
-%
-%
-%dengue_contrast_periodic_kernel <- dengue_prediction_log_score_diffs_from_sarima_long %>%
-%    filter(model %in% models_used) %>%
-%    select_("prediction_time", "prediction_horizon", "log_score_difference",
-%        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
-%    spread_("periodic",
-%        "log_score_difference") %>%
-%    mutate(
-%        contrast_value = `TRUE` - `FALSE`)
-%dengue_contrast_periodic_kernel$fixed_values <- "Null Model"
-%dengue_contrast_periodic_kernel$fixed_values[dengue_contrast_periodic_kernel$bw_full] <-
-%    "Full Bandwidth"
-%dengue_contrast_periodic_kernel$fixed_values <-
-%    factor(dengue_contrast_periodic_kernel$fixed_values,
-%        levels = c("Null Model", "Full Bandwidth"))
-%
-%boxplot_periodic_kernel_contrasts <- ggplot(dengue_contrast_periodic_kernel) +
-%    geom_hline(yintercept = 0) +
-%    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value)) +
-%#    facet_wrap( ~ fixed_values, ncol = 1) +
-%    ggtitle("(b) Effect of Adding Periodic Kernel to Model") +
-%#    xlab("Base Model") +
-%    xlab("") +
-%    ylab("Log Score Difference") +
-%#    ylab("Log Score Model With Periodic Kernel -\nLog Score Model Without Periodic Kernel") +
-%    theme_bw(base_size = 11)
-%
-%
-%
-%dengue_contrast_bw_full <- dengue_prediction_log_score_diffs_from_sarima_long %>%
-%    filter(model %in% models_used) %>%
-%    select_("prediction_time", "prediction_horizon", "log_score_difference",
-%        "seasonal_lag", "differencing", "periodic", "bw_full") %>%
-%    spread_("bw_full",
-%        "log_score_difference") %>%
-%    mutate(
-%        contrast_value = `TRUE` - `FALSE`)
-%dengue_contrast_bw_full$fixed_values <- "Null Model"
-%dengue_contrast_bw_full$fixed_values[dengue_contrast_bw_full$periodic] <-
-%    "Periodic Kernel"
-%dengue_contrast_bw_full$fixed_values <-
-%    factor(dengue_contrast_bw_full$fixed_values,
-%        levels = c("Null Model", "Periodic Kernel"))
-%
-%boxplot_bw_full_contrasts <- ggplot(dengue_contrast_bw_full) +
-%    geom_hline(yintercept = 0) +
-%    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value)) +
-%#    facet_wrap( ~ fixed_values, ncol = 1) +
-%    ggtitle("(c) Effect of Adding Fully Parameterized BW to Model") +
-%#    xlab("Base Model") +
-%    xlab("") +
-%    ylab("Log Score Difference") +
-%#    ylab("Log Score Model With Full Bandwidth -\nLog Score Model With Diagonal Bandwidth") +
-%    theme_bw(base_size = 11)
-%
-%
-%grid.newpage()
-%pushViewport(viewport(layout = grid.layout(nrow = 3, ncol = 1)))
-%print(boxplot_sarima_contrasts, vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
-%print(boxplot_periodic_kernel_contrasts, vp = viewport(layout.pos.row = 2, layout.pos.col = 1))
-%print(boxplot_bw_full_contrasts, vp = viewport(layout.pos.row = 3, layout.pos.col = 1))
-%
-%
-%#dengue_prediction_log_score_diffs_from_sarima_long$fixed_values <-
-%#    as.character(dengue_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor)
-%#dengue_prediction_log_score_diffs_from_sarima_long$contrast_value <-
-%#    dengue_prediction_log_score_diffs_from_sarima_long$log_score_difference
-%#dengue_prediction_log_score_diffs_from_sarima_long$contrast_type <- "Difference from SARIMA"
-%#dengue_contrast_periodic_kernel$contrast_type <- "Effect of Adding Periodic Kernel"
-%#dengue_contrast_bw_full$contrast_type <- "Effect of Adding Full Bandwidth"
-%#
-%#dengue_contrasts_merged <- rbind.fill(
-%#    dengue_prediction_log_score_diffs_from_sarima_long[dengue_prediction_log_score_diffs_from_sarima_long$model %in% models_used, ],
-%#    dengue_contrast_periodic_kernel,
-%#    dengue_contrast_bw_full)
-%#
-%#ggplot(dengue_contrasts_merged) +
-%#    geom_hline(yintercept = 0) +
-%#    geom_boxplot(aes(x = factor(fixed_values), y = contrast_value)) +
-%#    facet_wrap( ~ contrast_type, ncol = 1) +
-%##    ggtitle("Effect of Adding Fully Parameterized BW to Model") +
-%#    xlab("") +
-%#    ylab("Log Score Difference") +
-%#    theme_bw()
-%@
-%\end{figure}
 
 Figure~\ref{fig:CombinedPeakWeekIncidencePredictionLogScores} displays the log
 score of the predictive distributions for incidence in the peak week
@@ -4700,7 +4549,7 @@ there is much more consistency across different seasons.
 Another more subtle effect is present in the influenza data: there is a
 consistent short-term peak in influenza incidence on Christmas week.  This is
 visible in Figure~\ref{fig:IntialDataPlots}, and is highlighted in Figure *** in
-the supplementary materials.  This ``Christmas effect'' sometimes coincides with
+the supplement.  This ``Christmas effect'' sometimes coincides with
 the season peak, but sometimes occurs before the season peak.  We have observed
 evidence that the seasonal structure of the SARIMA model picks up on this
 structure, and SARIMA tended to outperform KCDE on Christmas week and the weeks
