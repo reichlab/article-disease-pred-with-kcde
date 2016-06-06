@@ -64,18 +64,21 @@ USA}
 %\email{elray@umass.edu}
 
 \begin{abstract}
-{We develop a novel approach to prediction of infectious disease incidence using
-kernel conditional density estimation (KCDE).  This method obtains predictive
-distributions for incidence in individual weeks and uses copulas to tie those
-distributions together into joint distributions in order to make
+{
+Creating statistical models that generate accurate predicted trajectories of 
+infectious disease incidence over multiple time points is a challenging methodological problem whose solution could benefit public health decision makers.
+We develop a new approach for prediction of infectious disease incidence using
+kernel conditional density estimation (KCDE).  We use KCDE to obtain predictive
+distributions for incidence in individual weeks and use copulas to tie those
+distributions together into joint distributions. This strategy enables us to create
 predictions for the timing of and incidence in the peak week of the season.
 Our implementation of KCDE incorporates two novel kernel components: a periodic
 component that captures seasonality in disease incidence, and a component that
-is appropriate for use with discrete variables but also allows for a full
-parameterization of the bandwidth matrix.  A simulation study
-demonstrates that allowing for a fully parameterized bandwidth matrix can
+allows for a full
+parameterization of the bandwidth matrix with discrete variables. We demonstrate
+via simulation that allowing for a fully parameterized bandwidth matrix can
 improve conditional density estimates.  In applications to predicting dengue
-fever and influenza, our method outperforms a baseline seasonal
+fever and influenza, our method outperforms a seasonal
 autoregressive integrated moving average (SARIMA) model for predictions of
 dengue incidence in individual weeks, and is comparable to the SARIMA model
 on the other prediction targets.  The periodic kernel function leads to improved
@@ -162,54 +165,70 @@ dengue_train_cutoff_time <- dengue_sj$time[max(which(dengue_sj$season == "2008/2
 \section{Introduction}
 \label{sec:Intro}
 
-Accurate prediction of infectious disease incidence is important for public
-health officials planning disease prevention and control measures such as vector
-control and increased use of personal protective equipment by medical
-personnel during periods of high disease incidence
-(\citealp{wallinga2010optimizingIDInterventions,
-hatchett2007interventionsIntensity1918flu}).
-Several quantities have emerged as being of particular utility in making these
-planning decisions; in this article we focus
-on measures of weekly incidence, the timing of the season peak, and incidence
-in the peak week
+With the maturation of digital disease surveillance systems in recent years, 
+accurate and real-time infectious disease prediction has become an achieveable goal in many contexts.
+Predictions of infectious disease incidence from rigorously evaluated models provide valuable information to
+public health officials planning disease prevention and control measures.
+For example, interventions designed to reduce person-to-person transmission of disease
+have been associated with diminished outbreak intensity 
+(\citealp{hatchett2007interventionsIntensity1918flu}). Therefore, accurate 
+predictions can help target resource allocation more effectively.
+
+Recent collaborative efforts by government officials and academic researchers have focsed on identifying features of outbreaks that can be used and interpreted by public health decision makers.
+In this article we focus
+on three features: weekly incidence, the timing of the season peak, and incidence
+in the peak week. 
+These quantities have emerged as being targets of particular utility in making
+planning decisions 
 (\citealp{PandemicPredictionandForecastingScienceandTechnologyInteragencyWorkingGroup2015Announcement,
-EpidemicPredictionInitiative2015Index}).  Predictive distributions for these
-quantities are preferred to point predictions because they communicate
-uncertainty in the predictions and give decision makers more information in
-cases where the predictive distribution is skewed or has multiple modes.
+EpidemicPredictionInitiative2015Index}).
 
 In this work, we employ a non-parametric approach referred to as kernel
-conditional density estimation (KCDE) to obtain separate predictive
-distributions for disease incidence in each week of the season.  We then
+conditional density estimation (KCDE). Using data available before a given timepoint, we use KCDE to obtain separate predictive
+distributions for disease incidence in each subsequent week of the season.  
+We then
 combine those marginal distributions using copulas to obtain joint predictive distributions for the
-trajectory of incidence over the course of multiple weeks.  Predictive
+trajectory of incidence over the course of the following weeks.  Predictive
 distributions relating to the timing of and incidence at the peak week can be
 obtained from this joint predictive distribution for the trajectory of
 disease incidence.
+
 In addition to the novel application of these methods to predicting disease incidence,
 our contributions include the use of a periodic kernel specification to capture
 seasonality in disease incidence and a method for obtaining multivariate
 kernel functions that handle discrete data while allowing for a fully
 parameterized bandwidth matrix.
 
+From the outset of this project, our goal has been to develop a method that 
+can generate flexible predictive distributions of our targets of interest. 
+Compared with point predictions, the full predictive distributions generated by KCDE characterize uncertainty in the predictions. 
+A full predictive distribution also gives decision makers additional information in
+situations where the predictive distribution is skewed or has multiple modes.
+Additionally, unlike many methods common in the infectious disease literature (Brown et al., in preparation), KCDE makes minimal assumptions about the underlying system governing disease dynamics. This flexibility makes KCDE suitable for application to a wide variety of time series, including diseases with different latent dynamics.
+
+
 %\lboxit{Keep only one of the following two paragraphs.
 %The second is what I wrote initially, the first incorporates some revisions
 %suggested by Nick.}
 
-At its heart, KCDE is a local method in the sense that the conditional density
-estimate for future incidence given conditioning variables is a weighted
-combination of contributions from previous observations of incidence with
+In a time-series context, KCDE is a local method in the sense that the conditional density
+estimate for future observations given conditioning variables is a weighted
+combination of contributions from previous observations with
 similar conditioning values.  Using such local methods is a natural idea in predicting
-nonlinear dynamical systems.  For example, in the infectious disease literature
+nonlinear systems, because it imposes little structure on the assumed relationship between conditioning and outcome variables. Applications range from similar infectious disease settings where
 nearest neighbors regression has been used to make point predictions for incidence of
 measles (\citealp{sugihara1990nonlinearForecasting}) and
-influenza (\citealp{viboud2003predictionInfluenzaMoA}).  The point prediction
+influenza (\citealp{viboud2003predictionInfluenzaMoA}) to sports analytics where a version of nearest neighbors regression predicts the career trajectories of current NBA players [[CITATION: http://fivethirtyeight.com/features/how-were-predicting-nba-player-career/]].  
+We note that KCDE can be seen as a distribution-based counterpart of nearest neighbors regression. For example, the point prediction
 obtained from nearest neighbors regression is equal to the expected value of the predictive distribution
 obtained from KCDE if a particular kernel function is used in the formulation of
 KCDE ({e.g.}, \citealp{HastieTibshiraniESL} discuss the connection between
 nearest neighbors and kernel methods for regression).
-However, KCDE offers the advantage of providing a complete predictive
-distribution rather than only a point prediction.  KCDE has not previously been
+
+% Additionally, KCDE is a simple representation of models proposed for chaotic and non-linear systems in disease, physics, and ecology.
+% In our implementation of KCDE, the conditioning variables are recent lags of incidence. In dynamical systems, the use of recent observations of a dynamical process state can be motivated by state space reconstruction, which tells us that recent lags of one variable in a complex system can give us information about trajectory of the system even when other components of the underlying state are unobserved. 
+
+KCDE has not previously been
 applied to obtain predictive distributions for infectious disease incidence, but
 it has been successfully used for prediction in other settings such as survival
 time of lung cancer patients (\citealp{hall2004crossvalidationKCDE}), female
