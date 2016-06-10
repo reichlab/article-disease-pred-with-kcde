@@ -18,8 +18,7 @@
 %\documentclass[Crown, sagev]{sagej}
 
 
-\title{Infectious disease prediction with kernel conditional density
-estimation}
+\title{Infectious disease prediction with kernel conditional density estimation}
 
 %\author{Evan L. Ray\affilnum{1},
 %Krzysztof Sakrejda\affilnum{1},
@@ -33,6 +32,7 @@ REICH\\[4pt]
 % Author addresses
 \textit{Department of Biostatistics and Epidemiology,
 School of Public Health and Health Sciences, \\
+University of Massachusetts, Amherst \\
 415 Arnold House,
 715 N. Pleasant Street,
 Amherst, MA 01003,
@@ -66,19 +66,20 @@ USA}
 \begin{abstract}
 {
 Creating statistical models that generate accurate predicted trajectories of 
-infectious disease incidence over multiple time points is a challenging methodological problem whose solution could benefit public health decision makers.
+infectious disease incidence over multiple time points is a challenging
+methodological problem whose solution could benefit public health decision makers.
 We develop a new approach for prediction of infectious disease incidence using
-kernel conditional density estimation (KCDE).  We use KCDE to obtain predictive
-distributions for incidence in individual weeks and use copulas to tie those
+kernel conditional density estimation (KCDE) and copulas.  We use KCDE to obtain
+predictive distributions for incidence in individual weeks and use copulas to tie those
 distributions together into joint distributions. This strategy enables us to create
 predictions for the timing of and incidence in the peak week of the season.
 Our implementation of KCDE incorporates two novel kernel components: a periodic
 component that captures seasonality in disease incidence, and a component that
 allows for a full
 parameterization of the bandwidth matrix with discrete variables. We demonstrate
-via simulation that allowing for a fully parameterized bandwidth matrix can
-improve conditional density estimates.  In applications to predicting dengue
-fever and influenza, our method outperforms a seasonal
+via simulation that using a fully parameterized bandwidth matrix can
+improve conditional density estimates. 
+In applications to predicting dengue fever and influenza, our method outperforms a seasonal
 autoregressive integrated moving average (SARIMA) model for predictions of
 dengue incidence in individual weeks, and is comparable to the SARIMA model
 on the other prediction targets.  The periodic kernel function leads to improved
@@ -106,7 +107,7 @@ suppressMessages(library(lubridate))
 library(ggplot2)
 library(grid)
 
-library(forecast)
+suppressMessages(library(forecast))
 library(kcde)
 suppressMessages(suppressWarnings(library(pdtmvn)))
 
@@ -171,41 +172,45 @@ Predictions of infectious disease incidence from rigorously evaluated models pro
 public health officials planning disease prevention and control measures.
 For example, interventions designed to reduce person-to-person transmission of disease
 have been associated with diminished outbreak intensity 
-(\citealp{hatchett2007interventionsIntensity1918flu}). Therefore, accurate 
+(\citealp{hatchett2007interventionsIntensity1918flu}).  Accurate 
 predictions can help target resource allocation more effectively.
 
-Recent collaborative efforts by government officials and academic researchers have focsed on identifying features of outbreaks that can be used and interpreted by public health decision makers.
-In this article we focus
-on three features: weekly incidence, the timing of the season peak, and incidence
-in the peak week. 
-These quantities have emerged as being targets of particular utility in making
-planning decisions 
+Recent collaborative efforts by government officials and academic researchers
+have identified features of outbreaks that can be used and 
+interpreted by public health decision makers.  In this article we focus
+on three of these features: weekly incidence, the timing of the season peak, and
+incidence in the peak week.  These quantities have emerged as being targets of
+particular utility in making planning decisions 
 (\citealp{PandemicPredictionandForecastingScienceandTechnologyInteragencyWorkingGroup2015Announcement,
 EpidemicPredictionInitiative2015Index}).
 
-In this work, we employ a non-parametric approach referred to as kernel
-conditional density estimation (KCDE). Using data available before a given timepoint, we use KCDE to obtain separate predictive
-distributions for disease incidence in each subsequent week of the season.  
-We then
+In this work, we use a non-parametric approach to conditional density
+estimation referred to as kernel conditional density estimation (KCDE) and a
+parametric method for modeling joint dependence structures known as copulas.
+Using data available up through a given time point, we employ KCDE
+to obtain separate predictive distributions for
+disease incidence in each subsequent week of the season.  We then
 combine those marginal distributions using copulas to obtain joint predictive distributions for the
 trajectory of incidence over the course of the following weeks.  Predictive
 distributions relating to the timing of and incidence at the peak week can be
-obtained from this joint predictive distribution for the trajectory of
-disease incidence.
-
-In addition to the novel application of these methods to predicting disease incidence,
-our contributions include the use of a periodic kernel specification to capture
-seasonality in disease incidence and a method for obtaining multivariate
-kernel functions that handle discrete data while allowing for a fully
-parameterized bandwidth matrix.
+obtained from this joint predictive distribution for the trajectory of disease
+incidence.  In addition to the novel application of these methods to predicting
+disease incidence, our contributions include the use of a periodic kernel
+specification to capture seasonality in disease incidence and a method for
+obtaining multivariate kernel functions that handle discrete data while allowing
+for a fully parameterized bandwidth matrix.
 
 From the outset of this project, our goal has been to develop a method that 
 can generate flexible predictive distributions of our targets of interest. 
-Compared with point predictions, the full predictive distributions generated by KCDE characterize uncertainty in the predictions. 
+Compared with point predictions, the full predictive distributions generated by
+KCDE characterize uncertainty in the predictions.
 A full predictive distribution also gives decision makers additional information in
 situations where the predictive distribution is skewed or has multiple modes.
-Additionally, unlike many methods common in the infectious disease literature (Brown et al., in preparation), KCDE makes minimal assumptions about the underlying system governing disease dynamics. This flexibility makes KCDE suitable for application to a wide variety of time series, including diseases with different latent dynamics.
-
+Additionally, unlike many methods common in the infectious disease literature
+(Brown \textit{and others}, in preparation), KCDE makes minimal assumptions about the
+underlying system governing disease dynamics. This flexibility makes KCDE
+suitable for application to a wide variety of time series, including diseases
+with different latent dynamics.
 
 %\lboxit{Keep only one of the following two paragraphs.
 %The second is what I wrote initially, the first incorporates some revisions
@@ -215,10 +220,12 @@ In a time-series context, KCDE is a local method in the sense that the condition
 estimate for future observations given conditioning variables is a weighted
 combination of contributions from previous observations with
 similar conditioning values.  Using such local methods is a natural idea in predicting
-nonlinear systems, because it imposes little structure on the assumed relationship between conditioning and outcome variables. Applications range from similar infectious disease settings where
-nearest neighbors regression has been used to make point predictions for incidence of
+nonlinear systems because it imposes little structure on the assumed
+relationship between conditioning and outcome variables. Applications range from similar infectious disease settings where nearest neighbors regression has been used to make point predictions for incidence of
 measles (\citealp{sugihara1990nonlinearForecasting}) and
-influenza (\citealp{viboud2003predictionInfluenzaMoA}) to sports analytics where a version of nearest neighbors regression predicts the career trajectories of current NBA players [[CITATION: http://fivethirtyeight.com/features/how-were-predicting-nba-player-career/]].  
+influenza (\citealp{viboud2003predictionInfluenzaMoA}) to sports analytics
+where a version of nearest neighbors regression predicts the career trajectories
+of current NBA players (\citealp{SilverCARMELOPrediction}).
 We note that KCDE can be seen as a distribution-based counterpart of nearest neighbors regression. For example, the point prediction
 obtained from nearest neighbors regression is equal to the expected value of the predictive distribution
 obtained from KCDE if a particular kernel function is used in the formulation of
@@ -234,10 +241,9 @@ it has been successfully used for prediction in other settings such as survival
 time of lung cancer patients (\citealp{hall2004crossvalidationKCDE}), female
 labor force participation (\citealp{hall2004crossvalidationKCDE}), bond yields
 and value at risk in financial markets (\citealp{fan2004crossvalidationKCDE}),
-and wind power (\citealp{jeon2012KCDEWindPower}) among others.  Methods similar
-to those we explore in this article can also be formulated in the Bayesian
-framework.  One example along these lines is
-\citet{zhou2015DirichletProcessCopulaAmphibianDiseaseArrival}, who model the
+and wind power (\citealp{jeon2012KCDEWindPower}), among others.  Similar methods
+can also be formulated in the Bayesian framework.  One example along these lines
+is \citet{zhou2015DirichletProcessCopulaAmphibianDiseaseArrival}, who model the
 time to arrival of a disease in amphibian populations using Dirichlet processes and copulas.
 
 %KCDE has not previously been applied to obtain predictive distributions for
@@ -300,8 +306,8 @@ li2003nonparametricEstDistnsCategoricalContinuous,
 li2008nonparametricConditionalCDFQuantile,
 ouyang2006crossvalidationEstDistnCategorical,
 racine2004kernelEstConditionalDistns}).
-Using a product kernel simplifies the mathemetical formulation of the kernel
-function when discrete variables are present, but has the effect of forcing the
+Using a product kernel simplifies the formulation of the kernel
+function when discrete variables are present, but forces the
 kernel function to be orientied in line with the coordinate axes.  In settings
 with only continuous variables, asymptotic
 analysis and experience with applications have shown that using a multivariate
@@ -345,14 +351,10 @@ vectors, and work by specifying a relatively simple parametric model for the
 dependence relations among those variables.  This simple dependence model
 ties separate marginal distribution estimates together into a joint
 distribution.  In our case, we obtain those marginal distribution estimates
-through KCDE.  Methods combining nonparametric
+through KCDE.  Methods combining non-parametric
 estimates of marginal densities with copulas have been considered for other
-applications before.  For example,
-\citet{patton2012reviewCopulaEconomicTimeSeries} is a recent review of copula
-methods for economic and financial time series including several
-articles that have used nonparametric estimates for the marginal distributions.  Our
-approach differs from these in the details of how the nonparametric marginal
-distribution estimates are obtained.
+applications such as economic time series
+(\citealp{patton2012reviewCopulaEconomicTimeSeries}) before.
 
 %Specifically, we model the joint distribution of $Y_1,
 %\ldots, Y_D$ by $F_{Y_1, \ldots, Y_D}(y_1, \ldots, y_D) = C(F_{Y_1}(y_1),
@@ -400,8 +402,8 @@ distribution estimates are obtained.
 The remainder of this article is organized as follows.  First, we describe our
 approach to prediction using KCDE and copulas.  Next, we present the
 results of a simulation study comparing the performance of KCDE for
-estimating discrete distributions using a fully parameterized bandwidth
-matrix and a diagonal bandwidth matrix.  We then illustrate our methods by applying them to predicting
+estimating discrete conditional distributions using a fully parameterized
+bandwidth matrix and a diagonal bandwidth matrix.  We then illustrate our methods by applying them to predicting
 disease incidence in two data sets: one with a measure of weekly incidence of
 influenza in the United States and a second with a measure of weekly incidence
 of dengue fever in San Juan, Puerto Rico.  We conclude with a discussion of
@@ -447,8 +449,8 @@ distribution $f(\bz_{({t^*} + 1):({t^*} + H_{t^*})} | {t^*}, \bz_{1:{t^*}})$ for
     \end{align}
   \item Binned incidence in the peak week of the current season:
     \begin{align}
-    &P(\text{Incidence in Peak Week} \in [a, b]) = P(a \leq \max_{w} Z_{S_{t^*} + w} \leq b | {t^*}, \bz_{1:{t^*}}) \nonumber \\
-    &\qquad = \int_{\{(\bz_{({t^*} + 1):({t^*} + H_{t^*})}): a \leq \max_{w} z_{S_{t^*} + w} \leq b\}} f(\bz_{({t^*} + 1):({t^*} + H_{t^*})} | {t^*}, \bz_{1:{t^*}}) \, d \bz_{({t^*} + 1):({t^*} + H_{t^*})}. \label{eqn:PeakPredIncidenceIntegral}
+    &P(\text{Incidence in Peak Week} \in [a, b)) = P(a \leq \max_{w} Z_{S_{t^*} + w} < b | {t^*}, \bz_{1:{t^*}}) \nonumber \\
+    &\qquad = \int_{\{(\bz_{({t^*} + 1):({t^*} + H_{t^*})}): a \leq \max_{w} z_{S_{t^*} + w} < b\}} f(\bz_{({t^*} + 1):({t^*} + H_{t^*})} | {t^*}, \bz_{1:{t^*}}) \, d \bz_{({t^*} + 1):({t^*} + H_{t^*})}. \label{eqn:PeakPredIncidenceIntegral}
     \end{align}
 \end{enumerate}
 In practice, we use Monte Carlo integration to evaluate
@@ -456,9 +458,10 @@ the integrals in Equations \eqref{eqn:PeakPredTimingIntegral} and
 \eqref{eqn:PeakPredIncidenceIntegral} by sampling incidence trajectories from
 the joint predictive distribution.
 
-We will introduce the overall structure of our model here and describe its
-components in more detail in the following subsections.  At time $t^*$, our
-model approximates $f(\bz_{(t^* + 1):(t^* + H_{t^*})} | t^*, \bz_{1:t^*})$
+We introduce the overall structure of our model here and describe its
+components and parameter estimation in more detail in the
+following Subsections.
+At time $t^*$, our model approximates $f(\bz_{(t^* + 1):(t^* + H_{t^*})} | t^*, \bz_{1:t^*})$
 by conditioning only on the time at which we are making the predictions and
 observed incidence at a few recent time points with lags given by the non-negative integers $l_1, \ldots, l_M$:
 $f(\bz_{(t^* + 1):(t^* + H_{t^*})} | t^*, z_{t^* - l_1}, \ldots, z_{t^* -
@@ -506,19 +509,10 @@ $H_{t^*}$ of interest for the prediction task.
 
 
 
-Broadly, estimation for the model parameters proceeds in two stages:
-first we estimate the parameters for KCDE separately for each prediction
-horizon $h = 1, \ldots, H_{t^*}$, and second we estimate the copula parameters while holding the KCDE
-parameters fixed.  In general the two-stage approach may result in some loss
-of efficiency relative to one-stage methods, but this efficiency loss is small
-for some model specifications
-(\citealp{joe2005asymptoticEfficiencyTwoStageCopula}).
-We pursue the two-stage strategy in this work because it results in a large
-reduction in the computational cost of parameter estimation.
 
-In the following subsections we describe the formulations of KCDE and
-the copula in more detail and give our estimation strategy for each set of
-model parameters.
+%In the following subsections we describe the formulations of KCDE and
+%the copula in more detail and give our estimation strategy for each set of
+%model parameters.
 
 \subsection{KCDE for Predictive Densities at Individual Prediction Horizons}
 \label{subsec:Methods:KCDE}
@@ -552,7 +546,9 @@ With this restriction, we can
 interpret $K^{\bX}$ as a weighting function determining how much each observation
 $(\bx_t, y^h_t)$ contributes to our final density estimate according to how
 similar $\bx_t$ is to the value $\bx_{t^*}$ that we are conditioning on.
-For each $y^h_t$, $K^{Y | \bX}$ is a density function that contributes
+These weights are the $\zeta^h_{t^*, t}$ in Equations~\eqref{eqn:KDEwt} and
+\eqref{eqn:KCDEWeightsDef}.
+$K^{Y | \bX}$ is a density function that contributes
 mass to the final density estimate near $y^h_t$.  The
 parameters $\btheta^h$ control the locality and orientation of the weighting
 function and the contributions to the density estimate from each observation.
@@ -823,7 +819,7 @@ discrete case counts in the application to dengue fever.  In the continuous
 case, we have used a multivariate log-normal kernel function parameterized in
 terms of its mode rather than its mean (Figure~\ref{fig:PeriodicKernelPlot}).
 Using the mode ensures that the contribution to the conditional density
-contribution is largest near $z_{t + h}$.
+is largest near $z_{t + h}$.
 This kernel specification automatically handles the restriction that counts are
 non-negative, and approximately captures the long tail in disease incidence that
 we will illustrate in the applications Section below.  This kernel function has
@@ -1224,8 +1220,8 @@ compare prediction methods in two recent government-sponsored infectious disease
 prediction contests
 (\citealp{PandemicPredictionandForecastingScienceandTechnologyInteragencyWorkingGroup2015Announcement,
 EpidemicPredictionInitiative2015Index}).
-We will apply our method to the data sets
-from those competitions in the applications section below, and will report log
+We apply our method to the data sets
+from those competitions in the applications section below, and report log
 scores in order to facilitate comparisons with other results from those
 competitions that may be published in the future.
 In general, the log score is a strictly proper scoring rule; i.e., its
@@ -1247,7 +1243,11 @@ predictive distributions for individual prediction horizons obtained from KCDE t
 distribution for the trajectory of incidence over multiple time points. 
 The copula is a parametric function that captures the dependence relations among
 a collection of random variables and allows us to compute the joint distribution
-from the marginal distributions.
+from the marginal distributions.  Figure 10 in the
+supplement shows that the copula induces positive correlation
+in the predictive distributions for incidence in nearby weeks, so that high
+incidence in one week is more likely to be followed by high incidence in
+weeks soon after.
 
 In order to describe our methods for both continuous and discrete distributions, it is
 most convenient to frame the discussion in this Section in terms of
@@ -1283,29 +1283,18 @@ Intuitively, $\xi^H_d$ captures the amount of dependence between incidence
 levels at future times that are $d$ weeks apart.
 
 We obtain a separate copula fit for each value of $H$ from 2 to $W$ (note that a
-copula is not required for ``trajectories'' of length $H = 1$).  In order to do this, we follow a
-two-stage estimation strategy
-(\citealp{joe2005asymptoticEfficiencyTwoStageCopula}):
-\begin{enumerate}
-  \item Estimate the parameters for marginal predictive distributions
-  using the procedures described in the previous subsection.
-  \item Estimate the copula parameters, holding the parameters for the
-  marginal predictive distributions fixed:
-    \begin{enumerate}
-      \item Form vectors of
-  ``pseudo-observations'' by passing observed incidence trajectories from previous seasons through the marginal predictive {c.d.f.}s obtained in step 1:
-  \begin{align}
-  &(u_{k,1}, \ldots, u_{k, H}) = \nonumber \\
-  &\qquad \{F^{1}(z_{t_k^* + 1} | t_k^*, z_{t_k^* - l_1}, \ldots, z_{t_k^* - l_M}; \btheta^1), \ldots, F^{H}(z_{t_k^* + H} | t_k^*, z_{t_k^* - l_1}, \ldots, z_{t_k^* - l_M}; \btheta^H)\} \nonumber
-  \end{align}
-  We form one such vector of pseudo-observations for each season in the training
-  data; in the notation here, these seasons are indexed by $k$.  The relevant
-  time points $t_k^*$ are the times in those previous seasons falling $H$ time
-  steps before the end of the season.
-  \item Estimate the copula parameters $\bxi^H$ by maximizing the likelihood of the
-  pseudo-observations.
-  \end{enumerate}
-\end{enumerate}
+copula is not required for ``trajectories'' of length $H = 1$).
+Broadly, estimation for the model parameters proceeds in two stages:
+first we estimate the parameters for KCDE separately for each prediction
+horizon $h = 1, \ldots, H$ as described in the previous Section, and second
+we estimate the copula parameters while holding the KCDE parameters fixed.
+We give a more detailed description of this estimation
+procedure in the supplement.  In general the two-stage approach may result in
+some loss of efficiency relative to one-stage methods, but this efficiency 
+loss is small for some model specifications
+(\citealp{joe2005asymptoticEfficiencyTwoStageCopula}).
+Also, it results in a large reduction in the computational cost of parameter
+estimation.
 
 \section{Simulation Study}
 \label{sec:SimStudy}
@@ -1318,8 +1307,8 @@ parameterizations.  In this simulation study, we vary just one of these factors:
 the sample size ($N = 100$ or $N = 1000$).  We hold other factors that may be
 related to the relative performance of different bandwidth specifications fixed.
 
-The distributions that we simulate from are discretized bivariate normal
-distributions.  To define this
+We simulate data from a discretized bivariate normal
+distribution.  To define this
 distribution, let $\bU \sim MVN(\b0, \Sigma)$ where $\Sigma$ is a $2 \times 2$ matrix with $1$ on
 the diagonal and $0.9$ off of the diagonal.  We treat $\bU$
 as a latent variable and discretize it to obtain the random variable $\bX$ using
@@ -1333,7 +1322,7 @@ parameters for two variations on a KCDE model for the conditional distribution
 of $X_1 | X_2$: one with a diagonal bandwidth matrix specification
 and one with a fully parameterized bandwidth matrix.  In this simulation study,
 the kernel function was obtained by discretizing a multivariate normal kernel
-function rather than a log-normal kernel function as in our applications below. 
+function rather than a log-normal kernel function as in the applications below. 
 Otherwise, the method is as described previously.
 
 We evaluated the conditional density estimates by an importance
@@ -1469,14 +1458,13 @@ doctor visits with influenza-like illness.
 Figure~\ref{fig:IntialDataPlots} displays each time series.  As indicated in the
 figure, we have divided each data set into two subsets.  The first period is used as a training set in
 estimating the model parameters.  The last four years of each data set are
-reserved as a test set for evaluating model performance.  The length of
-the testing set in the dengue data was set by the competition
-administrators, and we have adopted that convention of four years for use with
-the influenza data as well.  All predictions are made as though in real time assuming that
-once cases are reported, they are never revised.  Specifically, we use only data up
-through a given week in order to make predictions for incidence after that week.
+reserved as a test set for evaluating model performance, as was chosen by
+the competition administrators.  All predictions are made as though in real time assuming that
+once cases are reported, they are never revised and that there are no delays in
+reporting.  Specifically, we use only data up through a given week in order to
+make predictions for incidence after that week.
 
-There are three prediction targets for each data set, based closely on the
+We use three prediction targets for each data set, based closely on the
 prediction targets that were used in the original competitions.  First, for each
 week in the test data, we obtain a predictive distribution for the incidence
 measure in that week at each prediction horizon from 1 to 52 weeks ahead. 
@@ -1488,7 +1476,8 @@ competitions, we make predictions for \textit{binned} incidence in the peak
 week.  For the dengue data set, the bins are $[0, 50), [50, 100), \ldots, [500, \infty)$.
 For the influenza data set, the bins are $[0, 0.5), [0.5, 1), \ldots, [13, \infty)$.
 Our predictions for incidence in individual weeks are for the raw, unbinned,
-incidence measure.  These prediction targets are illustrated in the supplement.
+incidence measure.  These prediction targets are illustrated in Figure 3 of the
+supplement.
 %Figure~\ref{fig:PredictionTargetsIllustration}.
 
 
@@ -1515,42 +1504,65 @@ kernel.
 %a diagonal bandwidth matrix specification.  The other three variations are
 %obtained by adding the periodic kernel component to this null KCDE model, using
 %a fully parameterized bandwidth matrix for the incidence kernel, or both.  
-We use a seasonal autoregressive integrated moving average (SARIMA) model for
-the log-transformed incidence measure as a baseline to compare our methods to.  
-We performed first-order seasonal differencing to obtain a roughly stationary
-time series and then obtained the final model fits using the {\tt auto.arima}
-function in {\tt R}'s {\tt forecast} package
-(\citealp{hyndmanRForecastPackage}); this function uses a stepwise procedure to
-determine the terms to include in the model.
-This procedure resulted in a
+
+We use a seasonal autoregressive integrated moving average (SARIMA) model as a
+baseline to compare our methods to.  In fitting this model, we first
+transformed the observed incidence measure to the log scale (after adding $1$ in
+the Dengue data set, which included some observations of $0$ cases); this
+transformation makes the normality assumptions of the SARIMA model more plausible.
+We then performed first-order seasonal differencing, and obtained the final
+model fits using the {\tt auto.arima} function in {\tt R}'s {\tt forecast}
+package (\citealp{hyndmanRForecastPackage}); this function uses a stepwise
+procedure to determine the terms to include in the model.
+This procedure resulted in a 
 <<ILISarimaModelFitSummary, echo = FALSE, results = "asis">>=
 ili_sarima_fit <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/ili_national/estimation-results/sarima-fit.rds")
-temp <- capture.output(summary(ili_sarima_fit)) 
-cat(paste0("SARIMA(", substr(temp[2], 7, 15), as.integer(substr(temp[2], 16,16)) + 1, substr(temp[2], 17, 18), ")$_{52}$"))
+temp <- capture.output(summary(ili_sarima_fit))
+cat(paste0("SARIMA(", substr(temp[2], 7, 15), as.integer(substr(temp[2], 16,16)) + 1, substr(temp[2], 17, 18), ")$_{52}$")) 
 @
 model for the influenza data and a 
 <<DengueSarimaModelFitSummary, echo = FALSE, results = "asis">>=
 dengue_sarima_fit <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/dengue_sj/estimation-results/sarima-fit.rds")
-temp <- capture.output(summary(dengue_sarima_fit)) 
-cat(paste0("SARIMA(", substr(temp[2], 7, 15), as.integer(substr(temp[2], 16, 16)) + 1, substr(temp[2], 17, 18), ")$_{52}$"))
+temp <- capture.output(summary(dengue_sarima_fit))
+cat(paste0("SARIMA(", substr(temp[2], 7, 15), as.integer(substr(temp[2], 16, 16)) + 1, substr(temp[2], 17, 18), ")$_{52}$")) 
 @
-model for the dengue data.  Further details of the SARIMA model specification
-and estimation procedure are in the supplement.
+model for the Dengue data.
+
+%We use a seasonal autoregressive integrated moving average (SARIMA) model for
+%the log-transformed incidence measure as a baseline to compare our methods to.  
+%We performed first-order seasonal differencing to obtain a roughly stationary
+%time series and then obtained the final model fits using the {\tt auto.arima}
+%function in {\tt R}'s {\tt forecast} package
+%(\citealp{hyndmanRForecastPackage}); this function uses a stepwise procedure to
+%determine the terms to include in the model.
+%This procedure resulted in a
+%<<ILISarimaModelFitSummary, echo = FALSE, results = "asis">>=
+%ili_sarima_fit <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/ili_national/estimation-results/sarima-fit.rds")
+%temp <- capture.output(summary(ili_sarima_fit)) 
+%cat(paste0("SARIMA(", substr(temp[2], 7, 15), as.integer(substr(temp[2], 16,16)) + 1, substr(temp[2], 17, 18), ")$_{52}$"))
+%@
+%model for the influenza data and a 
+%<<DengueSarimaModelFitSummary, echo = FALSE, results = "asis">>=
+%dengue_sarima_fit <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/dengue_sj/estimation-results/sarima-fit.rds")
+%temp <- capture.output(summary(dengue_sarima_fit)) 
+%cat(paste0("SARIMA(", substr(temp[2], 7, 15), as.integer(substr(temp[2], 16, 16)) + 1, substr(temp[2], 17, 18), ")$_{52}$"))
+%@
+%model for the dengue data.  Further details of the SARIMA model specification
+%and estimation procedure are in the supplement.
 
 We begin with a discussion of predictive distributions for incidence
 at individual time points.  Figure~\ref{fig:DengueRibbonsPredictions} displays
 the median and 95\% interval limits for the predictive distributions obtained 
-at prediction horizons of $1$, $6$, or $26$ weeks from SARIMA and from the KCDE
-specification with a fully parameterized bandwidth matrix and a periodic kernel component.
+at prediction horizons of $1$, $6$, or $26$ weeks from SARIMA and from the
+Periodic, Full Bandwidth KCDE model.
 For predictions of dengue fever incidence, at a prediction horizon of one week
 the point predictions from SARIMA and KCDE are similar, but the distribution from KCDE is
-much more concentrated around its center.  Both methods struggle with larger
+much more concentrated around its center.  Both methods struggle at larger
 prediction horizons, but it appears that the SARIMA model has more
 difficulty with aligning the predictive distribution with the
 season's peak, particularly in the two seasons with higher incidence.
-For the predictions of influenza incidence, which exhibits more regular
-seasonality, there is much less of a noticeable distinction between the
-predictions given by the two methods.  Throughout, the point predictions and intervals are similar.
+For the more regularly seasonal influenza data, there is less of a
+noticeable distinction between the predictions given by the two methods.
 
 
 %In our first example, we apply the method for prediction of
@@ -1829,7 +1841,7 @@ In the application to predicting influenza, the KCDE specifications including a
 periodic kernel did about as well as the SARIMA model, while the median
 performance of the specifications without a periodic kernel was slightly worse
 than SARIMA.  In both applications, including the periodic kernel component led
-to improved predictions; this can be seen directly in Figure *** of the
+to improved predictions; this can be seen directly in Figure 4 of the
 supplement. Using the fully parameterized bandwidth matrix generally had little
 impact on the quality of the predictive distributions as measured by the log score.
 
@@ -1874,9 +1886,11 @@ impact on the quality of the predictive distributions as measured by the log sco
 Figure~\ref{fig:CombinedPeakWeekIncidencePredictionLogScores} displays the log
 score of the predictive distributions for incidence in the peak week
 obtained from SARIMA and KCDE models over the course of each season in the test data sets, and
-Figure *** in the supplement displays log scores for predictions of
-peak week timing.  For both of these prediction targets, there is no consistent
-pattern of KCDE either outperforming or underperforming relative to SARIMA.
+Figure 5 in the supplement displays log scores for predictions of
+peak week timing.  Figures 6 through 9 of the supplement give the full
+predictive distributions for peak week timing and incidence.
+For both of these prediction targets, there is no consistent pattern of KCDE
+either outperforming or underperforming relative to SARIMA.
 
 %
 %If we consider the three seasons in the Influenza data set, KCDE tended to
@@ -3722,7 +3736,7 @@ peak_height_pred_dist_by_analysis_time_dengue$bin_center <-
 \section{Conclusions}
 
 Prediction of infectious disease incidence at horizons of more than a few weeks
-is a challenging task.  We have presented a semiparametric approach to doing
+is a challenging task.  We have presented a semi-parametric approach to doing
 this based on KCDE and copulas and found that it is a viable method that
 can yield improved predictions relative to commonly employed methods in this
 field.  In predicting incidence of dengue fever in individual weeks, we saw that
@@ -3732,6 +3746,20 @@ that are of most interest to public health decision makers: periods of high
 incidence near the season peak.  For predicting influenza-like illness, our
 method did about as well as SARIMA when predicting incidence in individual
 weeks.
+
+Our implementation of KCDE offers two main methodological contributions.  Most
+importantly in the context of modeling infectious disease, we have introduced the use of a periodic kernel
+component that captures seasonality.  In both of our applications, including
+this periodic kernel component in the KCDE specification led to substantial 
+improvements in the predictive distributions for incidence in individual weeks.
+We also introduced a method for obtaining kernel functions that are appropriate
+for use with discrete data while allowing for a fully parameterized bandwidth
+matrix.  In our applications, using a fully parameterized bandwidth matrix did
+not lead to consistent improvements in predictions.  However, we have
+demonstrated through a simulation study that the fully parameterized bandwidth
+can be helpful in some conditional density estimation tasks.  This general
+method for obtaining discrete kernel functions may be beneficial in other
+applications of KCDE.
 
 We believe that the difference in relative performance of KCDE and SARIMA for
 prediction in the dengue and influenza data sets can be explained to a great
@@ -3744,7 +3772,7 @@ times larger than the peak incidence in the smallest season; this ratio is only
 about 3 for influenza.  It may be the case that the restrictive
 structure of the SARIMA model means that it is not able to capture the dynamics
 of dengue incidence accurately.  Relaxing that structure by using a
-nonparametric approach such as KCDE may yield improved capability to represent
+non-parametric approach such as KCDE may yield improved capability to represent
 the disease dynamics.  This is less of an issue in predicting influenza where
 there is much more consistency across different seasons.
 
@@ -3756,10 +3784,10 @@ there is much more consistency across different seasons.
 
 Another more subtle effect is present in the influenza data: there is a
 consistent short-term peak in influenza incidence on Christmas week.  This is
-visible in Figure~\ref{fig:IntialDataPlots}, and is highlighted in Figure *** in
+visible in Figure~\ref{fig:IntialDataPlots}, and is highlighted in Figure 11 in
 the supplement.  This ``Christmas effect'' sometimes coincides with
-the season peak, but sometimes occurs before the season peak.  We have observed
-evidence that the seasonal structure of the SARIMA model picks up on this
+the season peak, but sometimes occurs before or after the season peak.  We have
+observed evidence that the seasonal structure of the SARIMA model picks up on this
 structure, and SARIMA tended to outperform KCDE on Christmas week and the weeks
 immediately thereafter on the influenza data set.  We believe that it would be
 possible to construct a variation on KCDE that captures this effect, for example
@@ -3782,20 +3810,6 @@ data set.  It may be the case that performance on the other two prediction tasks
 could be improved by implementing a combined one-stage estimation
 strategy for both the KCDE and copula parameters that optimizes a measure of
 performance on the specific prediction task at hand.
-
-Our implementation of KCDE offers two main methodological contributions.  Most
-importantly in the context of modeling infectious disease, we have introduced the use of a periodic kernel
-component that captures seasonality.  In both of our applications, including
-this periodic kernel component in the KCDE specification led to substantial 
-improvements in the predictive distributions for incidence in individual weeks.
-We also introduced a method for obtaining kernel functions that are appropriate
-for use with discrete data while allowing for a fully parameterized bandwidth
-matrix.  In our applications, using a fully parameterized bandwidth matrix did
-not lead to consistent improvements in predictions.  However, we have
-demonstrated through a simulation study that the fully parameterized bandwidth
-can be helpful in some conditional density estimation tasks.  This general
-method for obtaining discrete kernel functions may be beneficial in other
-applications of KCDE.
 
 There is a great deal of room for extensions and improvements to the methods we
 have outlined in this article.  One major limitation of our work lies in the
@@ -3825,7 +3839,7 @@ irrelevant) conditioning variables in the model without requiring
 a dramatically larger sample size.  In particular, we hypothesize that a
 penalty on the inverse of the bandwidth matrix encouraging it to have small
 eigenvalues could be helpful.  If successful, this would also enable further
-exploration of using other predictive variables (such as weather) in the model.
+exploration of using other predictive variables such as weather in the model.
 %A similar effect could be achieved in
 %a Bayesian framework by using Dirichlet process mixtures with informative priors
 %on the mixture component covariances.
@@ -3854,10 +3868,8 @@ score (\citealp{jeon2012KCDEWindPower}).
 %conditional densities and sensitivity measures in nonlinear dynamical systems."
 
 There is also a long history of using other modeling approaches such as
-compartmental models for infectious disease prediction.  A full discussion of
-those methods is beyond the scope of this article; see
-\citet{brown2016IDPredictionReview} for a review.  KCDE is distinguished from these approaches in that it
-makes minimal assumptions about the data generating process.  This can be
+compartmental models for infectious disease prediction.  KCDE is distinguished
+from these approaches in that it makes minimal assumptions about the data generating process.  This can be
 either an advantage or a disadvantage of KCDE.  In general, we would expect a
 well-specified parametric model to outperform KCDE.  On the other hand, because
 non-parametric approaches such as KCDE make fewer assumptions about the data
@@ -3887,8 +3899,7 @@ predictions to public health decision makers.
 \section{Software}
 
 The estimation methods were implemented in {\tt R} (\citealp{RCoreLanguage}) and
-{\tt C}.  All source code as well as the data we used in the applications
-are available in {\tt R} packages hosted on GitHub
+{\tt C}.  All source code and data are available in {\tt R} packages hosted on GitHub
 (\citealp{ReichLabGitHubDiseasePredWithKCDEPackage}).
 
 \section{Supplementary Material}
@@ -3901,7 +3912,9 @@ about the results.
 
 The authors thank Michael Johansson for helpful commentary on a draft of the
 paper and the competition administrators for making disease incidence data
-available.  This work was funded in part by grants *******.
+available.  This work was supported by the National Institute of Allergy and
+Infectious Diseases at the National Institutes of Health (grants R21AI115173 and
+R01AI102939).
 
 
 %\bibliographystyle{plainnat}
@@ -3909,7 +3922,7 @@ available.  This work was funded in part by grants *******.
 \bibliography{kde-bib}
 
 \begin{figure}
-<<PeriodicKernelPlot, echo = FALSE, fig.height = 7.75>>=
+<<PeriodicKernelPlot, echo = FALSE, fig.height = 7.75, dev = "postscript">>=
 plot_df <- data.frame(t=seq_len(5 * 52))
 
 kernel_center <- plot_df$t[nrow(plot_df)]
@@ -4132,7 +4145,7 @@ bandwidth matrix $\begin{bmatrix}0.2 & 0.15 \\ 0.15 & 0.2\end{bmatrix}$.}
 \end{figure}
 
 \begin{figure}
-<<SimStudyResultsPlot, echo = FALSE, fig.height = 5>>=
+<<SimStudyResultsPlot, echo = FALSE, fig.height = 5, dev = "postscript">>=
 sim_results <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/sim-study/kcde-predictions.rds")
 sim_results <- sim_results[1:2000, ]
 sim_results$sim_run_inds <- rep(seq_len(500), each = 4)
@@ -4156,6 +4169,7 @@ ggplot() +
 #            })) +
     xlab("Training Set Sample Size") +
     ylab("Difference in Hellinger Distance for KCDE with\nDiagonal Bandwidth vs. Fully Parameterized Bandwidth") +
+    ggtitle("Simulation Study Results\nImprovement in Integrated Hellinger Distance\nfrom Using Fully Parameterized Bandwidth") +
     theme_bw()
 @
 \caption{Results from the simulation study.  Positive values indicate simulation trials
@@ -4166,7 +4180,7 @@ target conditional density.}
 \end{figure}
 
 \begin{figure}
-<<InitialDataPlot, echo = FALSE, fig.height = 5>>=
+<<InitialDataPlot, echo = FALSE, fig.height = 5, dev = "postscript">>=
 #time_limits <- c(min(c(ili_national$time, dengue_sj$time)),
 #    max(c(ili_national$time, dengue_sj$time)))
 
@@ -4212,7 +4226,7 @@ with vertical grey bars.}
 \end{figure}
 
 \begin{figure}
-<<DengueDataRibbonsPredictionPlot95Intervals, echo = FALSE, fig.height = 8.6>>=
+<<DengueDataRibbonsPredictionPlot95Intervals, echo = FALSE, fig.height = 8.6, dev = "cairo_ps">>=
 #color_palette <- c("#E69F00", "#0072B2")
 color_palette <- c("#D55E00", "#0072B2")
 
@@ -4333,7 +4347,7 @@ Periodic, Full Bandwidth KCDE model.}
 \end{figure}
 
 \begin{figure}
-<<FluDataResultsAggregatedBoxplots, echo = FALSE, fig.height = 7.8>>=
+<<FluDataResultsAggregatedBoxplots, echo = FALSE, fig.height = 7.8, dev = "postscript">>=
 models_used <- unique(ili_prediction_results$full_model_descriptor[
     !ili_prediction_results$differencing & !(ili_prediction_results$max_seasonal_lag == 1)])
 
@@ -4572,7 +4586,7 @@ combination of prediction target week and prediction horizon.
 \end{figure}
 
 \begin{figure}
-<<CombinedPeakWeekHeightLogScoreByAnalysisTime, echo = FALSE, fig.keep = "last", fig.height = 8.3, dependson = c("FluDataMergePeakWeekPredictionResults", "DengueDataMergePeakWeekPredictionResults")>>=
+<<CombinedPeakWeekHeightLogScoreByAnalysisTime, echo = FALSE, fig.keep = "last", fig.height = 8.3, dev = "postscript", dependson = c("FluDataMergePeakWeekPredictionResults", "DengueDataMergePeakWeekPredictionResults")>>=
 ## Add season and season week columns to data so that we can get from
 ## analysis_time_season and analysis_time_season_week to analysis_time
 #dengue_sj$season <- ifelse(
@@ -4680,7 +4694,9 @@ p_d_1 <- ggplot(dengue_peak_week_results[dengue_peak_week_results$full_model_des
     xlab("") +
     ylab("") +
     theme_bw() +
-    theme(legend.position = "none")
+    theme(legend.position = "none") +
+    theme(plot.margin = unit(c(0,0,0,0), "cm")) +
+    theme(panel.margin = unit(c(0,0,0,0), "cm"))
 
 p_d_2 <- ggplot(dengue_peak_week_results[dengue_peak_week_results$full_model_descriptor %in% models_used &
                 dengue_peak_week_results$analysis_time_season == "2010/2011", ]) +
@@ -4701,7 +4717,9 @@ p_d_2 <- ggplot(dengue_peak_week_results[dengue_peak_week_results$full_model_des
     xlab("") +
     ylab("") +
     theme_bw() +
-    theme(legend.position = "none")
+    theme(legend.position = "none") +
+    theme(plot.margin = unit(c(0,0,0,0), "cm")) +
+    theme(panel.margin = unit(c(0,0,0,0), "cm"))
 
 p_d_3 <- ggplot(dengue_peak_week_results[dengue_peak_week_results$full_model_descriptor %in% models_used &
                 dengue_peak_week_results$analysis_time_season == "2011/2012", ]) +
@@ -4722,7 +4740,9 @@ p_d_3 <- ggplot(dengue_peak_week_results[dengue_peak_week_results$full_model_des
     xlab("") +
     ylab("") +
     theme_bw() +
-    theme(legend.position = "none")
+    theme(legend.position = "none") +
+    theme(plot.margin = unit(c(0,0,0,0), "cm")) +
+    theme(panel.margin = unit(c(0,0,0,0), "cm"))
 
 p_d_4 <- ggplot(dengue_peak_week_results[dengue_peak_week_results$full_model_descriptor %in% models_used &
                 dengue_peak_week_results$analysis_time_season == "2012/2013", ]) +
@@ -4743,7 +4763,9 @@ p_d_4 <- ggplot(dengue_peak_week_results[dengue_peak_week_results$full_model_des
     xlab("Season Week at Analysis Time") +
     ylab("") +
     theme_bw() +
-    theme(legend.position = "none")
+    theme(legend.position = "none") +
+    theme(plot.margin = unit(c(0,0,0,0), "cm")) +
+    theme(panel.margin = unit(c(0,0,0,0), "cm"))
 
 
 
@@ -4766,7 +4788,9 @@ p_i_1 <- ggplot(ili_peak_week_results[ili_peak_week_results$full_model_descripto
     xlab("") +
     ylab("") +
     theme_bw() +
-    theme(legend.position = "none")
+    theme(legend.position = "none") +
+    theme(plot.margin = unit(c(0,0,0,0), "cm")) +
+    theme(panel.margin = unit(c(0,0,0,0), "cm"))
 
 p_i_2 <- ggplot(ili_peak_week_results[ili_peak_week_results$full_model_descriptor %in% models_used &
                 ili_peak_week_results$analysis_time_season == "2012/2013", ]) +
@@ -4787,7 +4811,9 @@ p_i_2 <- ggplot(ili_peak_week_results[ili_peak_week_results$full_model_descripto
     xlab("") +
     ylab("") +
     theme_bw() +
-    theme(legend.position = "none")
+    theme(legend.position = "none") +
+    theme(plot.margin = unit(c(0,0,0,0), "cm")) +
+    theme(panel.margin = unit(c(0,0,0,0), "cm"))
 
 p_i_3 <- ggplot(ili_peak_week_results[ili_peak_week_results$full_model_descriptor %in% models_used &
                 ili_peak_week_results$analysis_time_season == "2013/2014", ]) +
@@ -4808,28 +4834,36 @@ p_i_3 <- ggplot(ili_peak_week_results[ili_peak_week_results$full_model_descripto
     xlab("Season Week at Analysis Time") +
     ylab("") +
     theme_bw() +
-    theme(legend.position = "none")
+    theme(legend.position = "none") +
+    theme(plot.margin = unit(c(0,0,0,0), "cm")) +
+    theme(panel.margin = unit(c(0,0,0,0), "cm"))
 
 grid.newpage()
 #grid.layout(nrow = 2, ncol = 2, heights = unit(rep(1, 2), c("null", "lines")))
-pushViewport(viewport(layout = grid.layout(nrow = 4, ncol = 3,
-            heights = unit(rep(1, 4), c("null", "null", "null", "null")),
-            widths = unit(c(1, 1, 1), c("lines", "null", "null")))))
+pushViewport(viewport(layout = grid.layout(nrow = 5, ncol = 3,
+            heights = unit(c(2.3, 1, 1, 1, 1), c("lines", "null", "null", "null",
+                    "null")), widths = unit(c(1, 1, 1), c("lines", "null", "null")))))
+#pushViewport(viewport(layout = grid.layout(nrow = 4, ncol = 3,
+#            heights = unit(rep(1, 4), c("null", "null", "null", "null")),
+#            widths = unit(c(1, 1, 1), c("lines", "null", "null")))))
+grid.text("Log Scores for Predictive Distributions for Peak Week Incidence\nMade at Each Week in the Season",
+    gp = gpar(fontsize = 12),
+    vp = viewport(layout.pos.row = 1, layout.pos.col = 2:3))
 grid.text("Log Score",
     gp = gpar(fontsize = 12),
     rot = 90,
-    vp = viewport(layout.pos.row = 1:4, layout.pos.col = 1))
+    vp = viewport(layout.pos.row = 2:5, layout.pos.col = 1))
         
-pushViewport(viewport(layout.pos.row = 4, layout.pos.col = 3))
+pushViewport(viewport(layout.pos.row = 4 + 1, layout.pos.col = 3))
 grid.draw(legend_grob)
 upViewport()
-suppressWarnings(print(p_d_1, vp = viewport(layout.pos.row = 1, layout.pos.col = 2)))
-suppressWarnings(print(p_d_2, vp = viewport(layout.pos.row = 2, layout.pos.col = 2)))
-suppressWarnings(print(p_d_3, vp = viewport(layout.pos.row = 3, layout.pos.col = 2)))
-suppressWarnings(print(p_d_4, vp = viewport(layout.pos.row = 4, layout.pos.col = 2)))
-suppressWarnings(print(p_i_1, vp = viewport(layout.pos.row = 1, layout.pos.col = 3)))
-suppressWarnings(print(p_i_2, vp = viewport(layout.pos.row = 2, layout.pos.col = 3)))
-suppressWarnings(print(p_i_3, vp = viewport(layout.pos.row = 3, layout.pos.col = 3)))
+suppressWarnings(print(p_d_1, vp = viewport(layout.pos.row = 1 + 1, layout.pos.col = 2)))
+suppressWarnings(print(p_d_2, vp = viewport(layout.pos.row = 2 + 1, layout.pos.col = 2)))
+suppressWarnings(print(p_d_3, vp = viewport(layout.pos.row = 3 + 1, layout.pos.col = 2)))
+suppressWarnings(print(p_d_4, vp = viewport(layout.pos.row = 4 + 1, layout.pos.col = 2)))
+suppressWarnings(print(p_i_1, vp = viewport(layout.pos.row = 1 + 1, layout.pos.col = 3)))
+suppressWarnings(print(p_i_2, vp = viewport(layout.pos.row = 2 + 1, layout.pos.col = 3)))
+suppressWarnings(print(p_i_3, vp = viewport(layout.pos.row = 3 + 1, layout.pos.col = 3)))
 
 @
 \caption{Log scores for predictions of peak week incidence by predictive
