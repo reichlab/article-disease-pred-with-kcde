@@ -8,20 +8,20 @@ This repository contains code and data used in writing the paper "Infectious Dis
 This repository is organized as follows:
 * data-raw/ contains "raw" data in the form of .csv files. These data were obtained from competition administrators (http://dengueforecasting.noaa.gov/) or the R package providing data on inidence of flu in the United States (https://cran.r-project.org/web/packages/cdcfluview/index.html, http://www.cdc.gov/flu/weekly/).
 * inst/ contains everything else:
- * inst/code contains code used to estimate models and make predictions:
-  * inst/code/estimation/ contains code for estimation:
-   * inst/code/estimation/kcde-estimation-step.R does KCDE estimation for a particular combination of factors describing an estimation task (e.g., KCDE model specification, data set, prediction horizon, etc.)
-   * inst/code/estimation/submit-cluster-job-kcde-estimation-step.R sets up jobs on our cluster to run kcde-estimation-step.R for all relevant combinations of factors describing an estimation task.
-   * inst/code/estimation/copula-estimation-step.R does copula estimation given KCDE fits obtained by running kcde-estimation-step.R
-   * inst/code/estimation/sarima-estimation.R estimates a SARIMA model.
-  * inst/code/prediction/ contains code for prediction and model evaluation:
-   * inst/code/prediction/kcde-evaluation-simstudy.R evaluates the quality of density estimates obtained in the simulation study
-   * inst/code/prediction/kcde-prediction.R makes predictions for incidence in individual weeks from KCDE in the applications to dengue and influenza, and obtains log scores
-   * inst/code/prediction/kcde-peak-prediction.R makes predictions for peak week timing and incidence from KCDE+copulas in the applications to dengue and influenza
-   * inst/code/prediction/sarima-prediction.R makes predictions for incidence in individual weeks from SARIMA in the applications to dengue and influenza, and obtains log scores
-   * inst/code/prediction/sarima-peak-prediction.R makes predictions for peak week timing and incidence from SARIMA in the applications to dengue and influenza
-  * inst/code/postprocessing/influenza-results-model/ contains a sketch of a start at a spline model to examine the results of the application to influenza from different models. This didn't make it into the paper.
-  * inst/code/sim-densities-sim-study-discretized-Duong-Hazelton.R contains the code used in the simulation study to simulate from and evaluate the distributions data were simulated from.
- * inst/results/ contains intermediate results from the applications and the simulation study: model fits and data frames with summaries of the predictions that were made
- * inst/article/ contains the .Rnw and related files for the article.
- * inst/article-supplement/ contains the .Rnw and related files for the supplement.
+    * inst/code contains code used to estimate models and make predictions:
+        * inst/code/estimation/ contains code for estimation:
+            * inst/code/estimation/kcde-estimation-step.R does KCDE estimation for a particular combination of factors describing an estimation task (e.g., KCDE model specification, data set, prediction horizon, etc.)
+            * inst/code/estimation/submit-cluster-job-kcde-estimation-step.R sets up jobs on our cluster to run kcde-estimation-step.R for all relevant combinations of factors describing an estimation task.
+            * inst/code/estimation/copula-estimation-step.R does copula estimation given KCDE fits obtained by running kcde-estimation-step.R
+            * inst/code/estimation/sarima-estimation.R estimates a SARIMA model.
+        * inst/code/prediction/ contains code for prediction and model evaluation:
+            * inst/code/prediction/kcde-evaluation-simstudy.R evaluates the quality of density estimates obtained in the simulation study
+            * inst/code/prediction/kcde-prediction.R makes predictions for incidence in individual weeks from KCDE in the applications to dengue and influenza, and obtains log scores
+            * inst/code/prediction/kcde-peak-prediction.R makes predictions for peak week timing and incidence from KCDE+copulas in the applications to dengue and influenza
+            * inst/code/prediction/sarima-prediction.R makes predictions for incidence in individual weeks from SARIMA in the applications to dengue and influenza, and obtains log scores
+            * inst/code/prediction/sarima-peak-prediction.R makes predictions for peak week timing and incidence from SARIMA in the applications to dengue and influenza
+        * inst/code/postprocessing/influenza-results-model/ contains a sketch of a start at a spline model to examine the results of the application to influenza from different models. This didn't make it into the paper.
+        * inst/code/sim-densities-sim-study-discretized-Duong-Hazelton.R contains the code used in the simulation study to simulate from and evaluate the distributions data were simulated from.
+    * inst/results/ contains intermediate results from the applications and the simulation study: model fits and data frames with summaries of the predictions that were made
+    * inst/article/ contains the .Rnw and related files for the article.
+    * inst/article-supplement/ contains the .Rnw and related files for the supplement.
