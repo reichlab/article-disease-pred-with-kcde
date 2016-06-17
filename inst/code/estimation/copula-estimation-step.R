@@ -6,6 +6,11 @@ library(kcde)
 library(copula)
 library(mvtnorm)
 
+## There are some problems with the implementation of copula estimation in the
+## copula package, mainly centering around numerical issues and handling
+## negative values.  I've made some minor changes to fix these problems.
+## I haven't made these a part of the copula package, but have just put the
+## revised functions here.
 
 fitCopula.ml <- function (copula, u, start, lower, upper, method, optim.control, 
     estimate.variance, hideWarnings, bound.eps = .Machine$double.eps^0.5)
@@ -254,8 +259,11 @@ setMethod("dCopula", signature("matrix", "normalCopula"), dnormalCopula)
 setMethod("dCopula", signature("numeric", "normalCopula"),dnormalCopula)
 
 
-#all_data_sets <- "ili_national"
-all_data_sets <- "dengue_sj"
+## End revisions to copula package functionality
+## Start code for estimation in our application
+
+
+all_data_sets <- c("ili_national", "dengue_sj")
 
 for(data_set in all_data_sets) {
     save_path <- file.path("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results",
@@ -265,71 +273,21 @@ for(data_set in all_data_sets) {
         data_set,
         "estimation-results")
     
-    if(identical(data_set, "ili_national")) {
-        all_max_lags <- as.character(c(1L))
-        all_max_seasonal_lags <- rev(as.character(c(0L, 1L)))
-#        all_max_seasonal_lags <- rev(as.character(c(0L)))
-        all_filtering_values <- c("FALSE")
-        all_differencing_values <- rev(c("FALSE", "TRUE"))
-        all_seasonality_values <- rev(c("FALSE", "TRUE"))
-        all_bw_parameterizations <- rev(c("diagonal", "full"))
-#        all_differencing_values <- rev(c("FALSE"))
-#        all_seasonality_values <- rev(c("TRUE"))
-#        all_bw_parameterizations <- rev(c("full"))
-        all_sim_n <- "NA"
-        all_sim_families <- "NA"
-        all_sim_run_inds <- 1L
-    } else if(identical(data_set, "dengue_sj")) {
-        all_max_lags <- as.character(c(1L))
-#        all_max_seasonal_lags <- as.character(c(0L, 1L))
-        all_max_seasonal_lags <- as.character(0L)
-        all_filtering_values <- c("FALSE")
-#        all_differencing_values <- c("FALSE", "TRUE")
-        all_differencing_values <- "FALSE"
-        all_seasonality_values <- c("FALSE", "TRUE")
-        all_bw_parameterizations <- c("diagonal", "full")
-        all_sim_n <- "NA"
-        all_sim_families <- "NA"
-        all_sim_run_inds <- 1L
-    } else if(identical(data_set, "sim")) {
-        all_prediction_horizons <- "0"
-        all_max_lags <- "0"
-        all_max_seasonal_lags <- "0"
-        all_filtering_values <- "FALSE"
-        all_differencing_values <- c("FALSE")
-        all_seasonality_values <- c("FALSE")
-        
-        all_bw_parameterizations <- c("diagonal", "full")
-#        all_bw_parameterizations <- c("full")
-#        all_bw_parameterizations <- c("diagonal")
-        all_sim_n <- c("100", "1000")
-#        all_sim_n <- c("100")
-#        all_sim_families <- c("bivariate-B-discretized",
-#            "bivariate-C-discretized",
-#        all_sim_families <- c("multivariate-2d-discretized",
-#            "multivariate-4d-discretized", 
-#            "multivariate-6d-discretized")
-        all_sim_families <- c("multivariate-2d-discretized",
-            "multivariate-4d-discretized")
-#        all_sim_families <- c("multivariate-4d-discretized")
-#        all_sim_run_inds <- seq(from = 1, to = 100)
-#        all_sim_run_inds <- 9L
-        all_sim_run_inds <- c(seq(from = 1, to = 8), seq(from = 10, to = 100))
-        
-#        all_bw_parameterizations <- c("diagonal")
-#        all_sim_n <- c("100")
-#        all_sim_families <- c("multivariate-6d-discretized")
-#        all_sim_run_inds <- 45L
+    if(data_set %in% c("ili_national", "dengue_sj")) {
+        all_max_lags <- as.character(c(1L)) # use incidence at times t^* and t^* - 1 to predict incidence after t^*
+        all_max_seasonal_lags <- as.character(0L) # not used
+        all_filtering_values <- c("FALSE") # not used
+        all_differencing_values <- "FALSE" # not used
+        all_seasonality_values <- c("FALSE", "TRUE") # specifications without and with periodic kernel
+        all_bw_parameterizations <- c("diagonal", "full") # specifications with diagonal and full bandwidth
+        all_sim_n <- "NA" # not used for applications
+        all_sim_families <- "NA" # not used for applications
+        all_sim_run_inds <- 1L # not used for applications
     } else {
         stop("Invalid data set")
     }
     
     for(sim_family in all_sim_families) {
-        if(identical(data_set, "sim")) {
-#        save_path <- "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/R/application-influenza/estimation-results"
-            results_path <- paste0("/home/er71a/kcde-applied-paper/R/sim-", sim_family, "/estimation-results")
-            scripts_path <- paste0("/home/er71a/kcde-applied-paper/R/sim-", sim_family, "/estimation-scripts")
-        }
         for(sim_n in all_sim_n) {
             for(sim_run_ind in all_sim_run_inds) {
                 for(max_lag in all_max_lags) {
@@ -350,278 +308,277 @@ for(data_set in all_data_sets) {
                                         copula_fits_file_name <- paste0("kcde-copula-fits-",
                                             copula_fits_case_descriptor,
                                             ".rds")
-                                        if(!(file.exists(file.path(file.path(save_path, copula_fits_file_name))))) {
-                                            if(identical(data_set, "ili_national")) {
-                                                ## Load data for nationally reported influenza like illness
-                                                library(cdcfluview)
-                                                
-                                                usflu <- get_flu_data("national", "ilinet", years=1997:2014)
-                                                data <- transmute(usflu,
-                                                    region.type = REGION.TYPE,
-                                                    region = REGION,
-                                                    year = YEAR,
-                                                    week = WEEK,
-                                                    weighted_ili = as.numeric(X..WEIGHTED.ILI))
-                                                
-                                                ## Add time column.  This is used for calculating times to drop in cross-validation
-                                                data$time <- ymd(paste(data$year, "01", "01", sep = "-"))
-                                                week(data$time) <- data$week
-                                                
-                                                ## Add time_index column.  This is used for calculating the periodic kernel.
-                                                ## Here, this is calculated as the number of days since some origin date (1970-1-1 in this case).
-                                                ## The origin is arbitrary.
-                                                data$time_index <- as.integer(data$time -  ymd(paste("1970", "01", "01", sep = "-")))
-                                                
-                                                ## Subset data to do estimation using only data up through 2010
-                                                ## 2011 - 2014 are held out for evaluating performance.
-                                                data <- data[data$year <= 2010, , drop = FALSE]
-                                                
-                                                ## Season column: for example, weeks of 2010 up through and including week 30 get season 2009/2010;
-                                                ## weeks after week 30 get season 2010/2011
-                                                data$season <- ifelse(
-                                                    data$week <= 30,
-                                                    paste0(data$year - 1, "/", data$year),
-                                                    paste0(data$year, "/", data$year + 1)
-                                                )
-                                                
-                                                ## Season week column: week number within season
-                                                data$season_week <- sapply(seq_len(nrow(data)), function(row_ind) {
-                                                        sum(data$season == data$season[row_ind] & data$time_index <= data$time_index[row_ind])
-                                                    })
-                                                
-                                                if(differencing) {
-                                                    data$weighted_ili_ratio <- data$weighted_ili / lag(data$weighted_ili, 52) 
-                                                    prediction_target_var <- "weighted_ili_ratio"
-                                                    if(max_seasonal_lag == "1") {
-                                                        train_seasons <- paste0(seq(from = 1999, to = 2009), "/", seq(from = 2000, to = 2010))
-                                                    } else {
-                                                        train_seasons <- paste0(seq(from = 1998, to = 2009), "/", seq(from = 1999, to = 2010))
-                                                    }
-                                                } else {
-                                                    prediction_target_var <- "weighted_ili"
-                                                    if(max_seasonal_lag == "1") {
-                                                        train_seasons <- paste0(seq(from = 1998, to = 2009), "/", seq(from = 1999, to = 2010))
-                                                    } else {
-                                                        train_seasons <- paste0(seq(from = 1997, to = 2009), "/", seq(from = 1998, to = 2010))
-                                                    }
-                                                }
-                                                
-                                                season_length <- 33L
-                                                first_analysis_time_season_week <- 10 # == week 40 of year
-                                                last_analysis_time_season_week <- 41 # analysis for 33-week season, consistent with flu competition -- at week 41, we do prediction for a horizon of one week ahead
-#                                                last_analysis_time_season_week <- 10 # analysis for 33-week season, consistent with flu competition -- at week 41, we do prediction for a horizon of one week ahead
-                                            } else if(identical(data_set, "dengue_sj")) {
-                                                ## Load data for Dengue fever in San Juan
-                                                data <- read.csv("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/data-raw/San_Juan_Training_Data.csv")
-                                                
-                                                ## Restrict to data from 1990/1991 through 2008/2009 seasons
-                                                train_seasons <- paste0(1990:2008, "/", 1991:2009)
-                                                data <- data[data$season %in% train_seasons, ]
-                                                
-                                                ## Form variable with total cases + 1 which can be logged
-                                                data$total_cases_plus_1 <- data$total_cases + 1
-                                                
-                                                ## convert dates
-                                                data$time <- ymd(data$week_start_date)
-                                                
-                                                ## Add time_index column.  This is used for calculating the periodic kernel.
-                                                ## Here, this is calculated as the number of days since some origin date (1970-1-1 in this case).
-                                                ## The origin is arbitrary.
-                                                data$time_index <- as.integer(data$time -  ymd(paste("1970", "01", "01", sep = "-")))
-                                                
-                                                prediction_target_var <- "total_cases_plus_1"
-                                                
-                                                season_length <- 52L
-                                                first_analysis_time_season_week <- 1 # == week 40 of year
-                                                last_analysis_time_season_week <- 51 # analysis for 33-week season, consistent with flu competition -- at week 41, we do prediction for a horizon of one week ahead
-                                            }
+                                        
+                                        if(identical(data_set, "ili_national")) {
+                                            ## Load data for nationally reported influenza like illness
+                                            usflu <- read.csv("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/data-raw/usflu.csv")
                                             
-                                            copula_fits <- vector("list", last_analysis_time_season_week - first_analysis_time_season_week + 1)
-                                            copula_fits_ind <- 1L
+#                                            ## This is how I originally got the data -- have saved it to
+#                                            ## csv for the purposes of stable access going forward.
+#                                            library(cdcfluview)
+#                                            usflu <- get_flu_data("national", "ilinet", years=1997:2014)
                                             
-                                            cat(paste0("max_seasonal_lag = ", max_seasonal_lag, "\n"))
-                                            cat(paste0("differencing = ", differencing, "\n"))
-                                            cat(paste0("seasonality = ", seasonality, "\n"))
-                                            cat(paste0("bw_parameterization = ", bw_parameterization, "\n"))
+                                            ## A little cleanup
+                                            data <- transmute(usflu,
+                                                region.type = REGION.TYPE,
+                                                region = REGION,
+                                                year = YEAR,
+                                                week = WEEK,
+                                                weighted_ili = as.numeric(X..WEIGHTED.ILI))
                                             
-                                            ## We obtain a separate copula estimate for each combination of
-                                            ## data set and number of weeks left in season
-                                            ## omit the last week since there is only a prediction horizon of 1 then.
-                                            for(analysis_time_season_week in seq(from = first_analysis_time_season_week, to = last_analysis_time_season_week - 1)) {
-                                                cat(paste0("analysis_time_season_week = ", analysis_time_season_week, "\n"))
-                                                
-                                                ## Assemble matrix of probability-integral-transformed observed incidence trajectories in each season
-                                                ## The estimated KCDE density is used for the integral transform.
-                                                ## Rows correspond to seasons, columns to prediction horizons
-                                                max_prediction_horizon <-
-                                                    first_analysis_time_season_week + season_length - 1 -
-                                                    analysis_time_season_week
-                                                
-                                                pit_incidence_trajectories <- t(sapply(train_seasons,
-                                                        function(train_season) {
-                                                            ## Calculate conditional probability that incidence <= observed
-                                                            ## incidence for each prediction horizon separately
-                                                            analysis_time_ind <- which(data$season == train_season & data$season_week == analysis_time_season_week)
+                                            ## Add time column.  This is used for calculating times to drop in cross-validation
+                                            data$time <- ymd(paste(data$year, "01", "01", sep = "-"))
+                                            week(data$time) <- data$week
+                                            
+                                            ## Add time_index column.  This is used for calculating the periodic kernel.
+                                            ## Here, this is calculated as the number of days since some origin date (1970-1-1 in this case).
+                                            ## The origin is arbitrary.
+                                            data$time_index <- as.integer(data$time -  ymd(paste("1970", "01", "01", sep = "-")))
+                                            
+                                            ## Subset data to do estimation using only data up through 2010
+                                            ## 2011 - 2014 are held out for evaluating performance.
+                                            data <- data[data$year <= 2010, , drop = FALSE]
+                                            
+                                            ## Season column: for example, weeks of 2010 up through and including week 30 get season 2009/2010;
+                                            ## weeks after week 30 get season 2010/2011
+                                            data$season <- ifelse(
+                                                data$week <= 30,
+                                                paste0(data$year - 1, "/", data$year),
+                                                paste0(data$year, "/", data$year + 1)
+                                            )
+                                            
+                                            ## Season week column: week number within season
+                                            data$season_week <- sapply(seq_len(nrow(data)), function(row_ind) {
+                                                    sum(data$season == data$season[row_ind] & data$time_index <= data$time_index[row_ind])
+                                                })
+                                            
+                                            prediction_target_var <- "weighted_ili"
+                                            train_seasons <- paste0(seq(from = 1997, to = 2009), "/", seq(from = 1998, to = 2010))
+                                            
+                                            season_length <- 33L
+                                            first_analysis_time_season_week <- 10 # == week 40 of year
+                                            last_analysis_time_season_week <- 41 # analysis for 33-week season, consistent with flu competition -- at week 41, we do prediction for a horizon of one week ahead
+                                        } else if(identical(data_set, "dengue_sj")) {
+                                            ## Load data for Dengue fever in San Juan
+                                            data <- read.csv("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/data-raw/San_Juan_Training_Data.csv")
+                                            
+                                            ## Restrict to data from 1990/1991 through 2008/2009 seasons
+                                            train_seasons <- paste0(1990:2008, "/", 1991:2009)
+                                            data <- data[data$season %in% train_seasons, ]
+                                            
+                                            ## Form variable with total cases + 0.5 which can be logged
+                                            data$total_cases_plus_0.5 <- data$total_cases + 0.5
+                                            
+                                            ## convert dates
+                                            data$time <- ymd(data$week_start_date)
+                                            
+                                            ## Add time_index column.  This is used for calculating the periodic kernel.
+                                            ## Here, this is calculated as the number of days since some origin date (1970-1-1 in this case).
+                                            ## The origin is arbitrary.
+                                            data$time_index <- as.integer(data$time -  ymd(paste("1970", "01", "01", sep = "-")))
+                                            
+                                            prediction_target_var <- "total_cases_plus_0.5"
+                                            
+                                            season_length <- 52L
+                                            first_analysis_time_season_week <- 1 # == week 40 of year
+                                            last_analysis_time_season_week <- 51 # analysis for 33-week season, consistent with flu competition -- at week 41, we do prediction for a horizon of one week ahead
+                                        }
+                                        
+                                        copula_fits <- vector("list", last_analysis_time_season_week - first_analysis_time_season_week + 1)
+                                        copula_fits_ind <- 1L
+                                        
+                                        cat(paste0("seasonality = ", seasonality, "\n"))
+                                        cat(paste0("bw_parameterization = ", bw_parameterization, "\n"))
+                                        
+                                        ## We obtain a separate copula estimate for each combination of
+                                        ## data set and number of weeks left in season
+                                        ## omit the last week since there is only a prediction horizon of 1 then.
+                                        for(analysis_time_season_week in seq(from = first_analysis_time_season_week, to = last_analysis_time_season_week - 1)) {
+                                            cat(paste0("analysis_time_season_week = ", analysis_time_season_week, "\n"))
+                                            
+                                            ## Assemble matrix of probability-integral-transformed observed incidence trajectories in each season
+                                            ## The estimated KCDE density is used for the integral transform.
+                                            ## Rows correspond to seasons, columns to prediction horizons
+                                            max_prediction_horizon <-
+                                                first_analysis_time_season_week + season_length - 1 -
+                                                analysis_time_season_week
+                                            
+                                            pit_incidence_trajectories <- t(sapply(train_seasons,
+                                                function(train_season) {
+                                                    ## Calculate conditional probability that incidence <= observed
+                                                    ## incidence for each prediction horizon separately
+                                                    analysis_time_ind <- which(data$season == train_season & data$season_week == analysis_time_season_week)
+                                                    
+                                                    sapply(seq_len(max_prediction_horizon),
+                                                        function(prediction_horizon) {
+                                                            case_descriptor <- paste0(
+                                                                data_set,
+                                                                "-prediction_horizon_", prediction_horizon,
+                                                                "-max_lag_", max_lag,
+                                                                "-max_seasonal_lag_", max_seasonal_lag,
+                                                                "-filtering_", filtering,
+                                                                "-differencing_", differencing,
+                                                                "-seasonality_", seasonality,
+                                                                "-bw_parameterization_", bw_parameterization
+                                                            )
                                                             
-                                                            sapply(seq_len(max_prediction_horizon),
-                                                                function(prediction_horizon) {
-                                                                    case_descriptor <- paste0(
-                                                                        data_set,
-                                                                        "-prediction_horizon_", prediction_horizon,
-                                                                        "-max_lag_", max_lag,
-                                                                        "-max_seasonal_lag_", max_seasonal_lag,
-                                                                        "-filtering_", filtering,
-                                                                        "-differencing_", differencing,
-                                                                        "-seasonality_", seasonality,
-                                                                        "-bw_parameterization_", bw_parameterization
-                                                                    )
+                                                            kcde_fit_file_path <- file.path(estimation_results_path,
+                                                                paste0("kcde_fit-", case_descriptor, ".rds"))
+                                                            kcde_fit <- readRDS(kcde_fit_file_path)
+                                                            
+                                                            ## If Dengue fit, fix a bug in the in_range function for discrete variables 
+                                                            ## that was supplied at time of estimation.  This function was not used in
+                                                            ## estimation, but is required here.  Original definition referenced a function
+                                                            ## that may not be available now.
+                                                            if(identical(data_set, "dengue_sj")) {
+                                                                for(kernel_component_ind in seq_along(kcde_fit$kcde_control$kernel_components)) {
+                                                                    kernel_component <- kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]
                                                                     
-                                                                    if(identical(substr(data_set, 1, 3), "sim")) {
-                                                                        case_descriptor <- paste0(
-                                                                            case_descriptor,
-                                                                            "-sim_n_", sim_n,
-                                                                            "-sim_ind_", sim_ind)
-                                                                    }
-                                                                    
-                                                                    kcde_fit_file_path <- file.path(estimation_results_path,
-                                                                        paste0("kcde_fit-", case_descriptor, ".rds"))
-                                                                    
-                                                                    ## In my first run of this, one set of kcde estimation results doesn't exist because
-                                                                    ## it ran out of run time on the cluster.  For now, read in fit with next prediction horizon
-                                                                    if(!file.exists(kcde_fit_file_path)) {
-                                                                        file_path_case_descriptor <- paste0(
-                                                                            data_set,
-                                                                            "-prediction_horizon_", prediction_horizon + 1,
-                                                                            "-max_lag_", max_lag,
-                                                                            "-max_seasonal_lag_", max_seasonal_lag,
-                                                                            "-filtering_", filtering,
-                                                                            "-differencing_", differencing,
-                                                                            "-seasonality_", seasonality,
-                                                                            "-bw_parameterization_", bw_parameterization
-                                                                        )
-                                                                        
-                                                                        if(identical(substr(data_set, 1, 3), "sim")) {
-                                                                            file_path_case_descriptor <- paste0(
-                                                                                file_path_case_descriptor,
-                                                                                "-sim_n_", sim_n,
-                                                                                "-sim_ind_", sim_ind)
-                                                                        }
-                                                                        
-                                                                        kcde_fit_file_path <- file.path(estimation_results_path,
-                                                                            paste0("kcde_fit-", file_path_case_descriptor, ".rds"))
-                                                                    }
-                                                                    kcde_fit <- readRDS(kcde_fit_file_path)
-                                                                    
-                                                                    ## If Dengue fit, add truncation lower bound at log(0.5)
-                                                                    ## This bound was implicitly used during estimation since the smallest
-                                                                    ## value of the observed variable is 1, with discretization lower bound
-                                                                    ## for integration of 0.5.  However, it was not specified as part
-                                                                    ## of the kernel, which artificially deflates the method's log scores.
-                                                                    ## Here we insert this lower bound on the horizon term to correct this problem.
-                                                                    ## Also, we fix a bug in the in_range function for discrete variables 
-                                                                    ## that was supplied at time of estimation.  This function was not used in
-                                                                    ## estimation, but is required here.
-                                                                    if(identical(data_set, "dengue_sj") && !as.logical(differencing)) {
-                                                                        ## Iterate through kernel components looking for the one with the
-                                                                        ## right variable in it
-                                                                        for(kernel_component_ind in seq_along(kcde_fit$kcde_control$kernel_components)) {
-                                                                            kernel_component <- kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]
-                                                                            if("horizon" %in% kernel_component$vars_and_offsets$offset_type) {
-                                                                                ## Get variable name whose lower bound we want to update
-                                                                                horizon_var_name <- kernel_component$vars_and_offsets$combined_name[
-                                                                                    kernel_component$vars_and_offsets$offset_type == "horizon"]
-                                                                                
-                                                                                ## Update lower bound
-                                                                                lower_bound_update_ind <- which(
-                                                                                    names(kernel_component$theta_fixed$lower) == horizon_var_name)
-                                                                                kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]$theta_fixed$lower[lower_bound_update_ind] <-
-#                                                    log(0.5)
-                                                                                    -Inf
-                                                                            }
-                                                                            
-                                                                            if(!is.null(kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]$theta_fixed$discrete_var_range_fns)) {
-                                                                                for(var_ind in seq_along(kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]$theta_fixed$discrete_var_range_fns)) {
-                                                                                    kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]$theta_fixed$discrete_var_range_fns[[var_ind]]$in_range <-
-                                                                                        function(x, tolerance = .Machine$double.eps^0.5) {
-                                                                                        return(sapply(x, function(x_i) {
-                                                                                                    return(isTRUE(all.equal(x_i, 
-                                                                                                                kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]$theta_fixed$discrete_var_range_fns[[var_ind]]$discretizer(x_i))))
-                                                                                                }))
-                                                                                    }
+                                                                    if(!is.null(kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]$theta_fixed$discrete_var_range_fns)) {
+                                                                        for(var_ind in seq_along(kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]$theta_fixed$discrete_var_range_fns)) {
+                                                                            kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]$theta_fixed$discrete_var_range_fns[[var_ind]]$in_range <-
+                                                                                function(x, tolerance = .Machine$double.eps^0.5) {
+                                                                                    return(sapply(x,
+                                                                                        function(x_i) {
+                                                                                            return(isTRUE(all.equal(x_i, 
+                                                                                                kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]$theta_fixed$discrete_var_range_fns[[var_ind]]$discretizer(x_i))))
+                                                                                        }))
                                                                                 }
-                                                                                
-                                                                                kcde_fit$theta_hat[[kernel_component_ind]]$discrete_var_range_fns <-
-                                                                                    kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]$theta_fixed$discrete_var_range_fns
-                                                                            }
                                                                         }
+                                                                        
+                                                                        kcde_fit$theta_hat[[kernel_component_ind]]$discrete_var_range_fns <-
+                                                                            kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]$theta_fixed$discrete_var_range_fns
+                                                                    }
+                                                                }
+                                                            }
+                                                            
+                                                            ## fix rkernel_fn for pdtmvn-based kernel functions
+                                                            ## I supplied a buggy version of this in the call to the estimation routine
+                                                            ## that did not ensure that variables were supplied in a consistent order.
+                                                            ## This did not affect estimation as rkernel_fn is not called there
+                                                            ## But it does need to be fixed here.
+                                                            for(kernel_component_ind in seq(from = (as.logical(seasonality) + 1), to = length(kcde_fit$kcde_control$kernel_components))) {
+                                                                kcde_fit$kcde_control$kernel_components[[kernel_component_ind]]$rkernel_fn <-
+                                                                    function(n,
+                                                                        conditioning_obs,
+                                                                        center,
+                                                                        bw,
+                                                                        bw_continuous,
+                                                                        conditional_bw_discrete,
+                                                                        conditional_center_discrete_offset_multiplier,
+                                                                        continuous_vars,
+                                                                        discrete_vars,
+                                                                        continuous_var_col_inds,
+                                                                        discrete_var_col_inds,
+                                                                        discrete_var_range_fns,
+                                                                        lower,
+                                                                        upper,
+                                                                        x_names,
+                                                                        ...) {
+                                                                    if(missing(conditioning_obs) || is.null(conditioning_obs)) {
+                                                                        log_conditioning_obs <- NULL
+                                                                    } else {
+                                                                        log_conditioning_obs <- log(conditioning_obs)
+                                                                    }
+                                                                    if(missing(bw_continuous)) {
+                                                                        bw_continuous <- NULL
+                                                                    }
+                                                                    if(missing(conditional_bw_discrete)) {
+                                                                        conditional_bw_discrete <- NULL
+                                                                    }
+                                                                    if(missing(conditional_center_discrete_offset_multiplier)) {
+                                                                        conditional_center_discrete_offset_multiplier <- NULL
                                                                     }
                                                                     
+                                                                    ## center parameter of pdtmvn_kernel is mean of log
+                                                                    ## mode of resulting log-normal distribution is
+                                                                    ## mode = exp(mu - bw %*% 1) (where 1 is a column vector of 1s)
+                                                                    ## therefore mu = log(mode) + bw %*% 1
+                                                                    reduced_x_names <- names(center)
+                                                                    inds_x_vars_in_orig_vars <- which(x_names %in% reduced_x_names)
+                                                                    x_names_for_call <- x_names[inds_x_vars_in_orig_vars]
                                                                     
-#                                                                    kcde_fit <- readRDS(
-#                                                                        file.path(estimation_results_path,
-#                                                                            paste0("kcde_fit-", case_descriptor, ".rds")
-#                                                                        )
-#                                                                    )
+                                                                    mean_offset <- apply(bw, 1, sum)[x_names %in% colnames(center)]
                                                                     
-                                                                    tryCatch(
-                                                                        kcde_predict(
-                                                                            q = data[analysis_time_ind + prediction_horizon, prediction_target_var, drop = FALSE],
-                                                                            n = 10000,
-                                                                            kcde_fit = kcde_fit,
-                                                                            prediction_data =
-                                                                                data[seq_len(analysis_time_ind), , drop = FALSE],
-                                                                            leading_rows_to_drop = 0L,
-                                                                            trailing_rows_to_drop = 0L,
-                                                                            additional_training_rows_to_drop = NULL,
-                                                                            prediction_type = "prob",
-                                                                            log = TRUE
-                                                                        ),
-                                                                        error = function(e) {
-                                                                            if(identical(e$message, "0 rows in cross validation data after filtering, computing offsets and dropping NA rows")) {
-                                                                                ## Data at analysis time did not include sufficient lags without NA values to use
-                                                                                ## Returning NA allows us to continue without including this analysis time
-                                                                                return(NA)
-                                                                            } else {
-                                                                                stop(e$message)
-                                                                            }
-                                                                        }
-                                                                    )
+                                                                    return(exp(rpdtmvn_kernel(n = n,
+                                                                                conditioning_obs = log_conditioning_obs,
+                                                                                center = sweep(log(center)[, x_names_for_call, drop = FALSE], 2, mean_offset, `+`),
+                                                                                bw = bw,
+                                                                                bw_continuous = bw_continuous,
+                                                                                conditional_bw_discrete = conditional_bw_discrete,
+                                                                                conditional_center_discrete_offset_multiplier = conditional_center_discrete_offset_multiplier,
+                                                                                continuous_vars = continuous_vars,
+                                                                                discrete_vars = discrete_vars,
+                                                                                continuous_var_col_inds = continuous_var_col_inds,
+                                                                                discrete_var_col_inds = discrete_var_col_inds,
+                                                                                discrete_var_range_fns = discrete_var_range_fns,
+                                                                                lower = lower,
+                                                                                upper = upper,
+                                                                                x_names = x_names)[, reduced_x_names, drop = FALSE]))
+                                                                }
+                                                            }
+                                                            
+                                                            ## Get the probability integral transforms of the observed incidence trajectories.
+                                                            tryCatch(
+                                                                kcde_predict(
+                                                                    q = data[analysis_time_ind + prediction_horizon, prediction_target_var, drop = FALSE],
+                                                                    n = 10000,
+                                                                    kcde_fit = kcde_fit,
+                                                                    prediction_data =
+                                                                        data[seq_len(analysis_time_ind), , drop = FALSE],
+                                                                    leading_rows_to_drop = 0L,
+                                                                    trailing_rows_to_drop = 0L,
+                                                                    additional_training_rows_to_drop = NULL,
+                                                                    prediction_type = "prob",
+                                                                    log = TRUE
+                                                                ),
+                                                                error = function(e) {
+                                                                    if(identical(e$message, "0 rows in cross validation data after filtering, computing offsets and dropping NA rows")) {
+                                                                        ## Data at analysis time did not include sufficient lags without NA values to use
+                                                                        ## Returning NA allows us to continue without including this analysis time
+                                                                        return(NA)
+                                                                    } else {
+                                                                        stop(e$message)
+                                                                    }
                                                                 }
                                                             )
                                                         }
-                                                    ))
-                                                ## Drop NA rows
-                                                ## These may occur in early seasons if lag > 0 was used
-                                                na_rows <- which(apply(pit_incidence_trajectories, 1, function(pit_row) {any(is.na(pit_row))}))
-                                                if(length(na_rows) > 0) {
-                                                    pit_incidence_trajectories <- pit_incidence_trajectories[-na_rows, ]
+                                                    )
                                                 }
-                                                ## The evaluation of predictive distribution above is not exact, and may
-                                                ## give values of 0 or 1.  We require values between 0 and 1 for copula
-                                                pit_incidence_trajectories[pit_incidence_trajectories == 0] <- 10^-6
-                                                pit_incidence_trajectories[pit_incidence_trajectories == 1] <- 1 - 10^-6
-                                                
-                                                copula_fit <- fitCopula(
-                                                    copula = normalCopula(param = rep(0.3, max_prediction_horizon - 1),
-                                                        dim = max_prediction_horizon,
-                                                        dispstr = "toep"),
-                                                    data = pit_incidence_trajectories,
-                                                    estimate.variance = TRUE,
-                                                    method = "ml",
-                                                    optim.method = "L-BFGS-B")
-                                                
-                                                copula_fits[[copula_fits_ind]] <- list(
-                                                    analysis_time_season_week = analysis_time_season_week,
-                                                    pit_incidence_trajectories = pit_incidence_trajectories,
-                                                    copula_fit = copula_fit
-                                                )
-                                                
-                                                copula_fits_ind <- copula_fits_ind + 1L
-                                            }
+                                            ))
                                             
-                                            saveRDS(copula_fits,
-                                                file = file.path(save_path, copula_fits_file_name))
+                                            ## Drop NA rows
+                                            ## These may occur in early seasons if lag > 0 was used
+                                            na_rows <- which(apply(pit_incidence_trajectories, 1, function(pit_row) {any(is.na(pit_row))}))
+                                            if(length(na_rows) > 0) {
+                                                pit_incidence_trajectories <- pit_incidence_trajectories[-na_rows, ]
+                                            }
+                                            ## The evaluation of predictive distribution above is not exact, and may
+                                            ## give values of 0 or 1.  We require values between 0 and 1 for copula
+                                            pit_incidence_trajectories[pit_incidence_trajectories == 0] <- 10^-6
+                                            pit_incidence_trajectories[pit_incidence_trajectories == 1] <- 1 - 10^-6
+                                            
+                                            ## Fit copula
+                                            copula_fit <- fitCopula(
+                                                copula = normalCopula(param = rep(0.3, max_prediction_horizon - 1),
+                                                    dim = max_prediction_horizon,
+                                                    dispstr = "toep"),
+                                                data = pit_incidence_trajectories,
+                                                estimate.variance = TRUE,
+                                                method = "ml",
+                                                optim.method = "L-BFGS-B")
+                                            
+                                            copula_fits[[copula_fits_ind]] <- list(
+                                                analysis_time_season_week = analysis_time_season_week,
+                                                pit_incidence_trajectories = pit_incidence_trajectories,
+                                                copula_fit = copula_fit
+                                            )
+                                            
+                                            copula_fits_ind <- copula_fits_ind + 1L
                                         }
+                                        
+                                        saveRDS(copula_fits,
+                                            file = file.path(save_path, copula_fits_file_name))
                                     } # bw_parameterization
                                 } # seasonality
                             } # differencing

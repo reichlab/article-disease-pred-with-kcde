@@ -2,10 +2,10 @@ library(forecast)
 library(cdcfluview)
 library(plyr)
 library(dplyr)
+library(kcde)
 library(lubridate)
 
-all_data_sets <- c("ili_national")
-#all_data_sets <- c("dengue_sj")
+all_data_sets <- c("ili_national", "dengue_sj")
 all_prediction_horizons <- 1:52
 all_prediction_statistics <- c("log_score",
     "pt_pred",
@@ -19,9 +19,13 @@ for(data_set in all_data_sets) {
     ### Load data set and set variables describing how the fit is performed
     if(identical(data_set, "ili_national")) {
         ## Load data for nationally reported influenza like illness
-        library(cdcfluview)
+        usflu <- read.csv("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/data-raw/usflu.csv")
         
-        usflu <- get_flu_data("national", "ilinet", years=1997:2014)
+#            ## This is how I originally got the data -- have saved it to
+#            ## csv for the purposes of stable access going forward.
+#            library(cdcfluview)
+#            usflu <- get_flu_data("national", "ilinet", years=1997:2014)
+        
         data <- transmute(usflu,
             region.type = REGION.TYPE,
             region = REGION,
@@ -146,14 +150,14 @@ for(data_set in all_data_sets) {
                         log = TRUE)
             } else if(identical(data_set, "dengue_sj")) {
                 data_set_results$log_score[results_row_ind] <-
-                    plnorm(observed_prediction_target + 0.5,
+                    logspace_sub(plnorm(observed_prediction_target + 0.5,
                         meanlog = predictive_log_mean,
                         sdlog = predictive_log_sd,
-                        log = TRUE) -
+                        log = TRUE),
                     plnorm(observed_prediction_target - 0.5,
                         meanlog = predictive_log_mean,
                         sdlog = predictive_log_sd,
-                        log = TRUE)
+                        log = TRUE))
             }
             
             ## Compute point prediction

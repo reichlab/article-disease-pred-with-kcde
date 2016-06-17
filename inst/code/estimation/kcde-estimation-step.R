@@ -42,18 +42,24 @@ sim_n <- as.integer(args[10])
 sim_family <- args[11]
 
 
+## Initialization rule -- "cov" or "scott" for covariance or scott's rule, respectively
+bw_init_rule <- "scott"
+
 
 ## Manually set values for testing purposes
 #data_set <- "ili_national"
-data_set <- "dengue_sj"
-prediction_horizon <- 15L
-max_lag <- 1L
-max_seasonal_lag <- 0L
-filtering <- FALSE
-differencing <- FALSE
-seasonality <- FALSE
-bw_parameterization <- "full"
-save_path <- "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/ili_national/estimation-results"
+#data_set <- "dengue_sj"
+#prediction_horizon <- 6L
+#max_lag <- 1L
+#max_seasonal_lag <- 0L
+#filtering <- FALSE
+#differencing <- FALSE
+#seasonality <- TRUE
+#bw_parameterization <- "full"
+#bw_parameterization <- "diagonal"
+#bw_init_rule <- "scott"
+#bw_init_rule <- "cov"
+#save_path <- "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/ili_national/estimation-results"
 #save_path <- "/home/er71a/kcde-applied-paper/R/application-influenza/estimation-results"
 
 #data_set <- "sim_10"
@@ -72,19 +78,20 @@ save_path <- "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/ins
 ### Load data set and set variables describing how the fit is performed
 if(identical(data_set, "ili_national")) {
     ## Load data for nationally reported influenza like illness
-    library(cdcfluview)
+    usflu <- read.csv("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/data-raw/usflu.csv")
     
-    usflu <- get_flu_data("national", "ilinet", years=1997:2014)
+#    ## This is how I originally got the data -- have saved it to
+#    ## csv for the purposes of stable access going forward.
+#    library(cdcfluview)
+#    usflu <- get_flu_data("national", "ilinet", years=1997:2014)
+    
+    ## A little cleanup
     data <- transmute(usflu,
         region.type = REGION.TYPE,
         region = REGION,
         year = YEAR,
         week = WEEK,
         weighted_ili = as.numeric(X..WEIGHTED.ILI))
-    
-    ## Subset data to do estimation using only data up through 2010
-    ## 2011 - 2014 are held out for evaluating performance.
-    data <- data[data$year <= 2010, , drop = FALSE]
     
     ## Add time column.  This is used for calculating times to drop in cross-validation
     data$time <- ymd(paste(data$year, "01", "01", sep = "-"))
@@ -95,42 +102,39 @@ if(identical(data_set, "ili_national")) {
     ## The origin is arbitrary.
     data$time_index <- as.integer(data$time -  ymd(paste("1970", "01", "01", sep = "-")))
     
-    if(differencing) {
-        data$weighted_ili_ratio <- data$weighted_ili / lag(data$weighted_ili, 52) 
-        prediction_target_var <- "weighted_ili_ratio"
-        continuous_var_names <- c(
-            paste0(c("weighted_ili_ratio", "filtered_weighted_ili_ratio"), "_horizon", rep(1:52, each=2)),
-            paste0(c("weighted_ili_ratio", "filtered_weighted_ili_ratio"), "_lag", rep(seq(from = 0, to = max_lag + 52 * max_seasonal_lag), each=2))
-        )
-        discrete_var_names <- NULL
-        predictive_vars <- c("weighted_ili_ratio")
-    } else {
-        prediction_target_var <- "weighted_ili"
-        continuous_var_names <- c(
-            paste0(c("weighted_ili", "filtered_weighted_ili"), "_horizon", rep(1:52, each=2)),
-            paste0(c("weighted_ili", "filtered_weighted_ili"), "_lag", rep(seq(from = 0, to = max_lag + 52 * max_seasonal_lag), each=2))
-        )
-        discrete_var_names <- NULL
-        predictive_vars <- c("weighted_ili")
-    }
+    ## Subset data to do estimation using only data up through 2010
+    ## 2011 - 2014 are held out for evaluating performance.
+    data <- data[data$year <= 2010, , drop = FALSE]
+    
+    prediction_target_var <- "weighted_ili"
+    continuous_var_names <- c(
+        paste0(c("weighted_ili", "filtered_weighted_ili"), "_horizon", rep(1:52, each=2)),
+        paste0(c("weighted_ili", "filtered_weighted_ili"), "_lag", rep(seq(from = 0, to = max_lag + 52 * max_seasonal_lag), each=2))
+    )
+    discrete_var_names <- NULL
+    predictive_vars <- c("weighted_ili")
     time_var <- "time"
     
-    kernel_fn <- log_pdtmvn_kernel
-    rkernel_fn <- rlog_pdtmvn_kernel
+    kernel_fn <- log_pdtmvn_mode_centered_kernel
+    rkernel_fn <- rlog_pdtmvn_mode_centered_kernel
+    initialize_kernel_params_fn <- initialize_params_log_pdtmvn_kernel
+    get_theta_optim_bounds_fn <- get_theta_optim_bounds_log_pdtmvn_kernel
+    vectorize_kernel_params_fn <- vectorize_params_log_pdtmvn_kernel
+    update_theta_from_vectorized_theta_est_fn <- update_theta_from_vectorized_theta_est_log_pdtmvn_kernel
     
     variable_selection_method <- "all_included"
     crossval_buffer <- ymd("2010-01-01") - ymd("2009-01-01")
 } else if(identical(data_set, "dengue_sj")) {
     ## Load data for Dengue fever in San Juan
-    data <- read.csv("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/data-raw/San_Juan_Training_Data.csv")
-#    data <- read.csv("/home/er71a/kcde-applied-paper/R/San_Juan_Training_Data.csv")
+#    data <- read.csv("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/data-raw/San_Juan_Training_Data.csv")
+    data <- read.csv("/home/er71a/kcde-applied-paper/R/San_Juan_Training_Data.csv")
     
     ## Restrict to data from 1990/1991 through 2008/2009 seasons
     train_seasons <- paste0(1990:2008, "/", 1991:2009)
     data <- data[data$season %in% train_seasons, ]
     
-    ## Form variable with total cases + 1 which can be logged
-    data$total_cases_plus_1 <- data$total_cases + 1
+    ## Form variable with total cases + 0.5 which can be logged
+    data$total_cases_plus_0.5 <- data$total_cases + 0.5
     
     ## convert dates
     data$time <- ymd(data$week_start_date)
@@ -140,54 +144,38 @@ if(identical(data_set, "ili_national")) {
     ## The origin is arbitrary.
     data$time_index <- as.integer(data$time -  ymd(paste("1970", "01", "01", sep = "-")))
     
-    if(differencing) {
-        data$total_cases_plus_1_ratio <- data$total_cases_plus_1 / lag(data$total_cases_plus_1, 52)
-        prediction_target_var <- "total_cases_plus_1_ratio"
-        continuous_var_names <- c(
-            paste0(c("total_cases_plus_1_ratio", "filtered_total_cases_plus_1_ratio"), "_horizon", rep(1:52, each=2)),
-            paste0(c("total_cases_plus_1_ratio", "filtered_total_cases_plus_1_ratio"), "_lag", rep(seq(from = 0, to = max_lag + 52 * max_seasonal_lag), each=2))
+    prediction_target_var <- "total_cases_plus_0.5"
+    continuous_var_names <- NULL
+        discrete_var_names <- c(
+            paste0(c("total_cases_plus_0.5"), "_lag", rep(seq(from = 0, to = max_lag + 52 * max_seasonal_lag), each=2)),
+            paste0(c("total_cases_plus_0.5"), "_horizon", rep(1:52, each=2))
         )
-        discrete_var_names <- NULL
-        predictive_vars <- c("total_cases_plus_1_ratio")
-    } else {
-        prediction_target_var <- "total_cases_plus_1"
-    	continuous_var_names <- NULL
-    	discrete_var_names <- c(
-            paste0(c("total_cases_plus_1", "filtered_total_cases_plus_1"), "_lag", rep(seq(from = 0, to = max_lag + 52 * max_seasonal_lag), each=2)),
-            paste0(c("total_cases_plus_1", "filtered_total_cases_plus_1"), "_horizon", rep(1:52, each=2))
-        )
-        predictive_vars <- "total_cases_plus_1"
+        predictive_vars <- "total_cases_plus_0.5"
     }
     time_var <- "time"
     
-    kernel_fn <- log_pdtmvn_kernel
-    rkernel_fn <- rlog_pdtmvn_kernel
+    kernel_fn <- log_pdtmvn_mode_centered_kernel
+    rkernel_fn <- rlog_pdtmvn_mode_centered_kernel
+    initialize_kernel_params_fn <- initialize_params_log_pdtmvn_kernel
+    get_theta_optim_bounds_fn <- get_theta_optim_bounds_log_pdtmvn_kernel
+    vectorize_kernel_params_fn <- vectorize_params_log_pdtmvn_kernel
+    update_theta_from_vectorized_theta_est_fn <- update_theta_from_vectorized_theta_est_log_pdtmvn_kernel
     
     variable_selection_method <- "all_included"
     crossval_buffer <- ymd("2010-01-01") - ymd("2009-01-01")
 } else if(identical(substr(data_set, 1, 3), "sim")) {
     ## Load functions for generating simulated data
-    source("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/code/sim-densities-sim-study-discretized-Duong-Hazelton.R")
-#    source("/home/er71a/kcde-applied-paper/R/sim-densities-sim-study-discretized-Duong-Hazelton.R")
+#    source("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/code/sim-densities-sim-study-discretized-Duong-Hazelton.R")
+    source("/home/er71a/kcde-applied-paper/R/sim-densities-sim-study-discretized-Duong-Hazelton.R")
     
-    ## Get arguments determining size of simulation and simulation family
-#    sim_n <- as.integer(args[9])
-#    sim_family <- args[10]
+    ## Get simulation index
     sim_ind <- as.integer(substr(data_set, 5, nchar(data_set)))
-    cat(sim_n)
-    cat(sim_family)
-    cat(sim_ind)
-    cat("\n\n")
-    cat(data_set)
-    cat("\n")
-    cat(substr(data_set, 5, nchar(data_set)))
-    cat("\n")
     
     ## Set up random number generation
     ## We use the rstream package for RNG, with
     ## a separate stream of random numbers used for each combination of
     ## simulation index, simulation family, and observed sample size
-    ## We allow for up to 10000 simulations for each combinatio nof
+    ## We allow for up to 10000 simulations for each combination of
     ## simulation family and sample size
     rng_ind <- sim_ind
     cat(rng_ind)
@@ -232,6 +220,10 @@ if(identical(data_set, "ili_national")) {
     
     kernel_fn <- pdtmvn_kernel
     rkernel_fn <- rpdtmvn_kernel
+    initialize_kernel_params_fn <- initialize_params_pdtmvn_kernel
+    get_theta_optim_bounds_fn <- get_theta_optim_bounds_pdtmvn_kernel
+    vectorize_kernel_params_fn <- vectorize_params_pdtmvn_kernel
+    update_theta_from_vectorized_theta_est_fn <- update_theta_from_vectorized_theta_est_pdtmvn_kernel
     
     variable_selection_method <- "all_included"
     crossval_buffer <- 0L
@@ -247,6 +239,13 @@ if(identical(data_set, "ili_national")) {
 ## prediction_horizon, filtering, seasonality, and bw_parameterization
 kernel_components <- list()
 
+## sample size for initialize_kernel_params_args
+if(identical(bw_init_rule, "cov")) {
+    init_sample_size <- 1L
+} else {
+    init_sample_size <- nrow(data)
+}
+
 ## If requested, periodic kernel component capturing seasonality
 if(seasonality) {
     kernel_components <- c(kernel_components,
@@ -260,7 +259,9 @@ if(seasonality) {
             theta_fixed = list(period = pi / 365.2425), # 365.2425 is the mean number of days in a year
             theta_est = list("bw"),
             initialize_kernel_params_fn = initialize_params_periodic_kernel,
-            initialize_kernel_params_args = NULL,
+            initialize_kernel_params_args = list(
+                sample_size = init_sample_size
+            ),
             get_theta_optim_bounds_fn = get_theta_optim_bounds_periodic_kernel,
             get_theta_optim_bounds_args = NULL,
             vectorize_kernel_params_fn = vectorize_params_periodic_kernel,
@@ -419,7 +420,9 @@ if(data_set %in% c("ili_national", "dengue_sj")) {
     #' 
     #' @return floor(x) - 1
     log_exp_x_minus_0.5 <- function(x) {
-        return(log(exp(x) - 0.5))
+        temp <- exp(x) - 0.5
+        temp[temp < 0] <- 0
+        return(log(temp))
     }
     
     #' Compute log(exp(x) + 0.5)
@@ -448,11 +451,41 @@ if(data_set %in% c("ili_national", "dengue_sj")) {
         return(log(exp_x))
     }
     
+    #' Compute log(round(exp(x))) in such a way that the rounding function
+    #' always rounds up or down to an integer + 0.5, and
+    #' an integer always gets rounded up.
+    #' 
+    #' @param x numeric
+    #' 
+    #' @return floor(x) - 1
+    log_round_to_integer_plus_0.5_exp <- function(x) {
+        exp_x <- exp(x) + 0.5
+        
+        inds_ceil <- exp_x - floor(exp_x) >= 0.5
+        
+        exp_x[inds_ceil] <- ceiling(exp_x[inds_ceil])
+        exp_x[!inds_ceil] <- floor(exp_x[!inds_ceil])
+        
+        return(log(exp_x - 0.5))
+    }
+    
     
     a_fn <- log_exp_x_minus_0.5
     b_fn <- log_exp_x_plus_0.5
-    in_range_fn <- equals_log_integer
-    discretizer_fn <- log_round_up_0.5_exp
+#    discretizer_fn <- log_round_up_0.5_exp
+    discretizer_fn <- log_round_to_integer_plus_0.5_exp
+    in_range_fn <- function(x, tolerance = 0.5 * .Machine$double.eps^0.5) {
+        return(sapply(x, function(x_i) {
+            return(
+                isTRUE(all.equal(
+                    x_i,
+#                    log_round_up_0.5_exp(x_i),
+                    log_round_to_integer_plus_0.5_exp(x_i),
+                    tolerance = tolerance
+                ))
+            )
+        }))
+    }
 } else {
     a_fn <- x_minus_0.25
     b_fn <- x_plus_0.25
@@ -494,55 +527,27 @@ kernel_components <- c(kernel_components,
                     vars_and_offsets$combined_name %in% discrete_var_names],
                 discrete_var_range_fns = discrete_var_range_fns,
                 lower = lower_trunc_bds,
-                upper = upper_trunc_bds
+                upper = upper_trunc_bds,
+                validate_in_support = FALSE
             ),
             theta_est = list("bw"),
-            initialize_kernel_params_fn = initialize_params_pdtmvn_kernel,
-            initialize_kernel_params_args = NULL,
-            get_theta_optim_bounds_fn = get_theta_optim_bounds_pdtmvn_kernel,
+            initialize_kernel_params_fn = initialize_kernel_params_fn,
+            initialize_kernel_params_args = list(
+                sample_size = init_sample_size
+            ),
+            get_theta_optim_bounds_fn = get_theta_optim_bounds_fn,
             get_theta_optim_bounds_args = NULL,
-            vectorize_kernel_params_fn = vectorize_params_pdtmvn_kernel,
+            vectorize_kernel_params_fn = vectorize_kernel_params_fn,
             vectorize_kernel_params_args = NULL,
-            update_theta_from_vectorized_theta_est_fn = update_theta_from_vectorized_theta_est_pdtmvn_kernel,
+            update_theta_from_vectorized_theta_est_fn = update_theta_from_vectorized_theta_est_fn,
             update_theta_from_vectorized_theta_est_args = NULL
         ))
     })
 )
 
 
-## Set up filter_control
-if(filtering) {
-    ## filter the prediction target variable
-    filter_control <- list(
-        list(
-            var_name = prediction_target_var,
-            max_filter_window_size = 13,
-            filter_fn = two_pass_signal_filter,
-            fixed_filter_params = list(
-                n = 12,
-                type = "pass",
-                impute_fn = interior_linear_interpolation
-            ),
-            filter_args_fn = compute_filter_args_butterworth_filter,
-            filter_args_args = NULL,
-            initialize_filter_params_fn =
-                initialize_filter_params_butterworth_filter,
-            initialize_filter_params_args = NULL,
-            vectorize_filter_params_fn =
-                vectorize_filter_params_butterworth_filter,
-            vectorize_filter_params_args = NULL,
-            update_filter_params_from_vectorized_fn =
-                update_filter_params_from_vectorized_butterworth_filter,
-            update_filter_params_from_vectorized_args = NULL,
-            transform_fn = log,
-            detransform_fn = exp
-        )
-    )
-} else {
-    ## no filtering
-    filter_control <- NULL
-}
-
+## Set up filter_control to do no filtering
+filter_control <- NULL
 
 ## Assemble kernel_components and filter_control created above,
 ## along with other parameters controling KCDE definition and estimation
@@ -558,13 +563,15 @@ kcde_control <- create_kcde_control(X_names = "time_index",
         prediction_type = "distribution",
         log = TRUE),
     loss_args = NULL,
+    par_cores = 4L,
     variable_selection_method = variable_selection_method)
 
 
 
 ### Do estimation
 ## Read in output from an earlier run if it exists.
-## We started some runs that cut off by the cluster.
+## We started some runs that cut off by the cluster either because of run time
+## limits or some sort of cluster I/O issue.
 ## Read in output to get initial values for parameters that are the
 ## best that were realized in that earlier run.
 case_descriptor <- paste0(
@@ -578,14 +585,34 @@ case_descriptor <- paste0(
     "-bw_parameterization_", bw_parameterization
 )
 
-prev_Rout_file <- file.path(
-    "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results",
-    data_set,
-    "estimation-output",
-    paste0("output-kde-estimation-step-",
-        case_descriptor,
-        ".Rout")
-)
+if(identical(data_set, "dengue_sj")) {
+    prev_Rout_file <- file.path(
+#       "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results",
+#       data_set,
+#       "estimation-output",
+        "/home/er71a/kcde-applied-paper/R/application-dengue-scott-rule-start/estimation-scripts-first-pass",
+        paste0("output-kde-estimation-step-",
+            case_descriptor,
+            ".Rout")
+    )
+} else if(identical(data_set, "ili_national")) {
+    prev_Rout_file <- file.path(
+#       "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results",
+#       data_set,
+#       "estimation-output",
+        "/home/er71a/kcde-applied-paper/R/application-influenza-scott-rule-start/estimation-scripts-first-pass",
+        paste0("output-kde-estimation-step-",
+            case_descriptor,
+            ".Rout")
+    )
+} else if(identical(substr(data_set, 1, 3), "sim")) {
+    prev_Rout_file <- file.path(
+        "/home/er71a/kcde-applied-paper/R", paste0("sim-", sim_family), "estimation-scripts-first-pass",
+        paste0("output-kde-estimation-step-",
+            case_descriptor,
+            ".Rout")
+    )
+}
 
 if(file.exists(prev_Rout_file)) {
     Rout_lines <- readLines(prev_Rout_file)
@@ -603,16 +630,15 @@ if(file.exists(prev_Rout_file)) {
     init_phi_vector <- NULL
 }
 
-#num_cores <- (max_lag + 1) * (filtering + 1) + seasonality
-num_cores <- 1L
-registerDoMC(cores = num_cores)
+registerDoMC(cores = kcde_control$par_cores)
+
+## Get the KCDE fit
 fit_time <- system.time({
     kcde_fit <- kcde(data = data,
         kcde_control = kcde_control,
         init_theta_vector = init_theta_vector,
         init_phi_vector = init_phi_vector)
 })
-
 
 
 ### Save results

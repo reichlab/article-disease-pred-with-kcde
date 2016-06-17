@@ -12,8 +12,8 @@ source("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/code
 all_data_sets <- c("sim")
 all_bw_parameterizations <- c("diagonal", "full")
 all_sim_n <- c("100", "1000")
-all_sim_families <- c("multivariate-2d-discretized", "multivariate-4d-discretized", "multivariate-6d-discretized")
-all_sim_run_inds <- seq(from = 1, to = 100)
+all_sim_families <- "multivariate-2d-discretized"
+all_sim_run_inds <- seq(from = 1, to = 500)
 
 
 
@@ -45,8 +45,7 @@ results <- data.frame(
 results_row_ind <- 1L
 
 n_eval <- 10^5
-sim_family <- "multivariate-2d-discretized"
-#for(sim_family in all_sim_families) {
+for(sim_family in all_sim_families) {
     ## Set path where fit object is stored
     results_path <- file.path(
         "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/sim-study",
@@ -64,33 +63,22 @@ sim_family <- "multivariate-2d-discretized"
         for(sim_n in all_sim_n) {
             for(bw_parameterization in all_bw_parameterizations) {
                 ## Set values describing case in results
-#                results$prediction_horizon[results_row_ind] <-
-#                    prediction_horizon
-#                results$max_lag[results_row_ind] <-
-#                    max_lag
-#                results$filtering[results_row_ind] <-
-#                    filtering
-#                results$differencing[results_row_ind] <-
-#                    differencing
-#                results$seasonality[results_row_ind] <-
-#                    seasonality
-                results$sim_run_ind <- sim_run_ind
-                results$sim_n <- sim_n
+                results$sim_family[results_row_ind] <- sim_family
+                results$sim_run_ind[results_row_ind] <- sim_run_ind
+                results$sim_n[results_row_ind] <- sim_n
                 results$bw_parameterization[results_row_ind] <-
                     bw_parameterization
-#                results$prediction_time[results_row_ind] <-
-#                    data$time[prediction_time_ind]
                 
                 ## Load kcde_fit object.  Estimation was performed previously.
                 case_descriptor <- paste0(
-                    data_set,
+                    "sim",
                     "_", sim_run_ind,
-                    "-prediction_horizon_", prediction_horizon,
-                    "-max_lag_", max_lag,
-                    "-max_seasonal_lag_", max_seasonal_lag,
-                    "-filtering_", filtering,
-                    "-differencing_", differencing,
-                    "-seasonality_", seasonality,
+                    "-prediction_horizon_", 0L,
+                    "-max_lag_", 0L,
+                    "-max_seasonal_lag_", 0L,
+                    "-filtering_", "FALSE",
+                    "-differencing_", "FALSE",
+                    "-seasonality_", "FALSE",
                     "-bw_parameterization_", bw_parameterization,
                     "-sim_n_", sim_n,
                     "-sim_ind_", sim_run_ind)
@@ -140,8 +128,13 @@ sim_family <- "multivariate-2d-discretized"
             } # bw_parameterization
         } # sim_n
     } # sim_run_ind
+    
+    saveRDS(sample_true_density, file = paste0(
+            "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/sim-study/sample_true_density_for_kcde-predictions_",
+            sim_family,
+            ".rds"))
 } # sim_family
 
 ## Save results
 saveRDS(results, file = file.path(
-        "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/simstudy/kcde-predictions.rds"))
+        "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/sim-study/kcde-predictions.rds"))

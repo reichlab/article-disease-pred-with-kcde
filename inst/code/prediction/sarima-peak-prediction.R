@@ -8,6 +8,7 @@ library(doMC)
 
 
 data_set <- "ili_national"
+data_set <- "dengue_sj"
 
 n_sims <- 10000
 
@@ -52,9 +53,14 @@ sample_predictive_trajectories_arima <- function (object, h = ifelse(object$arma
 
 if(identical(data_set, "ili_national")) {
     ## Load data for nationally reported influenza like illness
-    library(cdcfluview)
+    usflu <- read.csv("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/data-raw/usflu.csv")
     
-    usflu <- get_flu_data("national", "ilinet", years=1997:2014)
+#            ## This is how I originally got the data -- have saved it to
+#            ## csv for the purposes of stable access going forward.
+#            library(cdcfluview)
+#            usflu <- get_flu_data("national", "ilinet", years=1997:2014)
+    
+    ## A little cleanup
     data <- transmute(usflu,
         region.type = REGION.TYPE,
         region = REGION,
@@ -90,6 +96,7 @@ if(identical(data_set, "ili_national")) {
             sum(data$season == data$season[row_ind] & data$time_index <= data$time_index[row_ind])
         })
     
+    
     season_length <- 33L
     analysis_seasons <- c("2011/2012", "2012/2013", "2013/2014")
     first_analysis_time_season_week <- 10 # == week 40 of year
@@ -120,6 +127,11 @@ if(identical(data_set, "ili_national")) {
     ## The origin is arbitrary.
     data$time_index <- as.integer(data$time -  ymd(paste("1970", "01", "01", sep = "-")))
     
+    season_length <- 52L
+    analysis_seasons <- paste0(2009:2012, "/", 2010:2013)
+    first_analysis_time_season_week <- 1 # == week 40 of year
+    last_analysis_time_season_week <- 51 # analysis for 33-week season, consistent with flu competition -- at week 41, we do prediction for a horizon of one week ahead
+    
     prediction_target_var <- "total_cases_plus_1"
     
     log_prediction_target <- log(data[, prediction_target_var])
@@ -145,14 +157,15 @@ results <- cbind(
             stringsAsFactors = FALSE),
         matrix(NA,
             nrow = length(analysis_seasons) * (last_analysis_time_season_week - first_analysis_time_season_week),
-            ncol = 2 * n_sims + 2)
+            ncol = 3 * n_sims + 2)
     ) %>%
     `colnames<-`(c("analysis_time_season",
             "analysis_time_season_week",
             "peak_week_log_score",
             "peak_height_log_score",
             paste0("peak_week_", seq_len(n_sims)),
-            paste0("peak_height_", seq_len(n_sims))))
+            paste0("peak_height_", seq_len(n_sims)),
+            paste0("unbinned_peak_height_", seq_len(n_sims))))
 
 ## generate peak week timing and height estimates
 for(analysis_time_season in analysis_seasons) {
@@ -166,6 +179,10 @@ for(analysis_time_season in analysis_seasons) {
         observed_peak_height <- which(
             ili_incidence_bins$lower <= observed_peak_height &
                 ili_incidence_bins$upper > observed_peak_height)
+    } else if(identical(data_set, "dengue_sj")) {
+        observed_peak_height <- which(
+            dengue_incidence_bins$lower <= observed_peak_height &
+                dengue_incidence_bins$upper > observed_peak_height)
     }
     
     for(analysis_time_season_week in seq(from = first_analysis_time_season_week, to = last_analysis_time_season_week - 1)) {
@@ -176,7 +193,7 @@ for(analysis_time_season in analysis_seasons) {
         ## through analysis_time_ind
         new_data <- seasonally_differenced_log_prediction_target[
             seq_len(max(0, analysis_time_ind - 52))]
-        last_na_ind <- max(which(is.na(new_data)))
+        last_na_ind <- max(c(0, max(which(is.na(new_data)))))
         new_data <- new_data[seq(from = last_na_ind + 1, to = length(new_data))]
         updated_log_sarima_fit <- Arima(
             new_data,
@@ -206,7 +223,7 @@ for(analysis_time_season in analysis_seasons) {
         if(season_start_ind < analysis_time_ind) {
             trajectory_samples <- cbind(
                 matrix(
-                    rep(data[seq(from = season_start_ind, to = analysis_time_ind - 1), prediction_target_var], each = n_sims),
+                    rep(data[seq(from = season_start_ind, to = analysis_time_ind), prediction_target_var], each = n_sims),
                     nrow = n_sims
                 ),
                 trajectory_samples
@@ -222,6 +239,9 @@ for(analysis_time_season in analysis_seasons) {
             peak_week_by_sim_ind
         
         peak_week_height_by_sim_ind <- trajectory_samples[cbind(seq_len(n_sims), peak_week_by_sim_ind)]
+        results[results_save_row, paste0("unbinned_peak_height_", seq_len(n_sims))] <-
+            peak_week_height_by_sim_ind
+        
         if(identical(data_set, "ili_national")) {
             peak_week_height_by_sim_ind <- sapply(peak_week_height_by_sim_ind,
                 function(height) {
@@ -235,7 +255,6 @@ for(analysis_time_season in analysis_seasons) {
                             dengue_incidence_bins$upper > height)
                 })
         }
-        
         results[results_save_row, paste0("peak_height_", seq_len(n_sims))] <-
             peak_week_height_by_sim_ind
         
@@ -250,30 +269,29 @@ saveRDS(results,
         paste0("peak-week-sarima-", data_set, ".rds")))
 
 
-library(plyr)
-library(dplyr)
-library(tidyr)
-library(ggplot2)
-
-prev_preds <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/ili_national/prediction-results/sarima-predictions.rds")
-inds_keep <- sapply(1:33, function(ph) {
-    which(prev_preds$prediction_time == data$time[analysis_time_ind + ph] & prev_preds$prediction_horizon == ph)
-})
-
-ts_for_plot <- trajectory_samples %>%
-    as.data.frame() %>%
-    `colnames<-`(as.character(seq(from = -1 * (analysis_time_season_week - 1), length = ncol(trajectory_samples)))) %>%
-    mutate(sim_ind = seq_len(nrow(trajectory_samples))) %>%
-    gather_("prediction_horizon", "sim_incidence", as.character(seq(from = -1 * (analysis_time_season_week - 1), length = ncol(trajectory_samples)))) %>%
-    mutate(prediction_time = data$time[analysis_time_ind + as.integer(prediction_horizon)])
-
-ggplot() +
-    geom_line(aes(x = as.Date(time), y = weighted_ili), data = data[seq(from = analysis_time_ind - 10, to = analysis_time_ind + 52), ]) +
-    geom_line(aes(x = as.Date(prediction_time), y = sim_incidence, group = sim_ind), colour = "blue", alpha = 0.5, data = ts_for_plot) +
-    geom_line(aes(x = as.Date(prediction_time), y = pt_pred), colour = "red", data = prev_preds[inds_keep, ]) +
-#    geom_hline(yintercept = 4.25906) +
-    geom_point(aes(x = as.Date(data$time[analysis_time_ind + peak_week_by_sim_ind - (analysis_time_season_week)]), y = peak_week_height_by_sim_ind)) +
-    scale_y_log10() +
-    theme_bw()
-
-
+## Visual check
+#library(plyr)
+#library(dplyr)
+#library(tidyr)
+#library(ggplot2)
+#
+#prev_preds <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/ili_national/prediction-results/sarima-predictions.rds")
+#inds_keep <- sapply(1:33, function(ph) {
+#    which(prev_preds$prediction_time == data$time[analysis_time_ind + ph] & prev_preds$prediction_horizon == ph)
+#})
+#
+#ts_for_plot <- trajectory_samples %>%
+#    as.data.frame() %>%
+#    `colnames<-`(as.character(seq(from = -1 * (analysis_time_season_week - 1), length = ncol(trajectory_samples)))) %>%
+#    mutate(sim_ind = seq_len(nrow(trajectory_samples))) %>%
+#    gather_("prediction_horizon", "sim_incidence", as.character(seq(from = -1 * (analysis_time_season_week - 1), length = ncol(trajectory_samples)))) %>%
+#    mutate(prediction_time = data$time[analysis_time_ind + as.integer(prediction_horizon)])
+#
+#ggplot() +
+#    geom_line(aes(x = as.Date(time), y = weighted_ili), data = data[seq(from = analysis_time_ind - 10, to = analysis_time_ind + 52), ]) +
+#    geom_line(aes(x = as.Date(prediction_time), y = sim_incidence, group = sim_ind), colour = "blue", alpha = 0.5, data = ts_for_plot) +
+#    geom_line(aes(x = as.Date(prediction_time), y = pt_pred), colour = "red", data = prev_preds[inds_keep, ]) +
+##    geom_hline(yintercept = 4.25906) +
+#    geom_point(aes(x = as.Date(data$time[analysis_time_ind + peak_week_by_sim_ind - (analysis_time_season_week)]), y = peak_week_height_by_sim_ind)) +
+#    scale_y_log10() +
+#    theme_bw()

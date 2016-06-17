@@ -8,9 +8,13 @@ for(data_set in all_data_sets) {
     ### Load data set and set variables describing how the fit is performed
     if(identical(data_set, "ili_national")) {
         ## Load data for nationally reported influenza like illness
-        library(cdcfluview)
+        usflu <- read.csv("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/data-raw/usflu.csv")
         
-        usflu <- get_flu_data("national", "ilinet", years=1997:2014)
+#            ## This is how I originally got the data -- have saved it to
+#            ## csv for the purposes of stable access going forward.
+#            library(cdcfluview)
+#            usflu <- get_flu_data("national", "ilinet", years=1997:2014)
+        
         data <- transmute(usflu,
             region.type = REGION.TYPE,
             region = REGION,

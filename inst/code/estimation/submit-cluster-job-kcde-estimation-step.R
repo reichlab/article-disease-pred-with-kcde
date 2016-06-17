@@ -1,102 +1,61 @@
 options(warn = 2, error = recover)
 
-#all_data_sets <- c("ili_national")
-#all_data_sets <- c("sim")
-all_data_sets <- c("dengue_sj")
+all_data_sets <- c("ili_national", "dengue_sj", "sim")
 
+cores_req <- "4"
 mem_req <- "1000"
-time_req <- "600:00"
+time_req <- "100:00"
 queue_req <- "long"
 
 for(data_set in all_data_sets) {
     if(identical(data_set, "ili_national")) {
-#        all_prediction_horizons <- as.character(seq_len(52))
-        all_prediction_horizons <- as.character(14)
-        all_max_lags <- as.character(c(1L))
-#        all_max_seasonal_lags <- as.character(c(0L, 1L))
-        all_max_seasonal_lags <- as.character(1L)
-#        all_filtering_values <- c("FALSE", "TRUE")
-        all_filtering_values <- c("FALSE")
-        all_differencing_values <- c("FALSE", "TRUE")
-        all_seasonality_values <- c("FALSE", "TRUE")
-#        all_differencing_values <- c("TRUE")
-#        all_seasonality_values <- c("TRUE")
-#        all_bw_parameterizations <- c("diagonal", "full")
-        all_bw_parameterizations <- "full"
-        all_sim_n <- "NA"
-        all_sim_families <- "NA"
-        all_sim_run_inds <- 1L
+        all_prediction_horizons <- as.character(seq_len(52)) ## Obtain fits for each prediction horizon from 1 to 52 weeks
+        all_max_lags <- as.character(c(1L)) # use incidence at times t^* and t^* - 1 to predict incidence after t^*
+        all_max_seasonal_lags <- as.character(0L) # not used
+        all_filtering_values <- c("FALSE") # not used
+        all_differencing_values <- "FALSE" # not used
+        all_seasonality_values <- c("FALSE", "TRUE") # specifications without and with periodic kernel
+        all_bw_parameterizations <- c("diagonal", "full") # specifications with diagonal and full bandwidth
+        all_sim_n <- "NA" # not used for applications
+        all_sim_families <- "NA" # not used for applications
+        all_sim_run_inds <- 1L # not used for applications
         
-#        save_path <- "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/R/application-influenza/estimation-results"
-        results_path <- "/home/er71a/kcde-applied-paper/R/application-influenza/estimation-results"
-        scripts_path <- "/home/er71a/kcde-applied-paper/R/application-influenza/estimation-scripts"
+        results_path <- "/home/er71a/kcde-applied-paper/R/application-influenza-scott-rule-start/estimation-results"
+        scripts_path <- "/home/er71a/kcde-applied-paper/R/application-influenza-scott-rule-start/estimation-scripts"
     } else if(identical(data_set, "dengue_sj")) {
-        all_prediction_horizons <- as.character(seq_len(52))
-        all_max_lags <- as.character(c(1L))
-        all_max_seasonal_lags <- as.character(c(0L, 1L))
-#        all_filtering_values <- c("FALSE", "TRUE")
-        all_filtering_values <- c("FALSE")
-#        all_differencing_values <- c("FALSE", "TRUE")
-        all_differencing_values <- c("FALSE")
-#        all_differencing_values <- c("TRUE")
-        all_seasonality_values <- c("FALSE", "TRUE")
-        all_bw_parameterizations <- c("diagonal", "full")
+        all_prediction_horizons <- as.character(seq_len(52)) ## Obtain fits for each prediction horizon from 1 to 52 weeks
+        all_max_lags <- as.character(c(1L)) # use incidence at times t^* and t^* - 1 to predict incidence after t^*
+        all_max_seasonal_lags <- as.character(0L) # not used
+        all_filtering_values <- c("FALSE") # not used
+        all_differencing_values <- "FALSE" # not used
+        all_seasonality_values <- c("FALSE", "TRUE") # specifications without and with periodic kernel
+        all_bw_parameterizations <- c("diagonal", "full") # specifications with diagonal and full bandwidth
+        all_sim_n <- "NA" # not used for applications
+        all_sim_families <- "NA" # not used for applications
+        all_sim_run_inds <- 1L # not used for applications
         
-        all_prediction_horizons <- as.character(45L)
-        all_max_lags <- as.character(c(1L))
-        all_max_seasonal_lags <- as.character(c(1L))
-#        all_filtering_values <- c("FALSE", "TRUE")
-        all_filtering_values <- c("FALSE")
-        all_differencing_values <- c("TRUE")
-        all_seasonality_values <- c("TRUE")
-        all_bw_parameterizations <- c("diagonal")
-        
-        all_sim_n <- "NA"
-        all_sim_families <- "NA"
-        all_sim_run_inds <- 1L
-        
-#        save_path <- "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/R/application-influenza/estimation-results"
-        results_path <- "/home/er71a/kcde-applied-paper/R/application-dengue/estimation-results"
-        scripts_path <- "/home/er71a/kcde-applied-paper/R/application-dengue/estimation-scripts"
+        results_path <- "/home/er71a/kcde-applied-paper/R/application-dengue-scott-rule-start/estimation-results"
+        scripts_path <- "/home/er71a/kcde-applied-paper/R/application-dengue-scott-rule-start/estimation-scripts"
     } else if(identical(data_set, "sim")) {
-        all_prediction_horizons <- "0"
-        all_max_lags <- "0"
-        all_max_seasonal_lags <- "0"
-        all_filtering_values <- "FALSE"
-        all_differencing_values <- c("FALSE")
-        all_seasonality_values <- c("FALSE")
+        all_prediction_horizons <- "0" # not used for simulation
+        all_max_lags <- "0" # not used for simulation
+        all_max_seasonal_lags <- "0" # not used for simulation
+        all_filtering_values <- "FALSE" # not used for simulation
+        all_differencing_values <- "FALSE" # not used for simulation
+        all_seasonality_values <- "FALSE" # not used for simulation
         
-        all_bw_parameterizations <- c("diagonal", "full")
-#        all_bw_parameterizations <- c("full")
-#        all_bw_parameterizations <- c("diagonal")
-        all_sim_n <- c("100", "1000")
-#        all_sim_n <- c("100")
-#        all_sim_families <- c("bivariate-B-discretized",
-#            "bivariate-C-discretized",
-        all_sim_families <- c("multivariate-2d-discretized",
-            "multivariate-4d-discretized", 
-            "multivariate-6d-discretized")
-#        all_sim_families <- c("multivariate-2d-discretized")
-#            "multivariate-4d-discretized")
-#        all_sim_families <- c("multivariate-4d-discretized",
-#            "multivariate-6d-discretized")
-        all_sim_run_inds <- seq(from = 101, to = 500)
-#        all_sim_run_inds <- 1L
-#        all_sim_run_inds <- c(seq(from = 1, to = 8), seq(from = 10, to = 100))
-        
-#        all_bw_parameterizations <- c("diagonal")
-#        all_sim_n <- c("100")
-#        all_sim_families <- c("multivariate-6d-discretized")
-#        all_sim_run_inds <- 45L
+        all_bw_parameterizations <- c("diagonal", "full") # specifications with diagonal and full bandwidth
+        all_sim_n <- c("100", "1000") # sample size for training set
+        all_sim_families <- "multivariate-2d-discretized" # distribution data are sampled from
+        all_sim_run_inds <- seq(from = 1, to = 500) # index for simulation trial
     } else {
         stop("Invalid data set")
     }
     
     for(sim_family in all_sim_families) {
         if(identical(data_set, "sim")) {
-#        save_path <- "/media/evan/data/Reich/infectious-disease-prediction-with-kcde/R/application-influenza/estimation-results"
-            results_path <- paste0("/home/er71a/kcde-applied-paper/R/sim-", sim_family, "/estimation-results")
-            scripts_path <- paste0("/home/er71a/kcde-applied-paper/R/sim-", sim_family, "/estimation-scripts")
+            results_path <- paste0("/home/er71a/kcde-applied-paper/R/sim-", sim_family, "-scott-rule-start/estimation-results")
+            scripts_path <- paste0("/home/er71a/kcde-applied-paper/R/sim-", sim_family, "-scott-rule-start/estimation-scripts")
         }
         for(sim_n in all_sim_n) {
             for(sim_run_ind in all_sim_run_inds) {
@@ -109,7 +68,7 @@ for(data_set in all_data_sets) {
                                         for(bw_parameterization in all_bw_parameterizations) {
                                             if(identical(data_set, "ili_national")) {
                                                 data_set_and_sim_run_ind <- data_set
-                                                lsfoutfilename <- "kcde-est-applications.out"
+                                                lsfoutfilename <- "kcde-est-applications-scott-rule-start.out"
                                                 case_descriptor <- paste0(
                                                     data_set,
                                                     "-prediction_horizon_", prediction_horizon,
@@ -120,10 +79,9 @@ for(data_set in all_data_sets) {
                                                     "-seasonality_", seasonality,
                                                     "-bw_parameterization_", bw_parameterization
                                                 )
-						results_filename <- paste0(results_path, "/kcde_fit-", case_descriptor, ".rds")
                                             } else if(identical(data_set, "dengue_sj")) {
                                                 data_set_and_sim_run_ind <- data_set
-                                                lsfoutfilename <- "kcde-est-application-dengue.out"
+                                                lsfoutfilename <- "kcde-est-application-dengue-scott-rule-start.out"
                                                 case_descriptor <- paste0(
                                                     data_set,
                                                     "-prediction_horizon_", prediction_horizon,
@@ -134,10 +92,9 @@ for(data_set in all_data_sets) {
                                                     "-seasonality_", seasonality,
                                                     "-bw_parameterization_", bw_parameterization
                                                 )
-						results_filename <- paste0(results_path, "/kcde_fit-", case_descriptor, ".rds")
                                             } else {
                                                 data_set_and_sim_run_ind <- paste0(data_set, "_", sim_run_ind)
-                                                lsfoutfilename <- "kcde-est-simstudies.out"
+                                                lsfoutfilename <- "kcde-est-simstudies-scott-rule-start.out"
                                                 case_descriptor <- paste0(
                                                     data_set_and_sim_run_ind,
                                                     "-prediction_horizon_", prediction_horizon,
@@ -147,48 +104,42 @@ for(data_set in all_data_sets) {
                                                     "-bw_parameterization_", bw_parameterization,
                                                     "-sim_n_", sim_n
                                                 )
-						results_filename <- paste0(results_path, "/kcde_fit-", case_descriptor, "-sim_ind_", sim_run_ind, ".rds")
                                             }
                                             
                                             filename <- paste0(scripts_path, "/submit-kcde-estimation-step-", case_descriptor, ".sh")
-					    
-                                            if(!file.exists(results_filename)) {
-#                                                cores_req <- as.character((as.numeric(max_lag) + 1) * (as.numeric(as.logical(filtering)) + 1) + as.numeric(as.logical(seasonality)))
-                                                 cores_req <- "1"
-                                                
-                                                requestCmds <- "#!/bin/bash\n"
-                                                requestCmds <- paste0(requestCmds, "#BSUB -n ", cores_req, " # how many cores we want for our job\n",
-                                                    "#BSUB -R span[hosts=1] # ask for all the cores on a single machine\n",
-                                                    "#BSUB -R rusage[mem=", mem_req, "] # ask for memory\n",
-                                                    "#BSUB -o ", lsfoutfilename, " # log LSF output to a file\n",
-                                                    "#BSUB -W ", time_req, " # run time\n",
-                                                    "#BSUB -q ", queue_req, " # which queue we want to run in\n")
-                                                
-                                                cat(requestCmds, file = filename)
-                                                cat("module load R/3.2.2\n", file = filename, append = TRUE)
-                                                cat(paste0("R CMD BATCH --vanilla \'--args ",
-                                                        data_set_and_sim_run_ind, " ",
-                                                        prediction_horizon, " ",
-                                                        max_lag, " ",
-                                                        max_seasonal_lag, " ",
-                                                        filtering, " ",
-                                                        differencing, " ",
-                                                        seasonality, " ",
-                                                        bw_parameterization, " ",
-                                                        results_path, " ",
-                                                        sim_n, " ",
-                                                        sim_family,
-                                                        "\'  /home/er71a/kcde-applied-paper/R/kcde-estimation-step.R ",
-                                                        scripts_path, "/output-kde-estimation-step-", case_descriptor, ".Rout"),
-                                                    file = filename, append = TRUE)
-                                                
-                                                bsubCmd <- paste0("bsub < ", filename)
-                                                
-                                                system(bsubCmd)
-    	    		                    } # check if file exists
+					                        
+                                            requestCmds <- "#!/bin/bash\n"
+                                            requestCmds <- paste0(requestCmds, "#BSUB -n ", cores_req, " # how many cores we want for our job\n",
+                                                "#BSUB -R span[hosts=1] # ask for all the cores on a single machine\n",
+                                                "#BSUB -R rusage[mem=", mem_req, "] # ask for memory\n",
+                                                "#BSUB -o ", lsfoutfilename, " # log LSF output to a file\n",
+                                                "#BSUB -W ", time_req, " # run time\n",
+                                                "#BSUB -q ", queue_req, " # which queue we want to run in\n")
+                                            
+                                            cat(requestCmds, file = filename)
+                                            cat("module load R/3.2.2\n", file = filename, append = TRUE)
+                                            cat(paste0("R CMD BATCH --vanilla \'--args ",
+                                                    data_set_and_sim_run_ind, " ",
+                                                    prediction_horizon, " ",
+                                                    max_lag, " ",
+                                                    max_seasonal_lag, " ",
+                                                    filtering, " ",
+                                                    differencing, " ",
+                                                    seasonality, " ",
+                                                    bw_parameterization, " ",
+                                                    results_path, " ",
+                                                    sim_n, " ",
+                                                    sim_family,
+                                                    "\'  /home/er71a/kcde-applied-paper/R/kcde-estimation-step.R ",
+                                                    scripts_path, "/output-kde-estimation-step-", case_descriptor, ".Rout"),
+                                                file = filename, append = TRUE)
+                                            
+                                            bsubCmd <- paste0("bsub < ", filename)
+                                            
+                                            system(bsubCmd)
                                         } # bw_parameterization
-                                   } # seasonality
-                               } # differencing
+                                    } # seasonality
+                                } # differencing
                             } # filtering
                         } # max_seasonal_lag
                     } # max_lag
