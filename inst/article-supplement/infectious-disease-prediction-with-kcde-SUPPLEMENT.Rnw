@@ -1,10 +1,18 @@
-\documentclass[oupdraft]{bio}
+\documentclass[]{article}
+%\documentclass[oupdraft]{bio}
+
+\usepackage[top=1in, bottom=1.25in, left=1.25in, right=1.25in]{geometry}
+
 \usepackage[colorlinks=true, urlcolor=citecolor, linkcolor=citecolor, citecolor=citecolor]{hyperref}
-%\documentclass[Crown, sagev]{sagej}
+
+% Add history information for the article if required
+%\history{Received August 1, 2010;
+%revised October 1, 2010;
+%accepted for publication November 1, 2010}
 
 \usepackage{amssymb, amsmath, amsfonts}
 \usepackage[list=off]{caption} % list=off option prevents errors when using math environments within captions
-
+\usepackage{natbib}
 
 \include{GrandMacros}
 \newcommand{\cdf}{{c.d.f.} }
@@ -12,9 +20,12 @@
 \newcommand{\ind}{\mathbb{I}}
 
 \begin{document}
+%\documentclass[Crown, sagev]{sagej}
 
-\title{Infectious disease prediction with kernel conditional density
-estimation\\supplementary materials}
+
+\title{Infectious disease prediction with\\
+kernel conditional density estimation\\
+Supplementary Material}
 
 %\author{Evan L. Ray\affilnum{1},
 %Krzysztof Sakrejda\affilnum{1},
@@ -23,32 +34,102 @@ estimation\\supplementary materials}
 %Nicholas G. Reich\affilnum{1}}
 
 % List of authors, with corresponding author marked by asterisk
-\author{EVAN L. RAY$^\ast$, KRZYSZTOF SAKREJDA, STEPHEN A. LAUER, NICHOLAS G.
-REICH\\[4pt]
-% Author addresses
-\textit{Department of Biostatistics and Epidemiology,
-School of Public Health and Health Sciences, \\
-University of Massachusetts, Amherst \\
-415 Arnold House,
+\author{Evan L. Ray$^{1}$, Krzysztof Sakrejda$^1$, Stephen A. Lauer$^1$,\\
+Michael A. Johansson$^2$, Nicholas G. Reich$^1$\vspace{0.2cm} \\ 
+$^1${\small\textit{Department of
+Biostatistics and Epidemiology,}}\\
+{\small\textit{School of Public Health and Health Sciences,}}\\
+{\small\textit{University of Massachusetts, Amherst}}\\
+{\small\textit{415 Arnold House,
 715 N. Pleasant Street,
-Amherst, MA 01003,
-USA}
-\\[2pt]
-% E-mail address for correspondence
-{elray@umass.edu}}
+Amherst, MA 01003, USA}} \vspace{0.2cm}\\
+$^2${\small\textit{Dengue Branch, Division of Vector-Borne Infectious
+Diseases,}}\\
+{\small\textit{Centers for Disease Control and Prevention,}}\\
+{\small\textit{San Juan, Puerto Rico, USA}}\\
+}
 
-% Running headers of paper:
-\markboth%
-% First field is the short list of authors
-{E. L. Ray and others}
-% Second field is the short title of the paper
-{Infectious Disease Prediction with KCDE Supplementary Materials}
+%% Author addresses
+%$^1$\textit{Department of Biostatistics and Epidemiology,
+%School of Public Health and Health Sciences, \\
+%University of Massachusetts, Amherst \\
+%415 Arnold House,
+%715 N. Pleasant Street,
+%Amherst, MA 01003,
+%USA}
+%\\
+%$^2$\textit{Dengue Branch, Division of Vector-Borne Infectious Diseases,\\
+%Centers for Disease Control and Prevention,\\
+%San Juan, Puerto Rico,\\
+%USA}
+%\\[2pt]
+%% E-mail address for correspondence
+%{elray@umass.edu}}
+
+%% Running headers of paper:
+%\markboth%
+%% First field is the short list of authors
+%{E. L. Ray and others}
+%% Second field is the short title of the paper
+%{Infectious Disease Prediction with KCDE}
+
+\date{}
 
 \maketitle
 
-% Add a footnote for the corresponding author if one has been
-% identified in the author list
-\footnotetext{To whom correspondence should be addressed.}
+%
+%
+%\documentclass[oupdraft]{bio}
+%\usepackage[colorlinks=true, urlcolor=citecolor, linkcolor=citecolor, citecolor=citecolor]{hyperref}
+%%\documentclass[Crown, sagev]{sagej}
+%
+%\usepackage{amssymb, amsmath, amsfonts}
+%\usepackage[list=off]{caption} % list=off option prevents errors when using math environments within captions
+%
+%
+%\include{GrandMacros}
+%\newcommand{\cdf}{{c.d.f.} }
+%\newcommand{\pdf}{{p.d.f.} }
+%\newcommand{\ind}{\mathbb{I}}
+%
+%\begin{document}
+%
+%\title{Infectious disease prediction with kernel conditional density
+%estimation\\supplementary materials}
+%
+%%\author{Evan L. Ray\affilnum{1},
+%%Krzysztof Sakrejda\affilnum{1},
+%%Stephen A. Lauer\affilnum{1} and
+%%%Michael Johansen\affilnum{2} and
+%%Nicholas G. Reich\affilnum{1}}
+%
+%% List of authors, with corresponding author marked by asterisk
+%\author{EVAN L. RAY$^\ast$, KRZYSZTOF SAKREJDA, STEPHEN A. LAUER, NICHOLAS G.
+%REICH\\[4pt]
+%% Author addresses
+%\textit{Department of Biostatistics and Epidemiology,
+%School of Public Health and Health Sciences, \\
+%University of Massachusetts, Amherst \\
+%415 Arnold House,
+%715 N. Pleasant Street,
+%Amherst, MA 01003,
+%USA}
+%\\[2pt]
+%% E-mail address for correspondence
+%{elray@umass.edu}}
+%
+%% Running headers of paper:
+%\markboth%
+%% First field is the short list of authors
+%{E. L. Ray and others}
+%% Second field is the short title of the paper
+%{Infectious Disease Prediction with KCDE Supplementary Materials}
+%
+%\maketitle
+%
+%% Add a footnote for the corresponding author if one has been
+%% identified in the author list
+%\footnotetext{To whom correspondence should be addressed.}
 
 <<knitrGlobalSetup, echo = FALSE>>=
 library(cdcfluview)
@@ -340,6 +421,88 @@ communicating with decision makers.
 
 \bibliographystyle{plainnat}
 \bibliography{kde-bib}
+
+\begin{figure}
+<<DengueDataRibbonsPredictionPlot95Intervals, echo = FALSE, fig.height = 8.6, dev = "cairo_ps">>=
+dengue_prediction_results_sarima <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/dengue_sj/prediction-results/sarima-predictions.rds")
+dengue_prediction_results_hhh4 <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/dengue_sj/prediction-results/surveillance-predictions.rds")
+dengue_prediction_results_kcde <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/dengue_sj/prediction-results/kcde-predictions.rds")
+dengue_prediction_results_kcde$model <- "KCDE"
+dengue_prediction_results <- rbind.fill(dengue_prediction_results_sarima[!is.na(dengue_prediction_results_sarima$log_score), ],
+    dengue_prediction_results_hhh4,
+    dengue_prediction_results_kcde)
+dengue_prediction_results$AE <- unlist(dengue_prediction_results$AE)
+
+dengue_prediction_results$full_model_descriptor <- paste0(dengue_prediction_results$model,
+    "-seasonal_lag_", dengue_prediction_results$max_seasonal_lag,
+#    "-filtering_", dengue_prediction_results$filtering,
+    "-differencing_", dengue_prediction_results$differencing,
+    "-periodic_", dengue_prediction_results$seasonality,
+    "-bw_", dengue_prediction_results$bw_parameterization)
+
+
+#color_palette <- c("#E69F00", "#0072B2")
+color_palette <- c("#D55E00", "#0072B2")
+
+dengue_ribbons_df <- dengue_prediction_results %>%
+    select(prediction_time,
+        prediction_horizon,
+        full_model_descriptor,
+        model,
+        interval_pred_lb_95:interval_pred_ub_50) %>%
+    gather("bound_type", "predictive_value", interval_pred_lb_95:interval_pred_ub_50) %>%
+    mutate(interval_type = ifelse(grepl("50", bound_type), "50", "95"),
+        bound_type = ifelse(grepl("lb", bound_type), "lower", "upper")) %>%
+    spread(bound_type, predictive_value)
+
+phs_used <- c(1, 6, 26)
+models_used <- c(#"SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "HHH4-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
+#models_used <- c("SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+#    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_diagonal")
+pi_type <- "95"
+#pi_type <- "50"
+
+p_dengue <- ggplot() +
+    geom_ribbon(aes(x = prediction_time, ymin = lower, ymax = upper, colour = model, fill = model, alpha = model),
+#        alpha = 0.3,
+        size = 0,
+        data = dengue_ribbons_df[dengue_ribbons_df$prediction_horizon %in% phs_used &
+                dengue_ribbons_df$full_model_descriptor %in% models_used &
+                dengue_ribbons_df$interval_type == pi_type, ]) +
+    geom_line(aes(x = time, y = total_cases), data = dengue_sj[dengue_sj$season %in% paste0(2009:2012, "/", 2010:2013), ]) +
+#    geom_point(aes(x = time, y = total_cases), data = dengue_sj[dengue_sj$year %in% 2010:2014, ]) +
+    geom_line(aes(x = prediction_time, y = pt_pred, colour = model, linetype = model),
+        size = 1,
+        data = dengue_prediction_results[dengue_prediction_results$prediction_horizon %in% phs_used &
+                dengue_prediction_results$full_model_descriptor %in% models_used, ]) +
+    scale_alpha_discrete("Model",
+#        labels = c("50 Percent", "95 Percent"),
+        limits = c("KCDE", "HHH4"),
+        range = c(0.45, 0.2)) +
+#    scale_fill_manual("Model", values = c("#0072B2", "#E69F00")) +
+#    scale_colour_manual("Model", values = c("#0072B2", "#E69F00")) +
+    scale_fill_manual("Model", values = color_palette) +
+    scale_colour_manual("Model", values = color_palette) +
+    scale_linetype("Model") +
+    facet_wrap( ~ prediction_horizon, ncol = 1,
+        labeller = as_labeller(function(labels, ...) {
+                return(paste0("Prediction Horizon = ", labels))
+            })) +
+    xlab("Prediction Time") +
+    ylab("Reported Cases") +
+    ggtitle("(a) Point and 95% Interval Predictions, Dengue Fever") +
+#    scale_y_log10() +
+    theme_bw(base_size = 11)
+
+
+print(p_dengue, vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
+@
+\caption{Plots of point and interval predictions from HHH4 and the
+Periodic, Full Bandwidth KCDE model.}
+\label{fig:DengueRibbonsPredictions} %fig.height = 4.3
+\end{figure}
 
 
 <<DengueDataMergePredictionResults, echo = FALSE>>=
@@ -1129,6 +1292,11 @@ dengue_peak_week_results <- rbind.fill(
                         paste0("peak-week-sarima-", data_set, ".rds"))) %>%
                 mutate(model = "SARIMA")
         ),
+        list(
+            readRDS(file.path(prediction_save_path,
+                        paste0("peak-week-surveillance-", data_set, ".rds"))) %>%
+                mutate(model = "HHH4")
+        ),
         lapply(seq_len(nrow(case_definitions)), function(case_row_ind) {
                 max_lag <- case_definitions$max_lag[case_row_ind]
                 max_seasonal_lag <- case_definitions$max_seasonal_lag[case_row_ind]
@@ -1180,6 +1348,9 @@ dengue_peak_week_results$reduced_model_descriptor[
 dengue_peak_week_results$reduced_model_descriptor[
     dengue_peak_week_results$model == "SARIMA"] <-
     "SARIMA"
+dengue_peak_week_results$reduced_model_descriptor[
+    dengue_peak_week_results$model == "HHH4"] <-
+    "HHH4"
 
 num_analysis_time_season_values <- length(unique(dengue_peak_week_results$analysis_time_season))
 num_analysis_time_season_week_values <- length(unique(dengue_peak_week_results$analysis_time_season_week))
@@ -1196,7 +1367,7 @@ dengue_peak_week_results <- rbind.fill(dengue_peak_week_results,
 
 dengue_peak_week_results$reduced_model_descriptor <-
     factor(dengue_peak_week_results$reduced_model_descriptor,
-        levels = c("SARIMA", "Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE",
+        levels = c("HHH4", "SARIMA", "Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE",
             "Periodic, Full Bandwidth KCDE",
             "Equal Bin Probabilities"
         ))
@@ -2294,7 +2465,7 @@ peak_timing_pred_dist_by_analysis_time_dengue$bin <-
 #    peak_timing_pred_dist_by_analysis_time[,
 #        c("full_model_descriptor", "analysis_time_season", "analysis_time_season_week")],
 #    sum)
- 
+
 peak_timing_and_height_pred_dist_means_by_analysis_time_dengue <- 
     dengue_peak_week_results %>%
     select(full_model_descriptor,
@@ -2370,6 +2541,7 @@ peak_timing_and_height_pred_dist_means_by_analysis_time_dengue <-
 
 models_used <- c(
     "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "HHH4-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
     "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_diagonal",
     "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_full",
     "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_diagonal",
@@ -2377,6 +2549,7 @@ models_used <- c(
     "Equal Bin Probabilities")
 reduced_models_used <- c(
     "SARIMA",
+    "HHH4",
     "Null KCDE",
     "Full Bandwidth KCDE",
     "Periodic KCDE",
@@ -2387,8 +2560,14 @@ reduced_models_used <- c(
 p <- ggplot(dengue_peak_week_results[dengue_peak_week_results$full_model_descriptor %in% models_used, ]) +
     geom_line(aes(x = analysis_time_season_week, y = peak_week_log_score, colour = reduced_model_descriptor, linetype = reduced_model_descriptor)) +
 #    geom_point(aes(x = analysis_time_season_week, y = peak_week_log_score, colour = reduced_model_descriptor, shape = reduced_model_descriptor)) +
-    scale_colour_manual("Model", breaks = reduced_models_used, values = c("#E69F00", "#56B4E9", "#009E73", "#D55E00", "#0072B2", "#999999")) +
-    scale_linetype_manual("Model", breaks = reduced_models_used, values = c(1:5, 1)) +
+    scale_colour_manual("Model", breaks = reduced_models_used, 
+        values = c("SARIMA" = "#D55E00", "HHH4" = "#0072B2", "Null KCDE" = "#E69F00",
+            "Full Bandwidth KCDE" = "#56B4E9", "Periodic KCDE" = "#009E73", "Periodic, Full Bandwidth KCDE" = "#F0E442",
+            "Equal Bin Probabilities" = "#999999")) +
+    scale_linetype_manual("Model",
+        breaks = reduced_models_used,
+        values = c("SARIMA" = 1, "HHH4" = 2, "Null KCDE" = 3, "Full Bandwidth KCDE" = 4, "Periodic KCDE" = 5, "Periodic, Full Bandwidth KCDE" = 6,
+            "Equal Bin Probabilities" = 1)) +
     scale_shape_manual("Model", breaks = reduced_models_used, values = c(0:4, 45)) +
     geom_vline(aes(xintercept = peak_week), colour = "red", linetype = 2, data = dengue_peak_week_times) +
     facet_wrap( ~ analysis_time_season, ncol = 1) +
@@ -2404,8 +2583,14 @@ p_d_1 <- ggplot(dengue_peak_week_results[dengue_peak_week_results$full_model_des
                 dengue_peak_week_results$analysis_time_season == "2009/2010", ]) +
     geom_line(aes(x = analysis_time_season_week, y = peak_week_log_score, colour = reduced_model_descriptor, linetype = reduced_model_descriptor)) +
 #    geom_point(aes(x = analysis_time_season_week, y = peak_week_log_score, colour = reduced_model_descriptor, shape = reduced_model_descriptor)) +
-    scale_colour_manual("Model", breaks = reduced_models_used, values = c("#E69F00", "#56B4E9", "#009E73", "#D55E00", "#0072B2", "#999999")) +
-    scale_linetype_manual("Model", breaks = reduced_models_used, values = c(1:5, 1)) +
+    scale_colour_manual("Model", breaks = reduced_models_used, 
+        values = c("SARIMA" = "#D55E00", "HHH4" = "#0072B2", "Null KCDE" = "#E69F00",
+            "Full Bandwidth KCDE" = "#56B4E9", "Periodic KCDE" = "#009E73", "Periodic, Full Bandwidth KCDE" = "#F0E442",
+            "Equal Bin Probabilities" = "#999999")) +
+    scale_linetype_manual("Model",
+        breaks = reduced_models_used,
+        values = c("SARIMA" = 1, "HHH4" = 2, "Null KCDE" = 3, "Full Bandwidth KCDE" = 4, "Periodic KCDE" = 5, "Periodic, Full Bandwidth KCDE" = 6,
+            "Equal Bin Probabilities" = 1)) +
     scale_shape_manual("Model", breaks = reduced_models_used, values = c(0:4, 45)) +
     geom_vline(aes(xintercept = peak_week), colour = "black", linetype = 1, data = dengue_peak_week_times[dengue_peak_week_times$analysis_time_season == "2009/2010", ]) +
     ylim(c(-8, 0)) +
@@ -2427,8 +2612,14 @@ p_d_2 <- ggplot(dengue_peak_week_results[dengue_peak_week_results$full_model_des
                 dengue_peak_week_results$analysis_time_season == "2010/2011", ]) +
     geom_line(aes(x = analysis_time_season_week, y = peak_week_log_score, colour = reduced_model_descriptor, linetype = reduced_model_descriptor)) +
 #    geom_point(aes(x = analysis_time_season_week, y = peak_week_log_score, colour = reduced_model_descriptor, shape = reduced_model_descriptor)) +
-    scale_colour_manual("Model", breaks = reduced_models_used, values = c("#E69F00", "#56B4E9", "#009E73", "#D55E00", "#0072B2", "#999999")) +
-    scale_linetype_manual("Model", breaks = reduced_models_used, values = c(1:5, 1)) +
+    scale_colour_manual("Model", breaks = reduced_models_used, 
+        values = c("SARIMA" = "#D55E00", "HHH4" = "#0072B2", "Null KCDE" = "#E69F00",
+            "Full Bandwidth KCDE" = "#56B4E9", "Periodic KCDE" = "#009E73", "Periodic, Full Bandwidth KCDE" = "#F0E442",
+            "Equal Bin Probabilities" = "#999999")) +
+    scale_linetype_manual("Model",
+        breaks = reduced_models_used,
+        values = c("SARIMA" = 1, "HHH4" = 2, "Null KCDE" = 3, "Full Bandwidth KCDE" = 4, "Periodic KCDE" = 5, "Periodic, Full Bandwidth KCDE" = 6,
+            "Equal Bin Probabilities" = 1)) +
     scale_shape_manual("Model", breaks = reduced_models_used, values = c(0:4, 45)) +
     geom_vline(aes(xintercept = peak_week), colour = "black", linetype = 1, data = dengue_peak_week_times[dengue_peak_week_times$analysis_time_season == "2010/2011", ]) +
     ylim(c(-8, 0)) +
@@ -2450,8 +2641,14 @@ p_d_3 <- ggplot(dengue_peak_week_results[dengue_peak_week_results$full_model_des
                 dengue_peak_week_results$analysis_time_season == "2011/2012", ]) +
     geom_line(aes(x = analysis_time_season_week, y = peak_week_log_score, colour = reduced_model_descriptor, linetype = reduced_model_descriptor)) +
 #    geom_point(aes(x = analysis_time_season_week, y = peak_week_log_score, colour = reduced_model_descriptor, shape = reduced_model_descriptor)) +
-    scale_colour_manual("Model", breaks = reduced_models_used, values = c("#E69F00", "#56B4E9", "#009E73", "#D55E00", "#0072B2", "#999999")) +
-    scale_linetype_manual("Model", breaks = reduced_models_used, values = c(1:5, 1)) +
+    scale_colour_manual("Model", breaks = reduced_models_used, 
+        values = c("SARIMA" = "#D55E00", "HHH4" = "#0072B2", "Null KCDE" = "#E69F00",
+            "Full Bandwidth KCDE" = "#56B4E9", "Periodic KCDE" = "#009E73", "Periodic, Full Bandwidth KCDE" = "#F0E442",
+            "Equal Bin Probabilities" = "#999999")) +
+    scale_linetype_manual("Model",
+        breaks = reduced_models_used,
+        values = c("SARIMA" = 1, "HHH4" = 2, "Null KCDE" = 3, "Full Bandwidth KCDE" = 4, "Periodic KCDE" = 5, "Periodic, Full Bandwidth KCDE" = 6,
+            "Equal Bin Probabilities" = 1)) +
     scale_shape_manual("Model", breaks = reduced_models_used, values = c(0:4, 45)) +
     geom_vline(aes(xintercept = peak_week), colour = "black", linetype = 1, data = dengue_peak_week_times[dengue_peak_week_times$analysis_time_season == "2011/2012", ]) +
     ylim(c(-8, 0)) +
@@ -2473,8 +2670,14 @@ p_d_4 <- ggplot(dengue_peak_week_results[dengue_peak_week_results$full_model_des
                 dengue_peak_week_results$analysis_time_season == "2012/2013", ]) +
     geom_line(aes(x = analysis_time_season_week, y = peak_week_log_score, colour = reduced_model_descriptor, linetype = reduced_model_descriptor)) +
 #    geom_point(aes(x = analysis_time_season_week, y = peak_week_log_score, colour = reduced_model_descriptor, shape = reduced_model_descriptor)) +
-    scale_colour_manual("Model", breaks = reduced_models_used, values = c("#E69F00", "#56B4E9", "#009E73", "#D55E00", "#0072B2", "#999999")) +
-    scale_linetype_manual("Model", breaks = reduced_models_used, values = c(1:5, 1)) +
+    scale_colour_manual("Model", breaks = reduced_models_used, 
+        values = c("SARIMA" = "#D55E00", "HHH4" = "#0072B2", "Null KCDE" = "#E69F00",
+            "Full Bandwidth KCDE" = "#56B4E9", "Periodic KCDE" = "#009E73", "Periodic, Full Bandwidth KCDE" = "#F0E442",
+            "Equal Bin Probabilities" = "#999999")) +
+    scale_linetype_manual("Model",
+        breaks = reduced_models_used,
+        values = c("SARIMA" = 1, "HHH4" = 2, "Null KCDE" = 3, "Full Bandwidth KCDE" = 4, "Periodic KCDE" = 5, "Periodic, Full Bandwidth KCDE" = 6,
+            "Equal Bin Probabilities" = 1)) +
     scale_shape_manual("Model", breaks = reduced_models_used, values = c(0:4, 45)) +
     geom_vline(aes(xintercept = peak_week), colour = "black", linetype = 1, data = dengue_peak_week_times[dengue_peak_week_times$analysis_time_season == "2012/2013", ]) +
     ylim(c(-8, 0)) +
@@ -2498,8 +2701,14 @@ p_i_1 <- ggplot(ili_peak_week_results[ili_peak_week_results$full_model_descripto
                 ili_peak_week_results$analysis_time_season == "2011/2012", ]) +
     geom_line(aes(x = analysis_time_season_week, y = peak_week_log_score, colour = reduced_model_descriptor, linetype = reduced_model_descriptor)) +
 #    geom_point(aes(x = analysis_time_season_week, y = peak_week_log_score, colour = reduced_model_descriptor, shape = reduced_model_descriptor)) +
-    scale_colour_manual("Model", breaks = reduced_models_used, values = c("#E69F00", "#56B4E9", "#009E73", "#D55E00", "#0072B2", "#999999")) +
-    scale_linetype_manual("Model", breaks = reduced_models_used, values = c(1:5, 1)) +
+    scale_colour_manual("Model", breaks = reduced_models_used, 
+        values = c("SARIMA" = "#D55E00", "HHH4" = "#0072B2", "Null KCDE" = "#E69F00",
+            "Full Bandwidth KCDE" = "#56B4E9", "Periodic KCDE" = "#009E73", "Periodic, Full Bandwidth KCDE" = "#F0E442",
+            "Equal Bin Probabilities" = "#999999")) +
+    scale_linetype_manual("Model",
+        breaks = reduced_models_used,
+        values = c("SARIMA" = 1, "HHH4" = 2, "Null KCDE" = 3, "Full Bandwidth KCDE" = 4, "Periodic KCDE" = 5, "Periodic, Full Bandwidth KCDE" = 6,
+            "Equal Bin Probabilities" = 1)) +
     scale_shape_manual("Model", breaks = reduced_models_used, values = c(0:4, 45)) +
     geom_vline(aes(xintercept = peak_week), colour = "black", linetype = 1, data = ili_peak_week_times[ili_peak_week_times$analysis_time_season == "2011/2012", ]) +
     ylim(c(-8, 0)) +
@@ -2521,8 +2730,14 @@ p_i_2 <- ggplot(ili_peak_week_results[ili_peak_week_results$full_model_descripto
                 ili_peak_week_results$analysis_time_season == "2012/2013", ]) +
     geom_line(aes(x = analysis_time_season_week, y = peak_week_log_score, colour = reduced_model_descriptor, linetype = reduced_model_descriptor)) +
 #    geom_point(aes(x = analysis_time_season_week, y = peak_week_log_score, colour = reduced_model_descriptor, shape = reduced_model_descriptor)) +
-    scale_colour_manual("Model", breaks = reduced_models_used, values = c("#E69F00", "#56B4E9", "#009E73", "#D55E00", "#0072B2", "#999999")) +
-    scale_linetype_manual("Model", breaks = reduced_models_used, values = c(1:5, 1)) +
+    scale_colour_manual("Model", breaks = reduced_models_used, 
+        values = c("SARIMA" = "#D55E00", "HHH4" = "#0072B2", "Null KCDE" = "#E69F00",
+            "Full Bandwidth KCDE" = "#56B4E9", "Periodic KCDE" = "#009E73", "Periodic, Full Bandwidth KCDE" = "#F0E442",
+            "Equal Bin Probabilities" = "#999999")) +
+    scale_linetype_manual("Model",
+        breaks = reduced_models_used,
+        values = c("SARIMA" = 1, "HHH4" = 2, "Null KCDE" = 3, "Full Bandwidth KCDE" = 4, "Periodic KCDE" = 5, "Periodic, Full Bandwidth KCDE" = 6,
+            "Equal Bin Probabilities" = 1)) +
     scale_shape_manual("Model", breaks = reduced_models_used, values = c(0:4, 45)) +
     geom_vline(aes(xintercept = peak_week), colour = "black", linetype = 1, data = ili_peak_week_times[ili_peak_week_times$analysis_time_season == "2012/2013", ]) +
     ylim(c(-8, 0)) +
@@ -2546,8 +2761,14 @@ p_i_3 <- ggplot(ili_peak_week_results[ili_peak_week_results$full_model_descripto
                 ili_peak_week_results$analysis_time_season == "2013/2014", ]) +
     geom_line(aes(x = analysis_time_season_week, y = peak_week_log_score, colour = reduced_model_descriptor, linetype = reduced_model_descriptor)) +
 #    geom_point(aes(x = analysis_time_season_week, y = peak_week_log_score, colour = reduced_model_descriptor, shape = reduced_model_descriptor)) +
-    scale_colour_manual("Model", breaks = reduced_models_used, values = c("#E69F00", "#56B4E9", "#009E73", "#D55E00", "#0072B2", "#999999")) +
-    scale_linetype_manual("Model", breaks = reduced_models_used, values = c(1:5, 1)) +
+    scale_colour_manual("Model", breaks = reduced_models_used, 
+        values = c("SARIMA" = "#D55E00", "HHH4" = "#0072B2", "Null KCDE" = "#E69F00",
+            "Full Bandwidth KCDE" = "#56B4E9", "Periodic KCDE" = "#009E73", "Periodic, Full Bandwidth KCDE" = "#F0E442",
+            "Equal Bin Probabilities" = "#999999")) +
+    scale_linetype_manual("Model",
+        breaks = reduced_models_used,
+        values = c("SARIMA" = 1, "HHH4" = 2, "Null KCDE" = 3, "Full Bandwidth KCDE" = 4, "Periodic KCDE" = 5, "Periodic, Full Bandwidth KCDE" = 6,
+            "Equal Bin Probabilities" = 1)) +
     scale_shape_manual("Model", breaks = reduced_models_used, values = c(0:4, 45)) +
     geom_vline(aes(xintercept = peak_week), colour = "black", linetype = 1, data = ili_peak_week_times[ili_peak_week_times$analysis_time_season == "2013/2014", ]) +
     ylim(c(-8, 0)) +
@@ -2590,7 +2811,7 @@ suppressWarnings(print(p_d_3, vp = viewport(layout.pos.row = 3 + 1, layout.pos.c
 suppressWarnings(print(p_d_4, vp = viewport(layout.pos.row = 4 + 1, layout.pos.col = 2)))
 suppressWarnings(print(p_i_1, vp = viewport(layout.pos.row = 1 + 1, layout.pos.col = 3)))
 suppressWarnings(print(p_i_2, vp = viewport(layout.pos.row = 2 + 1, layout.pos.col = 3)))
-suppressWarnings(print(p_i_3, vp = viewport(layout.pos.row = 3 + 1, layout.pos.col = 3)))
+suppressWarnings(print(p_i_3, vp = viewport(layout.pos.row = 3 + 1, layout.pos.col = 3))) 
 @
 \caption{Log scores for predictions of peak week timing by predictive
 model and analysis time.  The vertical line is placed at the peak week for
