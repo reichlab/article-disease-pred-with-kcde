@@ -194,7 +194,7 @@ dengue_train_cutoff_time <- dengue_sj$time[max(which(dengue_sj$season == "2008/2
 With the maturation of digital disease surveillance systems in recent years, 
 accurate and real-time infectious disease prediction has become an achieveable goal in many contexts.
 Predictions of infectious disease incidence from rigorously evaluated models provide valuable information to
-public health officials planning disease prevention and control measures.
+public health officials planning disease prevention and control measures(\citet{Manheim:2016ur}).
 For example, interventions designed to reduce person-to-person transmission of disease
 have been associated with diminished outbreak intensity 
 (\citet{hatchett2007interventionsIntensity1918flu}).  Accurate 
@@ -225,7 +225,8 @@ In addition to the novel application of these methods to predicting
 disease incidence, our contributions include the use of a periodic kernel
 specification to capture seasonality in disease incidence and a method for
 obtaining multivariate kernel functions that handle discrete data while allowing
-for a fully parameterized bandwidth matrix.  To our knowledge, previous implementations of kernel methods for estimating
+for a fully parameterized bandwidth matrix.  
+To our knowledge, previous implementations of kernel methods for estimating
 multivariate densities or regression functions involving discrete variables have
 employed a kernel function that is a product of univariate kernel functions
 (\citet{aitchison1976multivariateBinaryKernel,
@@ -237,31 +238,35 @@ li2003nonparametricEstDistnsCategoricalContinuous,
 li2008nonparametricConditionalCDFQuantile,
 ouyang2006crossvalidationEstDistnCategorical,
 racine2004kernelEstConditionalDistns}).
-Using a product kernel simplifies the formulation of the kernel
-function when discrete variables are present, but forces the
-kernel function to be oriented in line with the coordinate axes.  In settings
-with only continuous variables, asymptotic
-analysis and experience with applications have shown that using a multivariate
-kernel function with a bandwidth parameterization that allows for
-other orientations can result in improved density estimates
-in many cases (\citet{duong2005crossvalidationBandwidthMultivariateKDE}).  We
-introduce an approach to allowing for discrete kernels with orientation by
-discretizing an underlying continuous kernel function.
+% Using a product kernel simplifies the formulation of the kernel
+% function when discrete variables are present, but 
+This approach forces the
+kernel function to be oriented in line with the coordinate axes.  
+% In settings with only continuous variables, asymptotic
+% analysis and experience with applications have shown that using a multivariate
+% kernel function with a bandwidth parameterization that allows for
+% other orientations can result in improved density estimates
+% in many cases (\citet{duong2005crossvalidationBandwidthMultivariateKDE}).  
+Motivated by results showing that multivariate
+kernel functions with a bandwidth parameterization allowing for
+flexible orientations can result in improved density estimates,
+we introduce an approach that allows for flexible orientation of discrete kernels 
+by discretizing an underlying continuous kernel function
+(\citet{duong2005crossvalidationBandwidthMultivariateKDE}).
 
-A limitation of local methods such as KCDE is that their performance may not
+Copulas present an attractive strategy
+for estimating the joint distribution of moderate to high dimensional random
+vectors.  Using a simple dependence model, a copula
+ties separate marginal distribution estimates (in our case, obtained by KCDE) together into a joint
+distribution.  
+This approach addresses the limitation of local methods such as KCDE, that their performance may not
 scale well with the dimension of the vector whose distribution is being estimated (\citet{HastieTibshiraniESL}).  This
 is particularly relevant in our application, where we wish to obtain joint
 predictive distributions for disease incidence over the course of many weeks.
-Copulas present one strategy
-for estimating the joint distribution of moderate to high dimensional random
-vectors, and work by specifying a relatively simple parametric model for the
-dependence relations among those variables.  This simple dependence model
-ties separate marginal distribution estimates together into a joint
-distribution.  In our case, we obtain those marginal distribution estimates
-through KCDE.  Methods combining non-parametric
+Methods combining non-parametric
 estimates of marginal densities with copulas have been considered for other
 applications such as economic time series
-(\citet{patton2012reviewCopulaEconomicTimeSeries}) before.
+(\citet{patton2012reviewCopulaEconomicTimeSeries}).
 
 In a time-series context, KCDE is a local method in the sense that the conditional density
 estimate for future observations given conditioning variables is a weighted
@@ -302,54 +307,73 @@ others} (in preparation) and
 of work on forecasting infectious disease, and describe these alternative
 approaches in more detail.
 
-Each of these classes of models has advantages and disadvantages.
-Approaches such as agent-based and compartmental models attempt to represent
-the disease process by tracking the disease status of
-individuals or groups of individuals, possibly in addition to disease reservoirs
-and vectors such as the water supply or mosquitoes.  
-This potential for fidelity to the disease process makes these models powerful tools, but comes with drawbacks.
-One disadvantage of these approaches is that they require expert knowledge to tailor them to the disease at hand: the
-same compartmental or agent-based model specification will not be applicable across a wide variety of
-diseases.  The details of the assumed model specification are important and can
-have a large impact on the quality of predictions obtained from these models
-(\citet{grad2012cholera}).
-Additionally, inference in fine-grained agent-based and compartmental models
-can entail considerable computational costs.  For example, recent
-realistic compartmental models for dengue fever strain the limits of modern
-computational resources (cite something).
-
-A variety of more generic regression-based and time series modeling frameworks
-have also been applied to infectious disease.  These approaches sacrifice some of the
-representative power of agent-based and compartmental models, but may
-offer advantages in terms of ease of use.  One of the most well-developed
-approaches in this category is the HHH4 model (\citet{Held2005HHHIntro,
+Little research has been done comparing the predictive performance of more detailed and 
+disease-mechanistic modeling approaches (agent-based or compartmental models) to 
+more statistical approaches (regression or SARIMA models). 
+One challenge in making comparisons to mechanistically detailed models is that 
+these models are often highly parameterized and difficult to independently reproduce or replicate.
+One of the most well-developed modern statistical frameworks for infectious 
+disease prediction is the ``HHH4'' model (\citet{Held2005HHHIntro,
 Paul2008MultivariateHHH4, Held2012HHHSeasonality}), a specific variation of a
 generalized linear model developed for infectious disease.
-Another commonly used approach in this category is the seasonal autoregressive
-integrated moving average (SARIMA) model.  While approaches along these lines
-have been used with a variety of different diseases, details of the model
-specification are still important.  For example, the HHH4 model specifies a
-discrete distribution for the observed incidence measure.  This is appropriate
-for some data sets, but not for others.  On the other hand, the standard SARIMA
+Another commonly used and widely studied approach is the seasonal autoregressive
+integrated moving average (SARIMA) model. However, both of these approaches 
+have limitations that also hamper generalizability. The HHH4 model specifies a
+discrete distribution for the observed incidence measure, an appropriate 
+assumption for some data sets, but not for others. The standard SARIMA
 specification is based on continuous distributions which means that it cannot be
 directly applied to modeling discrete case count data if low case counts are
 observed (\citet{unkel2012statisticalInfectiousDiseasePredictionReview}).
-As we will see, the mechanisms used in these models to capture seasonality may also be more or less appropriate for
-some diseases.
 
-From the outset of this project, our goal has been to develop a method that 
-can generate flexible predictive distributions of our targets of interest. 
-Compared with point predictions, the full predictive distributions generated by
-KCDE characterize uncertainty in the predictions.
-A full predictive distribution also gives decision makers additional information in
+
+% Each of these classes of models has advantages and disadvantages.
+% Approaches such as agent-based and compartmental models attempt to represent
+% the disease process by tracking the disease status of
+% individuals or groups of individuals, possibly in addition to disease reservoirs
+% and vectors such as the water supply or mosquitoes.  
+% This potential for fidelity to the disease process makes these models powerful tools, but comes with drawbacks.
+% One disadvantage of these approaches is that they require expert knowledge to tailor them to the disease at hand: the
+% same compartmental or agent-based model specification will not be applicable across a wide variety of
+% diseases.  The details of the assumed model specification are important and can
+% have a large impact on the quality of predictions obtained from these models
+% (\citet{grad2012cholera}).
+% Additionally, inference in fine-grained agent-based and compartmental models
+% can entail considerable computational costs.  For example, recent
+% realistic compartmental models for dengue fever strain the limits of modern
+% computational resources (cite something).
+
+% A variety of more generic regression-based and time series modeling frameworks
+% have also been applied to infectious disease.  These approaches sacrifice some of the
+% representative power of agent-based and compartmental models, but may
+% offer advantages in terms of ease of use.  One of the most well-developed
+% approaches in this category is the HHH4 model (\citet{Held2005HHHIntro,
+% Paul2008MultivariateHHH4, Held2012HHHSeasonality}), a specific variation of a
+% generalized linear model developed for infectious disease.
+% Another commonly used approach in this category is the seasonal autoregressive
+% integrated moving average (SARIMA) model.  While approaches along these lines
+% have been used with a variety of different diseases, details of the model
+% specification are still important.  For example, the HHH4 model specifies a
+% discrete distribution for the observed incidence measure.  This is appropriate
+% for some data sets, but not for others.  On the other hand, the standard SARIMA
+% specification is based on continuous distributions which means that it cannot be
+% directly applied to modeling discrete case count data if low case counts are
+% observed (\citet{unkel2012statisticalInfectiousDiseasePredictionReview}).
+% As we will see, the mechanisms used in these models to capture seasonality may also be more or less appropriate for
+% some diseases.
+
+There are several key features that distinguish our proposed approach
+from existing methods. 
+First, we focus on generating full predictive distributions to fully  
+characterize uncertainty in the predictions.
+Compared to point predictions, this gives decision makers additional information in
 situations where the predictive distribution is skewed or has multiple modes.
-Additionally, unlike many methods common in the infectious disease literature
+Second, unlike many methods common in the infectious disease literature
 (Brown \textit{and others}, in preparation), KCDE makes minimal assumptions about the
 underlying system governing disease dynamics. This flexibility makes KCDE
 suitable for application to a wide variety of time series, including diseases
-with different latent dynamics.  The method can also be used with either
-discrete or continuous data by substituting one kernel function specification
-for another.
+with different latent dynamics.  
+Third, the method can also be used with either discrete or continuous data 
+by substituting one kernel function specification for another.
 
 %most representative and agent-based approaches have the
 %pote KCDE is distinguished from these approaches in that it makes minimal assumptions about the data generating process.  This can be either an advantage or a disadvantage of KCDE.  In general, we would expect a well-specified parametric model to outperform KCDE.  On the other hand, because non-parametric approaches such as KCDE make fewer assumptions about the data generating process, they may outperform incorrectly specified parametric models.
