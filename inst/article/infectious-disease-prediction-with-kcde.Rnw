@@ -107,7 +107,7 @@ improve conditional density estimates.  In applications to predicting dengue
 fever and influenza, our method yields improved predictions for dengue incidence in individual weeks
 relative to a seasonal autoregressive integrated moving average (SARIMA) model
 and a previously published generalized linear model for infectious disease
-incidence referred to as HHH4.  KCDE also outperforms HHH4 for predictions of
+incidence known as HHH4.  KCDE also outperforms HHH4 for predictions of
 dengue incidence in the peak week, and is comparable to the baseline models on
 the other prediction targets.  The periodic kernel function leads to improved
 predictions of incidence in both applications.  Our approach and extensions of
@@ -1405,11 +1405,12 @@ estimation.
 
 We conducted a simulation study to examine the
 utility of using a non-diagonal bandwidth matrix specification when
-estimating conditional distributions with KCDE.  There are many factors that
+estimating discrete conditional distributions with KCDE.  There are many factors that
 determine the relative performance of KCDE estimators with different bandwidth
 parameterizations.  In this simulation study, we vary just one of these factors:
-the sample size ($N = 100$ or $N = 1000$).  We hold other factors that may be
-related to the relative performance of different bandwidth specifications fixed.
+the sample size ($N = 100$ or $N = 1000$).  
+% We hold other factors that may be
+% related to the relative performance of different bandwidth specifications fixed.
 
 We simulate data from a discretized bivariate normal
 distribution.  To define this
@@ -1548,28 +1549,29 @@ also more variation in performance with the smaller sample size.
 
 In this Section, we illustrate our methods through applications to prediction
 of infectious disease incidence in two examples with real disease incidence data
-sets: one with a weekly measure of incidence of dengue fever in San
-Juan, Puerto Rico, and a second with a weekly measure of incidence of influenza
-like illness in the United States.  These data sets were used in two recent
-prediction competitions sponsored by the United States federal
-government
+sets (Figure~\ref{fig:IntialDataPlots}). The first provides a weekly integer number of reported cases of dengue fever in San
+Juan, Puerto Rico. The second provides a weekly weighted proportion of
+doctor visits with influenza-like illness in the United States.  
+These data sets were used in two recent
+prediction competitions sponsored by the United States federal government
 (\citet{PandemicPredictionandForecastingScienceandTechnologyInteragencyWorkingGroup2015Announcement,
-EpidemicPredictionInitiative2015Index}).  In the dengue data set, the incidence
-measure is an integer number of reported cases in the given week.  In the
-influenza data set the incidence measure is continuous, a weighted proportion of
-doctor visits with influenza-like illness.
+EpidemicPredictionInitiative2015Index}).  
+% In the dengue data set, the incidence
+% measure is an integer number of reported cases in the given week.  In the
+% influenza data set the incidence measure is continuous, a weighted proportion of
+% doctor visits with influenza-like illness.
 
-Figure~\ref{fig:IntialDataPlots} displays each time series.  As indicated in the
-figure, we have divided each data set into two subsets.  The first period is used as a training set in
+We divided each data set into two subsets.  The first period is used as a training set in
 estimating the model parameters.  The last four years of each data set are
 reserved as a test set for evaluating model performance, as was chosen by
-the competition administrators.  All predictions are made as though in real time assuming that
-once cases are reported, they are never revised and that there are no delays in
+the competition administrators.  All predictions are made as though in real time, assuming that
+once cases are reported they are never revised and that there are no delays in
 reporting.  Specifically, we use only data up through a given week in order to
 make predictions for incidence after that week.
 
 We use three prediction targets for each data set, based closely on the
-prediction targets that were used in the original competitions.  First, for each
+prediction targets that were used in the original competitions (Supplemental Figure 3).  
+First, for each
 week in the test data, we obtain a predictive distribution for the incidence
 measure in that week at each prediction horizon from 1 to 52 weeks ahead. 
 Second, in each week of the test data set, we make predictions for the timing of
@@ -1580,13 +1582,12 @@ competitions, we make predictions for \textit{binned} incidence in the peak
 week.  For the dengue data set, the bins are $[0, 50), [50, 100), \ldots, [500, \infty)$.
 For the influenza data set, the bins are $[0, 0.5), [0.5, 1), \ldots, [13, \infty)$.
 Our predictions for incidence in individual weeks are for the raw, unbinned,
-incidence measure.  These prediction targets are illustrated in Figure 3 of the
-supplement.
+incidence measure.  
 %Figure~\ref{fig:PredictionTargetsIllustration}.
 
 
 
-Our applications include four variations on KCDE model specifications:
+Our applications evaluate four variations on KCDE model specifications:
 \begin{enumerate}
 \item The ``Null KCDE'' model omits the periodic component of the kernel
 function and uses a diagonal bandwidth matrix specification for the incidence
@@ -1609,7 +1610,7 @@ kernel.
 %obtained by adding the periodic kernel component to this null KCDE model, using
 %a fully parameterized bandwidth matrix for the incidence kernel, or both.  
 
-We include two baseline models to compare our methods to.  The first is a
+We include two baseline models for comparison to our methods.  The first is a
 seasonal autoregressive integrated moving average (SARIMA) model.  In fitting this model, we first
 transformed the observed incidence measure to the log scale (after adding $1$ in
 the dengue data set, which included some observations of $0$ cases); this
@@ -1635,7 +1636,7 @@ model for the dengue data.
 A limitation of SARIMA models is that they are only appropriate for
 continuous data.  In applying this model to the dengue data, we have
 discretized the predictive distributions obtained from SARIMA using the same
-methods that we used for KCDE.  This discretization trick was not used in model
+methods that we used for KCDE.  This discretization was not used in model
 estimation since it is not available in the standard estimation software.
 
 The second baseline model is the ``HHH4'' model for infectious disease incidence
@@ -1643,8 +1644,8 @@ The second baseline model is the ``HHH4'' model for infectious disease incidence
 available in the {\tt surveillance} (\citet{Hohle:R:surveillance}) package in R.
 This is a generalized linear model with either a Poisson or Negative Binomial family.
 The mean is a linear combination of autoregressive and sinusoidal components. 
-We followed the model selection and estimation procedures outlined in \citet{Held2012HHHSeasonality};
-further details are in that reference and the supplemental materials.  Because
+We followed the model selection and estimation procedures outlined in \citet{Held2012HHHSeasonality}
+(see Supplement for details).  Because
 the HHH4 model specifies a Poisson or Negative Binomial distribution for
 incidence, it cannot be used with continuous data; therefore, we have only applied this
 model with the dengue data.
@@ -1671,15 +1672,23 @@ model with the dengue data.
 %model for the dengue data.  Further details of the SARIMA model specification
 %and estimation procedure are in the supplement.
 
-We begin with a discussion of predictive distributions for incidence
-in individual weeks.  Figure~\ref{fig:DengueRibbonsPredictions} displays
-the median and 95\% interval limits for the predictive distributions obtained 
-at prediction horizons of $1$, $6$, or $26$ weeks from SARIMA and from the
-Periodic, Full Bandwidth KCDE model.  Figure 4 in the supplement shows the
-corresponding predictive intervals obtained from HHH4.  For predictions of
+% We begin with a discussion of predictive distributions for incidence
+% in individual weeks.  
+% Figure~\ref{fig:DengueRibbonsPredictions} displays
+% the median and 95\% interval limits for the predictive distributions obtained 
+% at prediction horizons of $1$, $6$, or $26$ weeks from SARIMA and from the
+% Periodic, Full Bandwidth KCDE model.  Figure 4 in the supplement shows the
+% corresponding predictive intervals obtained from HHH4.  
+Evaluating the predictions of weekly incidence showed similar performance 
+across the methods in many scenarios, although KCDE showed more stable and 
+calibrated performance across long horizons, especially in years that had 
+unusually high incidence.
+For predictions of
 dengue fever incidence, at a prediction horizon of one week the point
 predictions from all three methods are similar, although the intervals from
-SARIMA are quite a bit wider than those from KCDE and HHH4.  All three methods
+SARIMA are quite a bit wider than those from KCDE and HHH4 
+(Figure~\ref{fig:DengueRibbonsPredictions} and Supplemental Figure 4).  
+All three methods
 struggle at larger prediction horizons, but it appears that the SARIMA and HHH4
 models have more difficulty with aligning the predictive distribution with the
 season's peak, particularly in the two seasons with higher incidence.
@@ -1953,47 +1962,56 @@ ili_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor <-
 @
 
 
-Figure~\ref{fig:DengueLogScoreDiffVsReportedCasesCombined} offers a more
-quantitative view of the results for the Periodic, Full Bandwidth KCDE model
-in the application to dengue fever in terms of differences in log scores from
-the baseline models.
-The figure shows that the Periodic, Full Bandwidth KCDE model particularly
-outperformed the baseline models in predictions for times of high incidence near the season peaks.  In weeks with
-fewer than 93 reported cases (roughly one third of the maximum weekly case count
+% Figure~\ref{fig:AggregatedFluResultsBoxPlots} summarizes
+% the results for all of the KCDE specifications in both applications, aggregated
+% across all prediction target weeks and prediction horizons.
+We evaluated the performance of all KCDE specifications against the baseline 
+model(s) for each dataset.
+In all cases, the median performance of KCDE specifications without the periodic
+kernel is slightly lower than the baseline models, but the median performance of
+specifications with the periodic kernel is similar to or slightly better than
+the baseline models (Figure~\ref{fig:AggregatedFluResultsBoxPlots} and Supplemental Figure 4).  
+Using the fully parameterized bandwidth matrix generally had little
+impact on the quality of the predictive distributions as measured by the log score.
+% In the application to predicting dengue, 
+% % the pattern we
+% % saw in Figure~\ref{fig:DengueLogScoreDiffVsReportedCasesCombined} holds for all
+% % of the KCDE specifications: 
+% all KCDE specifications outperformed the baseline models for
+% predictions of high incidence near the season peaks.  
+% In Figure~\ref{fig:AggregatedFluResultsBoxPlots}, these cases are visible as
+% positive outliers in the boxplots.  This pattern does not hold in the
+% application to influenza.  
+For the influenza application, the KCDE specifications
+including the periodic kernel component performed about as well as SARIMA
+throughout the season. 
+We chose the Periodic, Full Bandwidth KCDE specification as the best-performing 
+KCDE specification for further comparison.
+
+The Periodic, Full Bandwidth KCDE model particularly
+% Figure~\ref{fig:DengueLogScoreDiffVsReportedCasesCombined} offers a more
+% quantitative view of the results for the Periodic, Full Bandwidth KCDE model
+% in the application to dengue fever in terms of differences in log scores from
+% the baseline models.
+% The figure shows that 
+outperformed the baseline models in predictions for times of high incidence near
+the season peaks (Figure~\ref{fig:DengueLogScoreDiffVsReportedCasesCombined}).  
+In weeks with fewer than 93 reported cases (roughly one third of the maximum weekly case count
 in the testing period), the average log score difference between the predictions
-from the Periodic, Full Bandwidth KCDE model and the SARIMA model was about
-0.252 with a standard deviation of 0.733; the average log score difference in
-comparison to HHH4 in this incidence range was about -0.009 with a standard
-deviation of 0.378.  These differences indicate that KCDE had similar
+from KCDE and SARIMA was about 0.252 (sd = 0.733), where values greater than zero 
+show KCDE making more accurate predictions than SARIMA.
+The average log score difference in comparison to HHH4 in this incidence range 
+was about -0.009 (sd = 0.378). These differences indicate that KCDE had similar
 performance to the baseline models in periods of low incidence.
-In weeks with more than 184 reported cases, in the upper third, the mean difference in log scores was about 1.589
-with a standard deviation of 1.598 relative to SARIMA, and about 2.060 with a
-standard deviation of 1.324 relative to HHH4.
+However, in weeks with more than 184 reported cases (the upper tertile) 
+the mean difference in log scores was about 1.589 (sd = 1.598) relative to SARIMA, 
+and about 2.060 (sd = 1.324) relative to HHH4.
 Translating to a probability scale, in these periods of high incidence KCDE
 assigned about 5 times higher probability to the observed outcome as SARIMA on average and
 almost 8 times higher probability as HHH4 on average.  Moreover, there were
 outlying cases where KCDE assigned up to about 450 times as much probability to
 the realized outcome as SARIMA, and over 100 times as much probability as HHH4.
 
-Figure~\ref{fig:AggregatedFluResultsBoxPlots} summarizes
-the results for all of the KCDE specifications in both applications, aggregated
-across all prediction target weeks and prediction horizons.
-In all cases, the median performance of KCDE specifications without the periodic
-kernel is slightly lower than the baseline models, but the median performance of
-specifications with the periodic kernel is similar to or slightly better than
-the baseline models.  Including the periodic kernel component led
-to improved predictions; this can also be seen directly in Figure 4 of the
-supplement.  Using the fully parameterized bandwidth matrix generally had little
-impact on the quality of the predictive distributions as measured by the log score.
-In the application to predicting dengue, the pattern we
-saw in Figure~\ref{fig:DengueLogScoreDiffVsReportedCasesCombined} holds for all
-of the KCDE specifications: KCDE outperformed the baseline models for
-predictions of high incidence near the season peaks.  In
-Figure~\ref{fig:AggregatedFluResultsBoxPlots}, these cases are visible as
-positive outliers in the boxplots.  This pattern does not hold in the
-application to influenza.  For that application, the KCDE specifications
-including the periodic kernel component performed about as well as SARIMA
-throughout the season.
 
 
 
@@ -2077,39 +2095,39 @@ throughout the season.
 %    factor(combined_contrast_bw_full$fixed_values[inds]),
 %    mean)
 
+In all cases and for both diseases, all methods evaluated tend to converge 
+rapidly on the truth once the peak week has passed 
+(Figure~\ref{fig:CombinedPeakWeekIncidencePredictionLogScores} and 
+Supplemental Figures 5 through 9).
+
+% Figure~\ref{fig:CombinedPeakWeekIncidencePredictionLogScores} displays the log
+% score of the predictive distributions for incidence in the peak week
+% obtained from SARIMA and KCDE models over the course of each season in the test data sets, and
+% Figure 5 in the supplement displays log scores for predictions of
+% peak week timing.  Figures 6 through 9 of the supplement give the full
+% predictive distributions for peak week timing and incidence.
 
 
-
-
-
-
-
-Figure~\ref{fig:CombinedPeakWeekIncidencePredictionLogScores} displays the log
-score of the predictive distributions for incidence in the peak week
-obtained from SARIMA and KCDE models over the course of each season in the test data sets, and
-Figure 5 in the supplement displays log scores for predictions of
-peak week timing.  Figures 6 through 9 of the supplement give the full
-predictive distributions for peak week timing and incidence.
-In all cases, the methods rapidly converge on the truth once the peak week has
-passed.
-
-In the application to dengue, HHH4 is outperformed by KCDE and SARIMA for
-predictions of peak incidence made early in the season.  In the two dengue
-seasons with low incidence, HHH4 offered small gains in predictions for peak
-week incidence relative to KCDE and SARIMA, but these are offset by very large drops in performance for predictions made in the first 10 to 20
-weeks of the two seasons with higher peaks.  The SARIMA and KCDE models performed very
-similarly in five of the seven seasons included in the testing period, including
-all four dengue seasons.  In the application to influenza, SARIMA performed
-better than KCDE in predicting peak incidence in the season with low incidence,
-but was outperformed by KCDE in the season with high incidence.  However, the
-SARIMA model was quite a bit worse than the naive prediction of assigning equal
-probability to each incidence bin in the season with high incidence, whereas KCDE never did much worse than using equal bin
-probabilities.  For predictions of peak week timing, performance of HHH4 and
-KCDE is similar in the application to Dengue.  Performance of the SARIMA model
-is more variable; the method underperforms relative to KCDE in some seasons but
-does better than KCDE in other seasons with no clear patterns.  Overall, the
-performance of early-season predictions of peak week timing and incidence from
-KCDE is more stable than the predictions from either of the baseline models.
+% Overall, the
+% performance of early-season predictions of peak week timing and incidence from
+% KCDE is more stable than the predictions from either of the baseline models.
+% Generally speaking, performance of both the SARIMA and HHH4 models
+% is more variable; the methods underperform (occasionally drastically) relative to KCDE in some seasons but
+% do better than KCDE at specific times in other seasons.  
+% In the application to dengue, HHH4 is outperformed by KCDE and SARIMA for
+% predictions of peak incidence made early in the season.  In the two dengue
+% seasons with low incidence, HHH4 offered small gains in predictions for peak
+% week incidence relative to KCDE and SARIMA, but these are offset by very large 
+% drops in performance for predictions made in the first 10 to 20
+% weeks of the two seasons with higher peaks.  The SARIMA and KCDE models performed very
+% similarly in five of the seven seasons included in the testing period, including
+% all four dengue seasons.  In the application to influenza, SARIMA performed
+% better than KCDE in predicting peak incidence in the season with low incidence,
+% but was outperformed by KCDE in the season with high incidence.  However, the
+% SARIMA model was quite a bit worse than the naive prediction of assigning equal
+% probability to each incidence bin in the season with high incidence, whereas KCDE never did much worse than using equal bin
+% probabilities.  For predictions of peak week timing, performance of HHH4 and
+% KCDE is similar in the application to Dengue.  
 
 %
 %If we consider the three seasons in the Influenza data set, KCDE tended to
@@ -3963,22 +3981,31 @@ peak_height_pred_dist_by_analysis_time_dengue$bin_center <-
 \section{Conclusions}
 
 Prediction of infectious disease incidence at horizons of more than a few weeks
-is a challenging task.  We have presented a semi-parametric approach to doing
+is a challenging task.  We have presented a non-parametric approach to doing
 this based on KCDE and copulas and found that it is a viable method that
 can yield improved predictions relative to commonly employed methods in this
 field.  In predicting incidence of dengue fever in individual weeks,
 our approach offered consistent and substantial performance gains relative to a
 SARIMA model and the HHH4 model.  These improvements were particularly
-concentrated in the times that are of most interest to public health decision makers: periods of high
-incidence near the season peak.  In the application to influenza,
+concentrated in the times that are of most interest to public health decision 
+makers: periods of high incidence near the season peak.  
+
+Overall, across both
+data sets our method offered more consistency than either of the
+baseline models in early-season predictions for the timing of
+and incidence in the peak week. In the application to influenza,
 our method did about as well as SARIMA when predicting incidence in individual
 weeks.  Our method also outperformed HHH4 for predictions of
-incidence in the peak week in the application to dengue.  Overall, across both
-data sets our method offered more consistency than either of the
-baseline models for predictions made early in the season for the timing of
-and incidence in the peak week.  These improvements in
-early-season predictions are valuable to public health officials planning interventions several weeks or months before the peak
-of the disease season.
+incidence in the peak week in the application to dengue.  In seasons with high incidence both baseline 
+models made worse predictions than a na\"ive model assigning equal probability to each 
+incidence bin, whereas KCDE never did much worse than this na\"ive model.  
+These improvements in early-season predictions are valuable to public health 
+officials planning interventions several weeks or months before the peak
+of the disease season. 
+However, since year-to-year variation is substantial, continued evaluation of 
+these methods on datasets with longer prospective testing phases could provide better 
+information about long-run performance of all of these methods.
+
 
 Our implementation of KCDE offers two main methodological contributions.  Most
 importantly in the context of modeling infectious disease, we have introduced the use of a periodic kernel
@@ -3998,9 +4025,9 @@ We believe that the difference in relative performance of KCDE and the baseline
 models for prediction in the dengue and influenza data sets can be explained to
 a great extent by differences in the underlying disease processes and how they relate to
 the model specifications.  The most salient difference between the two
-time series depicted in Figure~\ref{fig:IntialDataPlots} is the much greater
-season-to-season variablility in the dengue data set relative to the influenza
-data set.  For dengue, the peak incidence in the largest season is about 30
+time series is the much greater season-to-season variablility in the dengue 
+data set relative to the influenza data set (Figure~\ref{fig:IntialDataPlots}).  
+For dengue, the peak incidence in the largest season is about 30
 times larger than the peak incidence in the smallest season; this ratio is only
 about 3 for influenza.  It may be the case that the restrictive
 structure of the SARIMA and HHH4 models means that they are not able to capture
@@ -4042,7 +4069,8 @@ and incidence in the peak week in the dengue data.  Similarly, the standard
 SARIMA model is formulated in terms of continuous distributions.  The
 resulting continuous predictive distributions can be discretized as we have
 done in this article, but without extra coding effort the method is not
-appropriate for use with case count data when small integer numbers of cases are reported.  Furthermore, our approach consistently
+appropriate for use with case count data when small integer numbers of cases 
+are reported.  Furthermore, our approach consistently
 equalled or exceeded the performance SARIMA across the applications to dengue
 and influenza.
 
@@ -4088,10 +4116,13 @@ We conjecture
 that by introducing an appropriate penalty on the elements bandwidth
 matrix, we could include more (possibly
 irrelevant) conditioning variables in the model without requiring
-a dramatically larger sample size.  In particular, we hypothesize that a
-penalty on the inverse of the bandwidth matrix encouraging it to have small
-eigenvalues could be helpful.  If successful, this would also enable further
-exploration of using other predictive variables such as weather in the model.
+a dramatically larger sample size.  
+%In particular, we hypothesize that a
+%penalty on the inverse of the bandwidth matrix encouraging it to have small
+%eigenvalues could be helpful.  
+If successful, this would also enable further
+exploration of using other predictive variables such as weather or 
+incidence measures from neighboring locations in the model.
 %A similar effect could be achieved in
 %a Bayesian framework by using Dirichlet process mixtures with informative priors
 %on the mixture component covariances.
@@ -4136,7 +4167,7 @@ outperform incorrectly specified parametric models.
 %On the other hand,   An
 An evaluation of the benefits of an approach such as KCDE is therefore dependent
 on the particular characteristics of the system being modeled, the data that are
-available, and the quality of the models that are considered as alternatives.
+available, and the quality of the models that are considered as alternatives. 
 
 However, rather than selecting one ``preferred'' modeling framework or
 model formulation, we believe it may be fruitful to incorporate the methods
