@@ -1,6 +1,7 @@
 # article-disease-pred-with-kcde
 
 This repository contains code and data used in writing the paper "Infectious Disease Prediction with Kernel Conditional Density Estimation". It is organized as an R package, but formal installation as such is not necessary. Installation of 3 other R packages hosted on github is either helpful or required:
+
 1. https://github.com/reichlab/kcde (required): A package implementing estimation of KCDE models, oriented towards time series
 2. https://github.com/reichlab/pdtmvn (required): A package implementing partially discretized truncated multivariate normal distributions.
 3. https://github.com/reichlab/mvtnorm-mod-kcde (optional): A version of the mvtnorm package for R, modified for speed improvements. Installing this instead of the mvtnorm package will result in approximately 30% reductions in run time for some kcde specifications.
