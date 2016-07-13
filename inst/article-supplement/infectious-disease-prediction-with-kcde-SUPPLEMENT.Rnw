@@ -505,14 +505,63 @@ Periodic, Full Bandwidth KCDE model.}
 \end{figure}
 
 
+%<<DengueDataMergePredictionResults, echo = FALSE>>=
+%dengue_prediction_results_sarima <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/dengue_sj/prediction-results/sarima-predictions.rds")
+%dengue_prediction_results_hhh4 <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/dengue_sj/prediction-results/surveillance-predictions.rds")
+%dengue_prediction_results_kcde <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/dengue_sj/prediction-results/kcde-predictions.rds")
+%dengue_prediction_results_kcde$model <- "KCDE"
+%dengue_prediction_results <- rbind.fill(dengue_prediction_results_sarima[!is.na(dengue_prediction_results_sarima$log_score), ],
+%    dengue_prediction_results_hhh4,
+%    dengue_prediction_results_kcde)
+%dengue_prediction_results$AE <- unlist(dengue_prediction_results$AE)
+%     
+%dengue_prediction_results$full_model_descriptor <- paste0(dengue_prediction_results$model,
+%    "-seasonal_lag_", dengue_prediction_results$max_seasonal_lag,
+%#    "-filtering_", dengue_prediction_results$filtering,
+%    "-differencing_", dengue_prediction_results$differencing,
+%    "-periodic_", dengue_prediction_results$seasonality,
+%    "-bw_", dengue_prediction_results$bw_parameterization)
+%
+%dengue_prediction_log_score_diffs_from_sarima_wide <- dengue_prediction_results %>%
+%    select(full_model_descriptor, prediction_time, prediction_horizon, log_score) %>%
+%    spread(full_model_descriptor, log_score)
+%
+%dengue_prediction_log_score_diffs_from_sarima_wide[, unique(dengue_prediction_results$full_model_descriptor)] <-
+%    dengue_prediction_log_score_diffs_from_sarima_wide[, unique(dengue_prediction_results$full_model_descriptor)] -
+%    dengue_prediction_log_score_diffs_from_sarima_wide[, "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"]
+%
+%dengue_prediction_log_score_diffs_from_sarima_long <- dengue_prediction_log_score_diffs_from_sarima_wide %>%
+%    gather_("model", "log_score_difference", unique(dengue_prediction_results$full_model_descriptor)) %>%
+%    mutate(
+%        seasonal_lag = grepl("seasonal_lag_1", model),
+%        differencing = grepl("differencing_TRUE", model),
+%        periodic = grepl("periodic_TRUE", model),
+%        bw_full = grepl("bw_full", model)
+%    )
+%dengue_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor <- "Null KCDE"
+%dengue_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+%    dengue_prediction_log_score_diffs_from_sarima_long$periodic & !dengue_prediction_log_score_diffs_from_sarima_long$bw_full] <-
+%    "Periodic KCDE"
+%dengue_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+%    !dengue_prediction_log_score_diffs_from_sarima_long$periodic & dengue_prediction_log_score_diffs_from_sarima_long$bw_full] <-
+%    "Full Bandwidth KCDE"
+%dengue_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+%    dengue_prediction_log_score_diffs_from_sarima_long$periodic & dengue_prediction_log_score_diffs_from_sarima_long$bw_full] <-
+%    "Periodic, Full Bandwidth KCDE"
+%dengue_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor <-
+%    factor(dengue_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor,
+%        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE"))
+%@
 <<DengueDataMergePredictionResults, echo = FALSE>>=
 dengue_prediction_results_sarima <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/dengue_sj/prediction-results/sarima-predictions.rds")
+dengue_prediction_results_hhh4 <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/dengue_sj/prediction-results/surveillance-predictions.rds")
 dengue_prediction_results_kcde <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/dengue_sj/prediction-results/kcde-predictions.rds")
 dengue_prediction_results_kcde$model <- "KCDE"
 dengue_prediction_results <- rbind.fill(dengue_prediction_results_sarima[!is.na(dengue_prediction_results_sarima$log_score), ],
+    dengue_prediction_results_hhh4,
     dengue_prediction_results_kcde)
 dengue_prediction_results$AE <- unlist(dengue_prediction_results$AE)
-     
+
 dengue_prediction_results$full_model_descriptor <- paste0(dengue_prediction_results$model,
     "-seasonal_lag_", dengue_prediction_results$max_seasonal_lag,
 #    "-filtering_", dengue_prediction_results$filtering,
@@ -546,9 +595,45 @@ dengue_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor[
 dengue_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor[
     dengue_prediction_log_score_diffs_from_sarima_long$periodic & dengue_prediction_log_score_diffs_from_sarima_long$bw_full] <-
     "Periodic, Full Bandwidth KCDE"
+dengue_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    dengue_prediction_log_score_diffs_from_sarima_long$model == "HHH4-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+    ] <- "HHH4"
 dengue_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor <-
     factor(dengue_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor,
-        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE"))
+        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE", "HHH4"))
+
+dengue_prediction_log_score_diffs_from_hhh4_wide <- dengue_prediction_results %>%
+    select(full_model_descriptor, prediction_time, prediction_horizon, log_score) %>%
+    spread(full_model_descriptor, log_score)
+
+dengue_prediction_log_score_diffs_from_hhh4_wide[, unique(dengue_prediction_results$full_model_descriptor)] <-
+    dengue_prediction_log_score_diffs_from_hhh4_wide[, unique(dengue_prediction_results$full_model_descriptor)] -
+    dengue_prediction_log_score_diffs_from_hhh4_wide[, "HHH4-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"]
+
+dengue_prediction_log_score_diffs_from_hhh4_long <- dengue_prediction_log_score_diffs_from_hhh4_wide %>%
+    gather_("model", "log_score_difference", unique(dengue_prediction_results$full_model_descriptor)) %>%
+    mutate(
+        seasonal_lag = grepl("seasonal_lag_1", model),
+        differencing = grepl("differencing_TRUE", model),
+        periodic = grepl("periodic_TRUE", model),
+        bw_full = grepl("bw_full", model)
+    )
+dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor <- "Null KCDE"
+dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor[
+    dengue_prediction_log_score_diffs_from_hhh4_long$periodic & !dengue_prediction_log_score_diffs_from_hhh4_long$bw_full] <-
+    "Periodic KCDE"
+dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor[
+    !dengue_prediction_log_score_diffs_from_hhh4_long$periodic & dengue_prediction_log_score_diffs_from_hhh4_long$bw_full] <-
+    "Full Bandwidth KCDE"
+dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor[
+    dengue_prediction_log_score_diffs_from_hhh4_long$periodic & dengue_prediction_log_score_diffs_from_hhh4_long$bw_full] <-
+    "Periodic, Full Bandwidth KCDE"
+dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor[
+    dengue_prediction_log_score_diffs_from_hhh4_long$model == "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+] <- "SARIMA"
+dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor <-
+    factor(dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor,
+        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE", "SARIMA"))
 @
 
 <<FluDataMergePredictionResults, echo = FALSE>>=
@@ -1533,6 +1618,355 @@ In the lower panel positive values indicate cases when the specification of KCDE
 with a fully parameterized bandwidth outperformed the corresponding KCDE
 specification with a diagonal bandwidth matrix.}
 \label{fig:AggregatedApplicationResultsContrastsBoxPlots}
+\end{figure}
+
+
+
+\begin{figure}
+<<DengueLogScoreDiffNullVsReportedCasesCombined, echo = FALSE, fig.height = 8.4, fig.keep = "last", dev = "cairo_ps">>=
+temp <- dengue_sj[, c("time", "total_cases", "season")]
+colnames(temp) <- c("prediction_time", "total_cases", "season")
+
+dengue_prediction_log_score_diffs_from_sarima_long_test <-
+    dengue_prediction_log_score_diffs_from_sarima_long %>%
+    left_join(temp, by = "prediction_time", copy = TRUE)
+dengue_prediction_log_score_diffs_from_hhh4_long_test <-
+    dengue_prediction_log_score_diffs_from_hhh4_long %>%
+    left_join(temp, by = "prediction_time", copy = TRUE)
+
+dengue_prediction_log_score_diffs_from_sarima_long_test$baseline_model = "SARIMA"
+dengue_prediction_log_score_diffs_from_hhh4_long_test$baseline_model = "HHH4"
+dengue_prediction_log_score_diffs_from_baseline <- rbind.fill(
+    dengue_prediction_log_score_diffs_from_sarima_long_test,
+    dengue_prediction_log_score_diffs_from_hhh4_long_test
+)
+
+
+#color_palette <- c("#D55E00", "#56B4E9")
+#scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
+#    geom_point(aes(x = total_cases, y = log_score_difference, colour = baseline_model, shape = baseline_model),
+#        alpha = 0.4,
+#        data = dengue_prediction_log_score_diffs_from_baseline[dengue_prediction_log_score_diffs_from_baseline$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full", ]) +
+#    geom_hline(yintercept = 0) +
+#    geom_smooth(aes(x = total_cases, y = log_score_difference, colour = baseline_model),
+#        method = lm,
+##        colour = "#56B4E9",
+#        data = dengue_prediction_log_score_diffs_from_baseline[dengue_prediction_log_score_diffs_from_baseline$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full", ]) +
+#    scale_colour_manual("Baseline Model", values = color_palette) +
+#    scale_shape("Baseline Model") +
+#    facet_wrap( ~ season, ncol = 1) +
+#    xlab("Reported Dengue Cases in Prediction Target Week") +
+#    ylab("Log Score Difference") +
+#    ggtitle("Comparison of Periodic, Full Bandwidth KCDE Model and Baseline Models\nvs. Reported Dengue Cases in Prediction Target Week") +
+#    theme_bw(base_size = 11)
+#
+#print(scatterplot_dengue_diff_from_baseline_by_obs_cases)
+
+
+
+
+color_palette <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442")
+
+scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
+    geom_point(aes(x = total_cases, y = log_score_difference, colour = season, shape = season),
+#        alpha = 0.5,
+        data = dengue_prediction_log_score_diffs_from_baseline[dengue_prediction_log_score_diffs_from_baseline$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_diagonal", ]) +
+    geom_hline(yintercept = 0) +
+    geom_smooth(aes(x = total_cases, y = log_score_difference, colour = season),
+        method = lm,
+        se = FALSE,
+#        size = 1.5,
+#        colour = "#56B4E9",
+        data = dengue_prediction_log_score_diffs_from_baseline[dengue_prediction_log_score_diffs_from_baseline$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_diagonal", ]) +
+    scale_colour_manual("Season", values = color_palette) +
+    scale_shape("Season") +
+    facet_wrap( ~ baseline_model, ncol = 1) +
+    xlab("Reported Dengue Cases in Prediction Target Week") +
+    ylab("Log Score Difference") +
+    ggtitle("Comparison of Null KCDE Model and Baseline Models\nvs. Reported Dengue Cases in Prediction Target Week") +
+    theme_bw(base_size = 11)
+
+print(scatterplot_dengue_diff_from_baseline_by_obs_cases)
+
+#suppressWarnings(print(p))
+grid_list <- capture.output(grid.ls())
+legend_grob <- grid.get(str_trim(grid_list[grep("guide-box", grid_list)]))
+    
+scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
+    geom_point(aes(x = total_cases, y = log_score_difference, colour = season, shape = season),
+        alpha = 0.5,
+        data = dengue_prediction_log_score_diffs_from_baseline[dengue_prediction_log_score_diffs_from_baseline$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_diagonal", ]) +
+    geom_hline(yintercept = 0) +
+    geom_smooth(aes(x = total_cases, y = log_score_difference, colour = season),
+        method = lm,
+        se = FALSE,
+        size = 1.5,
+#        colour = "#56B4E9",
+        data = dengue_prediction_log_score_diffs_from_baseline[dengue_prediction_log_score_diffs_from_baseline$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_diagonal", ]) +
+    scale_colour_manual("Season", values = color_palette) +
+    scale_shape("Season") +
+    facet_wrap( ~ baseline_model, ncol = 1,
+        labeller = as_labeller(function(labels, ...) {
+            labels <- paste0("Baseline Model: ", labels)
+            return(labels)
+        })) +
+    xlab("Reported Dengue Cases in Prediction Target Week") +
+    ylab("Log Score Difference") +
+    ggtitle("Comparison of Null KCDE Model and Baseline Models\nvs. Reported Dengue Cases in Prediction Target Week") +
+    theme_bw(base_size = 11) +
+    theme(legend.position = "none")
+
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(nrow = 1, ncol = 2,
+#            heights = unit(c(1, 3), c("null", "null")),
+            heights = unit(c(1), c("null")),
+            widths = unit(c(5, 1), c("null", "null")))))
+print(scatterplot_dengue_diff_from_baseline_by_obs_cases, vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
+pushViewport(viewport(layout.pos.row = 1, layout.pos.col = 2))
+grid.draw(legend_grob)
+upViewport()
+@
+\caption{Differences in log scores for the weekly predictive distributions
+obtained from the Null KCDE model and the baseline
+models, plotted against the observed incidence in the week being predicted.
+For reference, a log score difference of 2.3 (4.6) indicates that the predictive density from KCDE was about 10 (100)
+times as large as the predictive density from the baseline model at the realized outcome.  Each
+point corresponds to a unique combination of prediction target week and
+prediction horizon.
+}
+\label{fig:DengueLogScoreDiffNullVsReportedCasesCombined}
+\end{figure}
+
+
+\begin{figure}
+<<DengueLogScoreDiffFullVsReportedCasesCombined, echo = FALSE, fig.height = 8.4, fig.keep = "last", dev = "cairo_ps">>=
+temp <- dengue_sj[, c("time", "total_cases", "season")]
+colnames(temp) <- c("prediction_time", "total_cases", "season")
+
+dengue_prediction_log_score_diffs_from_sarima_long_test <-
+    dengue_prediction_log_score_diffs_from_sarima_long %>%
+    left_join(temp, by = "prediction_time", copy = TRUE)
+dengue_prediction_log_score_diffs_from_hhh4_long_test <-
+    dengue_prediction_log_score_diffs_from_hhh4_long %>%
+    left_join(temp, by = "prediction_time", copy = TRUE)
+
+dengue_prediction_log_score_diffs_from_sarima_long_test$baseline_model = "SARIMA"
+dengue_prediction_log_score_diffs_from_hhh4_long_test$baseline_model = "HHH4"
+dengue_prediction_log_score_diffs_from_baseline <- rbind.fill(
+    dengue_prediction_log_score_diffs_from_sarima_long_test,
+    dengue_prediction_log_score_diffs_from_hhh4_long_test
+)
+
+
+#color_palette <- c("#D55E00", "#56B4E9")
+#scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
+#    geom_point(aes(x = total_cases, y = log_score_difference, colour = baseline_model, shape = baseline_model),
+#        alpha = 0.4,
+#        data = dengue_prediction_log_score_diffs_from_baseline[dengue_prediction_log_score_diffs_from_baseline$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full", ]) +
+#    geom_hline(yintercept = 0) +
+#    geom_smooth(aes(x = total_cases, y = log_score_difference, colour = baseline_model),
+#        method = lm,
+##        colour = "#56B4E9",
+#        data = dengue_prediction_log_score_diffs_from_baseline[dengue_prediction_log_score_diffs_from_baseline$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full", ]) +
+#    scale_colour_manual("Baseline Model", values = color_palette) +
+#    scale_shape("Baseline Model") +
+#    facet_wrap( ~ season, ncol = 1) +
+#    xlab("Reported Dengue Cases in Prediction Target Week") +
+#    ylab("Log Score Difference") +
+#    ggtitle("Comparison of Periodic, Full Bandwidth KCDE Model and Baseline Models\nvs. Reported Dengue Cases in Prediction Target Week") +
+#    theme_bw(base_size = 11)
+#
+#print(scatterplot_dengue_diff_from_baseline_by_obs_cases)
+
+
+
+
+color_palette <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442")
+
+scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
+    geom_point(aes(x = total_cases, y = log_score_difference, colour = season, shape = season),
+#        alpha = 0.5,
+        data = dengue_prediction_log_score_diffs_from_baseline[dengue_prediction_log_score_diffs_from_baseline$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_full", ]) +
+    geom_hline(yintercept = 0) +
+    geom_smooth(aes(x = total_cases, y = log_score_difference, colour = season),
+        method = lm,
+        se = FALSE,
+#        size = 1.5,
+#        colour = "#56B4E9",
+        data = dengue_prediction_log_score_diffs_from_baseline[dengue_prediction_log_score_diffs_from_baseline$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_full", ]) +
+    scale_colour_manual("Season", values = color_palette) +
+    scale_shape("Season") +
+    facet_wrap( ~ baseline_model, ncol = 1) +
+    xlab("Reported Dengue Cases in Prediction Target Week") +
+    ylab("Log Score Difference") +
+    ggtitle("Comparison of Full Bandwidth KCDE Model and Baseline Models\nvs. Reported Dengue Cases in Prediction Target Week") +
+    theme_bw(base_size = 11)
+
+print(scatterplot_dengue_diff_from_baseline_by_obs_cases)
+
+#suppressWarnings(print(p))
+grid_list <- capture.output(grid.ls())
+legend_grob <- grid.get(str_trim(grid_list[grep("guide-box", grid_list)]))
+    
+scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
+    geom_point(aes(x = total_cases, y = log_score_difference, colour = season, shape = season),
+        alpha = 0.5,
+        data = dengue_prediction_log_score_diffs_from_baseline[dengue_prediction_log_score_diffs_from_baseline$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_full", ]) +
+    geom_hline(yintercept = 0) +
+    geom_smooth(aes(x = total_cases, y = log_score_difference, colour = season),
+        method = lm,
+        se = FALSE,
+        size = 1.5,
+#        colour = "#56B4E9",
+        data = dengue_prediction_log_score_diffs_from_baseline[dengue_prediction_log_score_diffs_from_baseline$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_FALSE-bw_full", ]) +
+    scale_colour_manual("Season", values = color_palette) +
+    scale_shape("Season") +
+    facet_wrap( ~ baseline_model, ncol = 1,
+        labeller = as_labeller(function(labels, ...) {
+            labels <- paste0("Baseline Model: ", labels)
+            return(labels)
+        })) +
+    xlab("Reported Dengue Cases in Prediction Target Week") +
+    ylab("Log Score Difference") +
+    ggtitle("Comparison of Full Bandwidth KCDE Model and Baseline Models\nvs. Reported Dengue Cases in Prediction Target Week") +
+    theme_bw(base_size = 11) +
+    theme(legend.position = "none")
+
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(nrow = 1, ncol = 2,
+#            heights = unit(c(1, 3), c("null", "null")),
+            heights = unit(c(1), c("null")),
+            widths = unit(c(5, 1), c("null", "null")))))
+print(scatterplot_dengue_diff_from_baseline_by_obs_cases, vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
+pushViewport(viewport(layout.pos.row = 1, layout.pos.col = 2))
+grid.draw(legend_grob)
+upViewport()
+@
+\caption{Differences in log scores for the weekly predictive distributions
+obtained from the Full Bandwidth KCDE model and the baseline
+models, plotted against the observed incidence in the week being predicted.
+For reference, a log score difference of 2.3 (4.6) indicates that the predictive density from KCDE was about 10 (100)
+times as large as the predictive density from the baseline model at the realized outcome.  Each
+point corresponds to a unique combination of prediction target week and
+prediction horizon.
+}
+\label{fig:DengueLogScoreDiffFullVsReportedCasesCombined}
+\end{figure}
+
+
+\begin{figure}
+<<DengueLogScoreDiffPeriodicDiagonalVsReportedCasesCombined, echo = FALSE, fig.height = 8.4, fig.keep = "last", dev = "cairo_ps">>=
+temp <- dengue_sj[, c("time", "total_cases", "season")]
+colnames(temp) <- c("prediction_time", "total_cases", "season")
+
+dengue_prediction_log_score_diffs_from_sarima_long_test <-
+    dengue_prediction_log_score_diffs_from_sarima_long %>%
+    left_join(temp, by = "prediction_time", copy = TRUE)
+dengue_prediction_log_score_diffs_from_hhh4_long_test <-
+    dengue_prediction_log_score_diffs_from_hhh4_long %>%
+    left_join(temp, by = "prediction_time", copy = TRUE)
+
+dengue_prediction_log_score_diffs_from_sarima_long_test$baseline_model = "SARIMA"
+dengue_prediction_log_score_diffs_from_hhh4_long_test$baseline_model = "HHH4"
+dengue_prediction_log_score_diffs_from_baseline <- rbind.fill(
+    dengue_prediction_log_score_diffs_from_sarima_long_test,
+    dengue_prediction_log_score_diffs_from_hhh4_long_test
+)
+
+
+#color_palette <- c("#D55E00", "#56B4E9")
+#scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
+#    geom_point(aes(x = total_cases, y = log_score_difference, colour = baseline_model, shape = baseline_model),
+#        alpha = 0.4,
+#        data = dengue_prediction_log_score_diffs_from_baseline[dengue_prediction_log_score_diffs_from_baseline$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full", ]) +
+#    geom_hline(yintercept = 0) +
+#    geom_smooth(aes(x = total_cases, y = log_score_difference, colour = baseline_model),
+#        method = lm,
+##        colour = "#56B4E9",
+#        data = dengue_prediction_log_score_diffs_from_baseline[dengue_prediction_log_score_diffs_from_baseline$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full", ]) +
+#    scale_colour_manual("Baseline Model", values = color_palette) +
+#    scale_shape("Baseline Model") +
+#    facet_wrap( ~ season, ncol = 1) +
+#    xlab("Reported Dengue Cases in Prediction Target Week") +
+#    ylab("Log Score Difference") +
+#    ggtitle("Comparison of Periodic, Full Bandwidth KCDE Model and Baseline Models\nvs. Reported Dengue Cases in Prediction Target Week") +
+#    theme_bw(base_size = 11)
+#
+#print(scatterplot_dengue_diff_from_baseline_by_obs_cases)
+
+
+
+
+color_palette <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442")
+
+scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
+    geom_point(aes(x = total_cases, y = log_score_difference, colour = season, shape = season),
+#        alpha = 0.5,
+        data = dengue_prediction_log_score_diffs_from_baseline[dengue_prediction_log_score_diffs_from_baseline$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_diagonal", ]) +
+    geom_hline(yintercept = 0) +
+    geom_smooth(aes(x = total_cases, y = log_score_difference, colour = season),
+        method = lm,
+        se = FALSE,
+#        size = 1.5,
+#        colour = "#56B4E9",
+        data = dengue_prediction_log_score_diffs_from_baseline[dengue_prediction_log_score_diffs_from_baseline$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_diagonal", ]) +
+    scale_colour_manual("Season", values = color_palette) +
+    scale_shape("Season") +
+    facet_wrap( ~ baseline_model, ncol = 1) +
+    xlab("Reported Dengue Cases in Prediction Target Week") +
+    ylab("Log Score Difference") +
+    ggtitle("Comparison of Periodic, Diagonal Bandwidth KCDE Model and Baseline Models\nvs. Reported Dengue Cases in Prediction Target Week") +
+    theme_bw(base_size = 11)
+
+print(scatterplot_dengue_diff_from_baseline_by_obs_cases)
+
+#suppressWarnings(print(p))
+grid_list <- capture.output(grid.ls())
+legend_grob <- grid.get(str_trim(grid_list[grep("guide-box", grid_list)]))
+    
+scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
+    geom_point(aes(x = total_cases, y = log_score_difference, colour = season, shape = season),
+        alpha = 0.5,
+        data = dengue_prediction_log_score_diffs_from_baseline[dengue_prediction_log_score_diffs_from_baseline$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_diagonal", ]) +
+    geom_hline(yintercept = 0) +
+    geom_smooth(aes(x = total_cases, y = log_score_difference, colour = season),
+        method = lm,
+        se = FALSE,
+        size = 1.5,
+#        colour = "#56B4E9",
+        data = dengue_prediction_log_score_diffs_from_baseline[dengue_prediction_log_score_diffs_from_baseline$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_diagonal", ]) +
+    scale_colour_manual("Season", values = color_palette) +
+    scale_shape("Season") +
+    facet_wrap( ~ baseline_model, ncol = 1,
+        labeller = as_labeller(function(labels, ...) {
+            labels <- paste0("Baseline Model: ", labels)
+            return(labels)
+        })) +
+    xlab("Reported Dengue Cases in Prediction Target Week") +
+    ylab("Log Score Difference") +
+    ggtitle("Comparison of Periodic, Diagonal Bandwidth KCDE Model and Baseline Models\nvs. Reported Dengue Cases in Prediction Target Week") +
+    theme_bw(base_size = 11) +
+    theme(legend.position = "none")
+
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(nrow = 1, ncol = 2,
+#            heights = unit(c(1, 3), c("null", "null")),
+            heights = unit(c(1), c("null")),
+            widths = unit(c(5, 1), c("null", "null")))))
+print(scatterplot_dengue_diff_from_baseline_by_obs_cases, vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
+pushViewport(viewport(layout.pos.row = 1, layout.pos.col = 2))
+grid.draw(legend_grob)
+upViewport()
+@
+\caption{Differences in log scores for the weekly predictive distributions
+obtained from the Periodic, Diagonal Bandwidth KCDE model and the baseline
+models, plotted against the observed incidence in the week being predicted.
+For reference, a log score difference of 2.3 (4.6) indicates that the predictive density from KCDE was about 10 (100)
+times as large as the predictive density from the baseline model at the realized outcome.  Each
+point corresponds to a unique combination of prediction target week and
+prediction horizon.
+}
+\label{fig:DengueLogScoreDiffPeriodicDiagonalVsReportedCasesCombined}
 \end{figure}
 
 
