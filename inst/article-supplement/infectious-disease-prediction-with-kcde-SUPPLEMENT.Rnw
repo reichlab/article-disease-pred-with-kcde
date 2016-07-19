@@ -341,6 +341,51 @@ Figure~\ref{fig:PredictionTargetsIllustration}.
 %@
 %model for the Dengue data.
 
+\subsection{HHH4 Model}
+
+The HHH4 model for a single infectious disease incidence time series specifies
+that observed incidence $Z_t$ follows either a Poisson or a Negative Binomial
+distribution with mean parameterized as
+\begin{align*}
+E[Z_t] &= \lambda_t Z_{t - l} + \nu_t \text{, where} \\
+\log(\lambda_t) &= \alpha^{(\lambda)} + \sum_{s - 1}^{S^{(\lambda)}} \left\{ \gamma_s^{(\lambda)} \sin(\omega_w t) + \delta_s^{(\lambda)} \cos(\omega_s t) \right\} \\
+\log(\nu_t) &= \alpha^{(\nu)} + \sum_{s - 1}^{S^{(\nu)}} \left\{ \gamma_s^{(\nu)} \sin(\omega_w t) + \delta_s^{(\nu)} \cos(\omega_s t) \right\}
+\end{align*}
+
+In these equations, $l$ is a lag to use in the autoregressive term and
+$S^{(\lambda)}$ and $S^{(\nu)}$ specify the number of sinusoidal terms used to
+capture seasonality.  \citet{Held2012HHHSeasonality} advocate using performance
+of one-step-ahead predictions (as measured by the log score, ranked probability
+score, or squared error score) to select the model specification.
+In practice, they fix $l = 1$, vary $S^{(\lambda)} \in \{0, 1\}$, and either vary
+$S^{(\nu)} \in \{0, 1\}$ or fix $S^{(\nu)} = 3$ depending on the
+application.  In this work, we considered all possible model specifications that
+could be obtained by varying the following four factors:
+\begin{enumerate}
+\item Parametric family: $\{\text{Poisson}, \text{Negative Binomial}\}$
+\item $l \in \{1, 2, 3\}$
+\item $S^{(\lambda)} \in \{0, 1, 2, 3\}$
+\item $S^{(\nu)} \in \{0, 1, 2, 3\}$
+\end{enumerate}
+
+Following the examples in \citet{Held2012HHHSeasonality}, we selected the model
+with the best mean log score for predictions for the final two years of the
+training data.  The selected model had a Poisson family, $l = 1$,
+$S^{(\lambda)} = 0$, and $S^{(\nu)} = 3$.
+
+The surveillance package provides functionality to compute
+one-step-ahead predictive distributions and to iteratively sample trajectories
+over multiple time steps, but it does not provide functionality to compute the
+predictive distributions at horizons more than one step ahead.  For this
+article, we used an importance sampling estimate of the predictive density at
+horizons $h \geq 2$:
+\begin{align*}
+P(Z_{t + h} = z_{t + h} | z_t) &= \iint P(Z_{t + h} = z_{t + h}, \ldots, Z_{t + 1} = z_{t + 1} | z_t) \, d z_{t + 1} \cdots d z_{t + h - 1} \\
+&\approx \sum_{j = 1}^J P(Z_{t + h} = z_{t + h} | z^{(j)}_{t + h - 1}, \ldots, z^{(j)}_{t + 1}, z_t) \text{, where}
+\end{align*}
+$(z^{(j)}_{t + h - 1}, \ldots, z^{(j)}_{t + 1}),\, j = 1, \ldots, J$ are sampled
+from the joint distribution of $(Z_{t + h - 1}, \ldots, Z_{t + 1}) | z_t$.
+
 \subsection{Predictive Distributions for Individual Weeks: Additional Results}
 
 Here we present some additional results for predicting incidence in
