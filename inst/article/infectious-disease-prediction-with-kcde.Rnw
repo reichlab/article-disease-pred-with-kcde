@@ -545,8 +545,7 @@ the following functional form:
 K^{\text{inc}}_{\text{cont}}(\tilde{\bz}_{t^*}, \tilde{\bz}_{t}; \bB) = \frac{\exp\left[ -\frac{1}{2} \{\log(\tilde{\bz}_{t^*}) - \log(\tilde{\bz}_t) - \bB \b1\}' \bB^{-1} \{\log(\tilde{\bz}_{t^*}) - \log(\tilde{\bz}_t) - \bB \b1\} \right]}{(2 \pi)^{\frac{M+1}{2}} \vert \bB \vert^{\frac{1}{2}} z_{t^* + h} \prod_{m = 1}^M z_{t^* - l_m} }
 \end{equation}
 
-In this expression, the $\log$ operator applied to a vector takes the log of
-each component of that vector and $\b1$ is a column vector of ones.
+In this expression, $\b1$ is a column vector of ones.
 The matrix $\bB$ is a bandwidth matrix that
 controls the orientation and scale of the kernel function.  This bandwidth
 matrix is parameterized by $\btheta^h_{\text{inc}}$.  In this work we have considered
@@ -572,7 +571,7 @@ prediction contests
 EpidemicPredictionInitiative2015Index}).
 We apply our method to the data sets
 from those competitions in the applications section below, and report log
-scores in order to facilitate comparisons with other results from those
+scores to facilitate comparisons with other results from those
 competitions that may be published in the future.
 In general, the log score is a strictly proper scoring rule; i.e., its
 expectation is uniquely maximized by the true predictive
@@ -593,7 +592,7 @@ predictive distributions for individual prediction horizons obtained from KCDE t
 distribution for the trajectory of incidence over multiple time points. 
 The copula is a parametric function that captures the dependence relations among
 a collection of random variables and allows us to compute the joint distribution
-from the marginal distributions.  Figure 10 in the
+from the marginal distributions.  Figure 16 in the
 supplement shows that the copula induces positive correlation
 in the predictive distributions for incidence in nearby weeks, so that high
 incidence in one week is more likely to be followed by high incidence in
@@ -784,8 +783,8 @@ although KCDE showed more stable and calibrated performance across long
 horizons, especially in years that had unusually high incidence
 (Figure~\ref{fig:DengueRibbonsPredictions} and Supplemental Figure 4).
 For predictions of
-dengue fever incidence, at a prediction horizon of one week the point
-predictions from all three methods are similar, although the intervals from
+dengue fever incidence in individual weeks, at a prediction horizon of one week
+the point predictions from all three methods are similar, although the intervals from
 SARIMA are quite a bit wider than those from KCDE and HHH4.  
 All three methods
 struggle at larger prediction horizons, but it appears that the SARIMA and HHH4
@@ -793,7 +792,7 @@ models have more difficulty with aligning the predictive distribution with the
 season's peak, particularly in the two seasons with higher incidence.
 For the more regularly seasonal influenza data, there is less of a
 noticeable distinction between the predictions given by the KCDE and SARIMA
-models.
+models for incidence in individual weeks.
 
 <<DengueDataMergePredictionResults, echo = FALSE>>=
 ## The following relative paths assume the working directory is inst/article/
@@ -954,11 +953,14 @@ individual weeks.
 %performance of specifications with the periodic kernel is similar to or slightly
 %better than the baseline models 
 (Figure~\ref{fig:AggregatedFluResultsBoxPlots}
-and Supplemental Figure 4).  The periodic kernel also generally improved
-predictions of incidence in the peak week, but it did not have consistent
-benefits in predicting peak week timing.
+and Supplemental Figure 5).  The periodic kernel also generally improved
+predictions of incidence in the peak week, but it did not have
+consistent benefits in predicting peak week timing (Supplemental Figures 10
+and 11).
 Using the fully parameterized bandwidth matrix generally had little impact on
-the quality of the predictive distributions.
+the quality of the predictive distributions
+(Figure~\ref{fig:AggregatedFluResultsBoxPlots} and Supplemental Figures 5, 10,
+and 11).
 %In all cases, the distribution of log score differences between the KCDE
 %specifications and the baseline models are skewed to the right.  Particularly in
 %the application to dengue, there are many combinations of prediction horizon and
@@ -1069,7 +1071,7 @@ the KCDE specifications performed similarly to the baseline models near the seas
 % The figure shows that 
 outperformed the baseline models in predictions for times of high incidence near
 the season peaks (Figure~\ref{fig:DengueLogScoreDiffVsReportedCasesCombined}
-and Supplemental Figures ***).
+and Supplemental Figures 6 through 8).
 For example, in weeks with fewer than 93 reported cases (roughly one third of
 the maximum weekly case count in the testing period), the median log score
 difference between the predictions from the Periodic, Full Bandwidth KCDE model and SARIMA was about
@@ -1264,13 +1266,13 @@ predictions of the timing of the peak week and incidence in the peak week
 that were made before the season peak; all methods did
 well in predictions for these quantities made after the peak had passed
 (Figure~\ref{fig:CombinedPeakWeekIncidencePredictionLogScores} and Supplemental
-Figures 5 through 9).
+Figures 12 through 15).
 For predictions of peak incidence, the baseline methods occasionally struggled
-in the seasons with high peak incidence (Figure ***).
+in the seasons with high peak incidence (Figure 7 and Supplemental Figure 10).
 In the two dengue seasons with relatively high incidence, predictions of
 peak incidence made by the HHH4 model before the season peak had
 much lower log scores than both KCDE and a naive model that assigns equal
-probability to each incidence bin (Figures *** and ***).  Similarly, SARIMA underperformed
+probability to each incidence bin.  Similarly, SARIMA underperformed
 relative to both KCDE and using equal bin probabilities in the
 influenza season with the highest peak.
 %: in early-season predictions, the average
@@ -1288,7 +1290,7 @@ from the Periodic, Full Bandwidth KCDE model had higher average log scores than
 the equal bin probabilities model in three of the dengue seasons, and only did
 slightly worse than the naive model
 in the 2010/2011 season -- when both of the baseline models also did worse than
-the equal bin probabilities model on average (Figures *** and ***).
+the equal bin probabilities model on average.
 %Although the SARIMA method did about as well as KCDE in the application to
 %dengue, in the influenza season with the largest peak SARIMA's predictions for
 %peak incidence underperformed relative to both KCDE and the naive approach of
@@ -1300,10 +1302,10 @@ of the KCDE specifications for predicting peak incidence was with the Null KCDE
 model in the 2012/2013 dengue season -- and that performance was much better
 than the worst-case performance of either of the baseline models.  For the most
 part, the methods were comparable to each other in the remaining seasons, and
-offered considerable improvements over the naive approach.
+offered considerable improvements over equal bin probabilities.
 For predictions of peak week timing, SARIMA consistently underperformed relative
 to using equal bin probabilities in two of the dengue
-seasons.  KCDE and HHH4 rarely did much worse than using equal bin
+seasons (Supplemental Figures 9 and 11).  KCDE and HHH4 rarely did much worse than using equal bin
 probabilities.
 %For predictions of peak week timing and peak incidence, for both diseases
 %all methods evaluated tend to converge rapidly on the truth once the peak week
@@ -1885,7 +1887,7 @@ incidence measures from neighboring locations in the model.
 %analysis here.
 
 Another aspect of our method that should be explored further is the use of
-log score in estimation.  We used log scores in this work in order to match the use
+log score in estimation.  We used log scores in this work to match the use
 of log scores in evaluating and comparing the performance of different models. 
 The log score has the advantage of defining a proper scoring
 rule, but it has the disadvantage of being sensitive to outlying values.
@@ -2695,175 +2697,5 @@ specified incidence bins.  There are 11 incidence bins for dengue
 and 27 bins for influenza.}
 \label{fig:CombinedPeakWeekIncidencePredictionLogScores}
 \end{figure}
-
-
-
-
-
-\begin{figure}
-<<PeakIncidenceLogScoreDiffFromEqualBoxplots, echo = FALSE, fig.keep = "last", fig.height = 8.3, dev = "postscript">>=
-dengue_peak_incidence_log_score_diffs_from_equal_wide <- dengue_peak_week_results %>%
-    select(full_model_descriptor, analysis_time_season, analysis_time_season_week, peak_height_log_score) %>%
-    spread(full_model_descriptor, peak_height_log_score)
-
-dengue_peak_incidence_log_score_diffs_from_equal_wide[, unique(dengue_peak_week_results$full_model_descriptor)] <-
-    dengue_peak_incidence_log_score_diffs_from_equal_wide[, unique(dengue_peak_week_results$full_model_descriptor)] -
-    dengue_peak_incidence_log_score_diffs_from_equal_wide[, "Equal Bin Probabilities"]
-
-dengue_peak_incidence_log_score_diffs_from_equal_long <- dengue_peak_incidence_log_score_diffs_from_equal_wide %>%
-    gather_("model", "log_score_difference", unique(dengue_prediction_results$full_model_descriptor)) %>%
-    mutate(
-        seasonal_lag = grepl("seasonal_lag_1", model),
-        differencing = grepl("differencing_TRUE", model),
-        periodic = grepl("periodic_TRUE", model),
-        bw_full = grepl("bw_full", model)
-    )
-dengue_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor <- "Null KCDE"
-dengue_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
-    dengue_peak_incidence_log_score_diffs_from_equal_long$periodic & !dengue_peak_incidence_log_score_diffs_from_equal_long$bw_full] <-
-    "Periodic KCDE"
-dengue_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
-    !dengue_peak_incidence_log_score_diffs_from_equal_long$periodic & dengue_peak_incidence_log_score_diffs_from_equal_long$bw_full] <-
-    "Full Bandwidth KCDE"
-dengue_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
-    dengue_peak_incidence_log_score_diffs_from_equal_long$periodic & dengue_peak_incidence_log_score_diffs_from_equal_long$bw_full] <-
-    "Periodic, Full Bandwidth KCDE"
-dengue_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
-    dengue_peak_incidence_log_score_diffs_from_equal_long$model == "HHH4-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
-] <- "HHH4"
-dengue_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
-    dengue_peak_incidence_log_score_diffs_from_equal_long$model == "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
-] <- "SARIMA"
-dengue_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor <-
-    factor(dengue_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor,
-        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE", "HHH4", "SARIMA"))
-
-dengue_peak_incidence_log_score_diffs_from_equal_long$before_peak_week <- FALSE
-for(season in unique(dengue_peak_incidence_log_score_diffs_from_equal_long$analysis_time_season)) {
-    dengue_peak_incidence_log_score_diffs_from_equal_long$before_peak_week[
-        dengue_peak_incidence_log_score_diffs_from_equal_long$analysis_time_season == season &
-            dengue_peak_incidence_log_score_diffs_from_equal_long$analysis_time_season_week <
-            dengue_peak_week_times$peak_week[dengue_peak_week_times$analysis_time_season == season]
-    ] <- TRUE
-}
-
-ggplot() +
-    geom_boxplot(aes(x = reduced_model_descriptor, y = log_score_difference),
-        data = dengue_peak_incidence_log_score_diffs_from_equal_long[dengue_peak_incidence_log_score_diffs_from_equal_long$before_peak_week, ]) +
-    facet_wrap(~ analysis_time_season) +
-    theme_bw()
-
-
-
-dengue_prediction_log_score_diffs_from_hhh4_wide <- dengue_prediction_results %>%
-    select(full_model_descriptor, prediction_time, prediction_horizon, log_score) %>%
-    spread(full_model_descriptor, log_score)
-
-dengue_prediction_log_score_diffs_from_hhh4_wide[, unique(dengue_prediction_results$full_model_descriptor)] <-
-    dengue_prediction_log_score_diffs_from_hhh4_wide[, unique(dengue_prediction_results$full_model_descriptor)] -
-    dengue_prediction_log_score_diffs_from_hhh4_wide[, "HHH4-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"]
-
-dengue_prediction_log_score_diffs_from_hhh4_long <- dengue_prediction_log_score_diffs_from_hhh4_wide %>%
-    gather_("model", "log_score_difference", unique(dengue_prediction_results$full_model_descriptor)) %>%
-    mutate(
-        seasonal_lag = grepl("seasonal_lag_1", model),
-        differencing = grepl("differencing_TRUE", model),
-        periodic = grepl("periodic_TRUE", model),
-        bw_full = grepl("bw_full", model)
-    )
-dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor <- "Null KCDE"
-dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor[
-    dengue_prediction_log_score_diffs_from_hhh4_long$periodic & !dengue_prediction_log_score_diffs_from_hhh4_long$bw_full] <-
-    "Periodic KCDE"
-dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor[
-    !dengue_prediction_log_score_diffs_from_hhh4_long$periodic & dengue_prediction_log_score_diffs_from_hhh4_long$bw_full] <-
-    "Full Bandwidth KCDE"
-dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor[
-    dengue_prediction_log_score_diffs_from_hhh4_long$periodic & dengue_prediction_log_score_diffs_from_hhh4_long$bw_full] <-
-    "Periodic, Full Bandwidth KCDE"
-dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor[
-    dengue_prediction_log_score_diffs_from_hhh4_long$model == "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
-] <- "SARIMA"
-dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor <-
-    factor(dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor,
-        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE", "SARIMA"))
-
-
-ili_peak_incidence_log_score_diffs_from_equal_wide <- ili_peak_week_results %>%
-    select(full_model_descriptor, analysis_time_season, analysis_time_season_week, peak_height_log_score) %>%
-    spread(full_model_descriptor, peak_height_log_score)
-
-ili_peak_incidence_log_score_diffs_from_equal_wide[, unique(ili_peak_week_results$full_model_descriptor)] <-
-    ili_peak_incidence_log_score_diffs_from_equal_wide[, unique(ili_peak_week_results$full_model_descriptor)] -
-    ili_peak_incidence_log_score_diffs_from_equal_wide[, "Equal Bin Probabilities"]
-
-ili_peak_incidence_log_score_diffs_from_equal_long <- ili_peak_incidence_log_score_diffs_from_equal_wide %>%
-    gather_("model", "log_score_difference", unique(ili_prediction_results$full_model_descriptor)) %>%
-    mutate(
-        seasonal_lag = grepl("seasonal_lag_1", model),
-        differencing = grepl("differencing_TRUE", model),
-        periodic = grepl("periodic_TRUE", model),
-        bw_full = grepl("bw_full", model)
-    )
-ili_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor <- "Null KCDE"
-ili_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
-    ili_peak_incidence_log_score_diffs_from_equal_long$periodic & !ili_peak_incidence_log_score_diffs_from_equal_long$bw_full] <-
-    "Periodic KCDE"
-ili_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
-    !ili_peak_incidence_log_score_diffs_from_equal_long$periodic & ili_peak_incidence_log_score_diffs_from_equal_long$bw_full] <-
-    "Full Bandwidth KCDE"
-ili_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
-    ili_peak_incidence_log_score_diffs_from_equal_long$periodic & ili_peak_incidence_log_score_diffs_from_equal_long$bw_full] <-
-    "Periodic, Full Bandwidth KCDE"
-ili_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
-    ili_peak_incidence_log_score_diffs_from_equal_long$model == "HHH4-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
-] <- "HHH4"
-ili_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
-    ili_peak_incidence_log_score_diffs_from_equal_long$model == "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
-] <- "SARIMA"
-ili_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor <-
-    factor(ili_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor,
-        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE", "HHH4", "SARIMA"))
-
-ili_peak_incidence_log_score_diffs_from_equal_long$before_peak_week <- FALSE
-for(season in unique(ili_peak_incidence_log_score_diffs_from_equal_long$analysis_time_season)) {
-    ili_peak_incidence_log_score_diffs_from_equal_long$before_peak_week[
-        ili_peak_incidence_log_score_diffs_from_equal_long$analysis_time_season == season &
-            ili_peak_incidence_log_score_diffs_from_equal_long$analysis_time_season_week <
-            ili_peak_week_times$peak_week[ili_peak_week_times$analysis_time_season == season]
-    ] <- TRUE
-}
-
-ggplot() +
-    geom_boxplot(aes(x = reduced_model_descriptor, y = log_score_difference),
-        data = ili_peak_incidence_log_score_diffs_from_equal_long[ili_peak_incidence_log_score_diffs_from_equal_long$before_peak_week, ]) +
-    facet_wrap(~ analysis_time_season) +
-    theme_bw()
-
-
-ili_peak_incidence_log_score_diffs_from_equal_long$data_set_and_season <-
-    paste0("Influenza: ", ili_peak_incidence_log_score_diffs_from_equal_long$analysis_time_season)
-dengue_peak_incidence_log_score_diffs_from_equal_long$data_set_and_season <-
-    paste0("Dengue: ", dengue_peak_incidence_log_score_diffs_from_equal_long$analysis_time_season)
-ggplot() +
-    geom_hline(yintercept = 0) +
-    geom_boxplot(aes(x = reduced_model_descriptor, y = log_score_difference),
-        data = rbind.fill(
-            ili_peak_incidence_log_score_diffs_from_equal_long[ili_peak_incidence_log_score_diffs_from_equal_long$before_peak_week, ],
-            dengue_peak_incidence_log_score_diffs_from_equal_long[dengue_peak_incidence_log_score_diffs_from_equal_long$before_peak_week, ]
-        )
-    ) +
-    facet_wrap(~ data_set_and_season, ncol = 1) +
-    theme_bw()
-@
-\caption{Log scores for predictions of peak week incidence by predictive
-model.  The vertical line is placed at the peak week for
-each season.  The log score for ``Equal Bin Probabilities'' is obtained by
-assigning equal probability that the peak incidence will be in each of the
-specified incidence bins.  There are 11 incidence bins for dengue
-and 27 bins for influenza.}
-\label{fig:CombinedPeakWeekIncidencePredictionLogScores}
-\end{figure}
-
 
 \end{document}

@@ -433,121 +433,40 @@ can see that the effect of the copula is to induce correlation in the incidence 
 weeks.  The trajectories obtained with the copula are much smoother than the
 trajectories obtained with an independence assumption.
 
-\subsection{The Christmas Effect}
-
-Figure~\ref{fig:ChristmasEffect} illustrates the consistent peak
-in reported influenze incidence around Christmas that we have termed the
-``Christmas effect''.  This peak is sometimes a short-term spike in reported
-incidence, and sometimes coincides with the season peak.  There are a variety of
-possible explanations for this effect, such as heightened flu transmission due to increased travel or more reporting of flu relative to
-other diseases in that time.
-
-Regardless, this is a regular seasonal phenomenon that the
-structure of the SARIMA model picks up on.  We can see this from the horizontal
-banding in Figure~\ref{fig:FluPeakWeekTimingPredictiveDistributions}.  Note that
-because the disease season is defined to begin in July, Christmas occurs in week
-22 of the season.  In the predictive distributions for peak week timing from
-SARIMA, there is a consistent sharp peak at week 22, followed by a trough in the
-weeks immediately thereafter and another broader mode in the approximate range
-of weeks 26 to 33.  In other words, the predictive distributions obtained from
-SARIMA capture the fact that there is likely to be a peak centered at Christmas week,
-which will be followed by a dip but may be followed by another increase later
-in the season.  The SARIMA model is able to capture this pattern through its use
-of seasonal differencing and seasonal lags.  Our KCDE specification
-places high probability for peak weeks in the generally correct area, but has
-not captured this Christmas effect.
-
-We note that the SARIMA model also yields horizontal banding in the
-predictions for peak week timing for the dengue data, as can be seen from
-Figure~\ref{fig:DenguePeakWeekTimingPredictiveDistributions}.
-However, there the banding is less informative, and the smoother predictive
-distributions obtained from KCDE may be preferred from the perspective of
-communicating with decision makers.
+%\subsection{The Christmas Effect}
+%
+%Figure~\ref{fig:ChristmasEffect} illustrates the consistent peak
+%in reported influenze incidence around Christmas that we have termed the
+%``Christmas effect''.  This peak is sometimes a short-term spike in reported
+%incidence, and sometimes coincides with the season peak.  There are a variety of
+%possible explanations for this effect, such as heightened flu transmission due to increased travel or more reporting of flu relative to
+%other diseases in that time.
+%
+%Regardless, this is a regular seasonal phenomenon that the
+%structure of the SARIMA model picks up on.  We can see this from the horizontal
+%banding in Figure~\ref{fig:FluPeakWeekTimingPredictiveDistributions}.  Note that
+%because the disease season is defined to begin in July, Christmas occurs in week
+%22 of the season.  In the predictive distributions for peak week timing from
+%SARIMA, there is a consistent sharp peak at week 22, followed by a trough in the
+%weeks immediately thereafter and another broader mode in the approximate range
+%of weeks 26 to 33.  In other words, the predictive distributions obtained from
+%SARIMA capture the fact that there is likely to be a peak centered at Christmas week,
+%which will be followed by a dip but may be followed by another increase later
+%in the season.  The SARIMA model is able to capture this pattern through its use
+%of seasonal differencing and seasonal lags.  Our KCDE specification
+%places high probability for peak weeks in the generally correct area, but has
+%not captured this Christmas effect.
+%
+%We note that the SARIMA model also yields horizontal banding in the
+%predictions for peak week timing for the dengue data, as can be seen from
+%Figure~\ref{fig:DenguePeakWeekTimingPredictiveDistributions}.
+%However, there the banding is less informative, and the smoother predictive
+%distributions obtained from KCDE may be preferred from the perspective of
+%communicating with decision makers.
 
 \bibliographystyle{plainnat}
 \bibliography{kde-bib}
 
-\begin{figure}
-<<DengueDataRibbonsPredictionPlot95Intervals, echo = FALSE, fig.height = 8.6, dev = "cairo_ps">>=
-dengue_prediction_results_sarima <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/dengue_sj/prediction-results/sarima-predictions.rds")
-dengue_prediction_results_hhh4 <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/dengue_sj/prediction-results/surveillance-predictions.rds")
-dengue_prediction_results_kcde <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/dengue_sj/prediction-results/kcde-predictions.rds")
-dengue_prediction_results_kcde$model <- "KCDE"
-dengue_prediction_results <- rbind.fill(dengue_prediction_results_sarima[!is.na(dengue_prediction_results_sarima$log_score), ],
-    dengue_prediction_results_hhh4,
-    dengue_prediction_results_kcde)
-dengue_prediction_results$AE <- unlist(dengue_prediction_results$AE)
-
-dengue_prediction_results$full_model_descriptor <- paste0(dengue_prediction_results$model,
-    "-seasonal_lag_", dengue_prediction_results$max_seasonal_lag,
-#    "-filtering_", dengue_prediction_results$filtering,
-    "-differencing_", dengue_prediction_results$differencing,
-    "-periodic_", dengue_prediction_results$seasonality,
-    "-bw_", dengue_prediction_results$bw_parameterization)
-
-
-#color_palette <- c("#E69F00", "#0072B2")
-color_palette <- c("#D55E00", "#0072B2")
-
-dengue_ribbons_df <- dengue_prediction_results %>%
-    select(prediction_time,
-        prediction_horizon,
-        full_model_descriptor,
-        model,
-        interval_pred_lb_95:interval_pred_ub_50) %>%
-    gather("bound_type", "predictive_value", interval_pred_lb_95:interval_pred_ub_50) %>%
-    mutate(interval_type = ifelse(grepl("50", bound_type), "50", "95"),
-        bound_type = ifelse(grepl("lb", bound_type), "lower", "upper")) %>%
-    spread(bound_type, predictive_value)
-
-phs_used <- c(1, 6, 26)
-models_used <- c(#"SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
-    "HHH4-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
-    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
-#models_used <- c("SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
-#    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_diagonal")
-pi_type <- "95"
-#pi_type <- "50"
-
-p_dengue <- ggplot() +
-    geom_ribbon(aes(x = prediction_time, ymin = lower, ymax = upper, colour = model, fill = model, alpha = model),
-#        alpha = 0.3,
-        size = 0,
-        data = dengue_ribbons_df[dengue_ribbons_df$prediction_horizon %in% phs_used &
-                dengue_ribbons_df$full_model_descriptor %in% models_used &
-                dengue_ribbons_df$interval_type == pi_type, ]) +
-    geom_line(aes(x = time, y = total_cases), data = dengue_sj[dengue_sj$season %in% paste0(2009:2012, "/", 2010:2013), ]) +
-#    geom_point(aes(x = time, y = total_cases), data = dengue_sj[dengue_sj$year %in% 2010:2014, ]) +
-    geom_line(aes(x = prediction_time, y = pt_pred, colour = model, linetype = model),
-        size = 1,
-        data = dengue_prediction_results[dengue_prediction_results$prediction_horizon %in% phs_used &
-                dengue_prediction_results$full_model_descriptor %in% models_used, ]) +
-    scale_alpha_discrete("Model",
-#        labels = c("50 Percent", "95 Percent"),
-        limits = c("KCDE", "HHH4"),
-        range = c(0.45, 0.2)) +
-#    scale_fill_manual("Model", values = c("#0072B2", "#E69F00")) +
-#    scale_colour_manual("Model", values = c("#0072B2", "#E69F00")) +
-    scale_fill_manual("Model", values = color_palette) +
-    scale_colour_manual("Model", values = color_palette) +
-    scale_linetype("Model") +
-    facet_wrap( ~ prediction_horizon, ncol = 1,
-        labeller = as_labeller(function(labels, ...) {
-                return(paste0("Prediction Horizon = ", labels))
-            })) +
-    xlab("Prediction Time") +
-    ylab("Reported Cases") +
-    ggtitle("(a) Point and 95% Interval Predictions, Dengue Fever") +
-#    scale_y_log10() +
-    theme_bw(base_size = 11)
-
-
-print(p_dengue, vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
-@
-\caption{Plots of point and interval predictions from HHH4 and the
-Periodic, Full Bandwidth KCDE model.}
-\label{fig:DengueRibbonsPredictions} %fig.height = 4.3
-\end{figure}
 
 
 %<<DengueDataMergePredictionResults, echo = FALSE>>=
@@ -1528,6 +1447,90 @@ dengue_peak_week_results$peak_height_log_score[dengue_peak_week_results$peak_hei
 dengue_peak_week_results$peak_week_log_score[dengue_peak_week_results$peak_week_log_score == -50] <- NA
 dengue_peak_week_results$peak_height_log_score[dengue_peak_week_results$peak_height_log_score == -50] <- NA
 @
+
+
+\begin{figure}
+<<DengueDataRibbonsPredictionPlot95Intervals, echo = FALSE, fig.height = 8.6, dev = "cairo_ps">>=
+dengue_prediction_results_sarima <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/dengue_sj/prediction-results/sarima-predictions.rds")
+dengue_prediction_results_hhh4 <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/dengue_sj/prediction-results/surveillance-predictions.rds")
+dengue_prediction_results_kcde <- readRDS("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/results/dengue_sj/prediction-results/kcde-predictions.rds")
+dengue_prediction_results_kcde$model <- "KCDE"
+dengue_prediction_results <- rbind.fill(dengue_prediction_results_sarima[!is.na(dengue_prediction_results_sarima$log_score), ],
+    dengue_prediction_results_hhh4,
+    dengue_prediction_results_kcde)
+dengue_prediction_results$AE <- unlist(dengue_prediction_results$AE)
+
+dengue_prediction_results$full_model_descriptor <- paste0(dengue_prediction_results$model,
+    "-seasonal_lag_", dengue_prediction_results$max_seasonal_lag,
+#    "-filtering_", dengue_prediction_results$filtering,
+    "-differencing_", dengue_prediction_results$differencing,
+    "-periodic_", dengue_prediction_results$seasonality,
+    "-bw_", dengue_prediction_results$bw_parameterization)
+
+
+#color_palette <- c("#E69F00", "#0072B2")
+color_palette <- c("#D55E00", "#0072B2")
+
+dengue_ribbons_df <- dengue_prediction_results %>%
+    select(prediction_time,
+        prediction_horizon,
+        full_model_descriptor,
+        model,
+        interval_pred_lb_95:interval_pred_ub_50) %>%
+    gather("bound_type", "predictive_value", interval_pred_lb_95:interval_pred_ub_50) %>%
+    mutate(interval_type = ifelse(grepl("50", bound_type), "50", "95"),
+        bound_type = ifelse(grepl("lb", bound_type), "lower", "upper")) %>%
+    spread(bound_type, predictive_value)
+
+phs_used <- c(1, 6, 26)
+models_used <- c(#"SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "HHH4-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
+#models_used <- c("SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+#    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_diagonal")
+pi_type <- "95"
+#pi_type <- "50"
+
+p_dengue <- ggplot() +
+    geom_ribbon(aes(x = prediction_time, ymin = lower, ymax = upper, colour = model, fill = model, alpha = model),
+#        alpha = 0.3,
+        size = 0,
+        data = dengue_ribbons_df[dengue_ribbons_df$prediction_horizon %in% phs_used &
+                dengue_ribbons_df$full_model_descriptor %in% models_used &
+                dengue_ribbons_df$interval_type == pi_type, ]) +
+    geom_line(aes(x = time, y = total_cases), data = dengue_sj[dengue_sj$season %in% paste0(2009:2012, "/", 2010:2013), ]) +
+#    geom_point(aes(x = time, y = total_cases), data = dengue_sj[dengue_sj$year %in% 2010:2014, ]) +
+    geom_line(aes(x = prediction_time, y = pt_pred, colour = model, linetype = model),
+        size = 1,
+        data = dengue_prediction_results[dengue_prediction_results$prediction_horizon %in% phs_used &
+                dengue_prediction_results$full_model_descriptor %in% models_used, ]) +
+    scale_alpha_discrete("Model",
+#        labels = c("50 Percent", "95 Percent"),
+        limits = c("KCDE", "HHH4"),
+        range = c(0.45, 0.2)) +
+#    scale_fill_manual("Model", values = c("#0072B2", "#E69F00")) +
+#    scale_colour_manual("Model", values = c("#0072B2", "#E69F00")) +
+    scale_fill_manual("Model", values = color_palette, limits = c("KCDE", "HHH4")) +
+    scale_colour_manual("Model", values = color_palette, limits = c("KCDE", "HHH4")) +
+    scale_linetype("Model", limits = c("KCDE", "HHH4")) +
+    facet_wrap( ~ prediction_horizon, ncol = 1,
+        labeller = as_labeller(function(labels, ...) {
+                return(paste0("Prediction Horizon = ", labels))
+            })) +
+    xlab("Prediction Time") +
+    ylab("Reported Cases") +
+    ggtitle("Point and 95% Interval Predictions, Dengue Fever") +
+#    scale_y_log10() +
+    theme_bw(base_size = 11)
+
+
+print(p_dengue, vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
+@
+\caption{Plots of point and interval predictions from HHH4 and the
+Periodic, Full Bandwidth KCDE model.}
+\label{fig:DengueRibbonsPredictions} %fig.height = 4.3
+\end{figure}
+
 
 \begin{figure}
 <<FluDataResultsAggregatedBoxplots, echo = FALSE, dev = "cairo_ps">>=
@@ -3300,6 +3303,402 @@ year.}
 \label{fig:CombinedPeakWeekTimingPredictionLogScores}
 \end{figure}
 
+
+
+\begin{figure}
+<<PeakIncidenceLogScoreDiffFromEqualBoxplots, echo = FALSE, fig.keep = "last", fig.height = 8.3, dev = "postscript">>=
+dengue_peak_incidence_log_score_diffs_from_equal_wide <- dengue_peak_week_results %>%
+    select(full_model_descriptor, analysis_time_season, analysis_time_season_week, peak_height_log_score) %>%
+    spread(full_model_descriptor, peak_height_log_score)
+
+dengue_peak_incidence_log_score_diffs_from_equal_wide[, unique(dengue_peak_week_results$full_model_descriptor)] <-
+    dengue_peak_incidence_log_score_diffs_from_equal_wide[, unique(dengue_peak_week_results$full_model_descriptor)] -
+    dengue_peak_incidence_log_score_diffs_from_equal_wide[, "Equal Bin Probabilities"]
+
+dengue_peak_incidence_log_score_diffs_from_equal_long <- dengue_peak_incidence_log_score_diffs_from_equal_wide %>%
+    gather_("model", "log_score_difference", unique(dengue_prediction_results$full_model_descriptor)) %>%
+    mutate(
+        seasonal_lag = grepl("seasonal_lag_1", model),
+        differencing = grepl("differencing_TRUE", model),
+        periodic = grepl("periodic_TRUE", model),
+        bw_full = grepl("bw_full", model)
+    )
+dengue_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor <- "Null KCDE"
+dengue_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    dengue_peak_incidence_log_score_diffs_from_equal_long$periodic & !dengue_peak_incidence_log_score_diffs_from_equal_long$bw_full] <-
+    "Periodic KCDE"
+dengue_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    !dengue_peak_incidence_log_score_diffs_from_equal_long$periodic & dengue_peak_incidence_log_score_diffs_from_equal_long$bw_full] <-
+    "Full Bandwidth KCDE"
+dengue_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    dengue_peak_incidence_log_score_diffs_from_equal_long$periodic & dengue_peak_incidence_log_score_diffs_from_equal_long$bw_full] <-
+    "Periodic, Full Bandwidth KCDE"
+dengue_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    dengue_peak_incidence_log_score_diffs_from_equal_long$model == "HHH4-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+] <- "HHH4"
+dengue_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    dengue_peak_incidence_log_score_diffs_from_equal_long$model == "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+] <- "SARIMA"
+dengue_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor <-
+    factor(dengue_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor,
+        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE", "HHH4", "SARIMA"))
+
+dengue_peak_incidence_log_score_diffs_from_equal_long$before_peak_week <- FALSE
+for(season in unique(dengue_peak_incidence_log_score_diffs_from_equal_long$analysis_time_season)) {
+    dengue_peak_incidence_log_score_diffs_from_equal_long$before_peak_week[
+        dengue_peak_incidence_log_score_diffs_from_equal_long$analysis_time_season == season &
+            dengue_peak_incidence_log_score_diffs_from_equal_long$analysis_time_season_week <
+            dengue_peak_week_times$peak_week[dengue_peak_week_times$analysis_time_season == season]
+    ] <- TRUE
+}
+
+#ggplot() +
+#    geom_boxplot(aes(x = reduced_model_descriptor, y = log_score_difference),
+#        data = dengue_peak_incidence_log_score_diffs_from_equal_long[dengue_peak_incidence_log_score_diffs_from_equal_long$before_peak_week, ]) +
+#    facet_wrap(~ analysis_time_season) +
+#    theme_bw()
+
+
+
+dengue_prediction_log_score_diffs_from_hhh4_wide <- dengue_prediction_results %>%
+    select(full_model_descriptor, prediction_time, prediction_horizon, log_score) %>%
+    spread(full_model_descriptor, log_score)
+
+dengue_prediction_log_score_diffs_from_hhh4_wide[, unique(dengue_prediction_results$full_model_descriptor)] <-
+    dengue_prediction_log_score_diffs_from_hhh4_wide[, unique(dengue_prediction_results$full_model_descriptor)] -
+    dengue_prediction_log_score_diffs_from_hhh4_wide[, "HHH4-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"]
+
+dengue_prediction_log_score_diffs_from_hhh4_long <- dengue_prediction_log_score_diffs_from_hhh4_wide %>%
+    gather_("model", "log_score_difference", unique(dengue_prediction_results$full_model_descriptor)) %>%
+    mutate(
+        seasonal_lag = grepl("seasonal_lag_1", model),
+        differencing = grepl("differencing_TRUE", model),
+        periodic = grepl("periodic_TRUE", model),
+        bw_full = grepl("bw_full", model)
+    )
+dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor <- "Null KCDE"
+dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor[
+    dengue_prediction_log_score_diffs_from_hhh4_long$periodic & !dengue_prediction_log_score_diffs_from_hhh4_long$bw_full] <-
+    "Periodic KCDE"
+dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor[
+    !dengue_prediction_log_score_diffs_from_hhh4_long$periodic & dengue_prediction_log_score_diffs_from_hhh4_long$bw_full] <-
+    "Full Bandwidth KCDE"
+dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor[
+    dengue_prediction_log_score_diffs_from_hhh4_long$periodic & dengue_prediction_log_score_diffs_from_hhh4_long$bw_full] <-
+    "Periodic, Full Bandwidth KCDE"
+dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor[
+    dengue_prediction_log_score_diffs_from_hhh4_long$model == "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+] <- "SARIMA"
+dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor <-
+    factor(dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor,
+        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE", "SARIMA"))
+
+
+ili_peak_incidence_log_score_diffs_from_equal_wide <- ili_peak_week_results %>%
+    select(full_model_descriptor, analysis_time_season, analysis_time_season_week, peak_height_log_score) %>%
+    spread(full_model_descriptor, peak_height_log_score)
+
+ili_peak_incidence_log_score_diffs_from_equal_wide[, unique(ili_peak_week_results$full_model_descriptor)] <-
+    ili_peak_incidence_log_score_diffs_from_equal_wide[, unique(ili_peak_week_results$full_model_descriptor)] -
+    ili_peak_incidence_log_score_diffs_from_equal_wide[, "Equal Bin Probabilities"]
+
+ili_peak_incidence_log_score_diffs_from_equal_long <- ili_peak_incidence_log_score_diffs_from_equal_wide %>%
+    gather_("model", "log_score_difference", unique(ili_prediction_results$full_model_descriptor)) %>%
+    mutate(
+        seasonal_lag = grepl("seasonal_lag_1", model),
+        differencing = grepl("differencing_TRUE", model),
+        periodic = grepl("periodic_TRUE", model),
+        bw_full = grepl("bw_full", model)
+    )
+ili_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor <- "Null KCDE"
+ili_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    ili_peak_incidence_log_score_diffs_from_equal_long$periodic & !ili_peak_incidence_log_score_diffs_from_equal_long$bw_full] <-
+    "Periodic KCDE"
+ili_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    !ili_peak_incidence_log_score_diffs_from_equal_long$periodic & ili_peak_incidence_log_score_diffs_from_equal_long$bw_full] <-
+    "Full Bandwidth KCDE"
+ili_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    ili_peak_incidence_log_score_diffs_from_equal_long$periodic & ili_peak_incidence_log_score_diffs_from_equal_long$bw_full] <-
+    "Periodic, Full Bandwidth KCDE"
+ili_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    ili_peak_incidence_log_score_diffs_from_equal_long$model == "HHH4-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+] <- "HHH4"
+ili_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    ili_peak_incidence_log_score_diffs_from_equal_long$model == "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+] <- "SARIMA"
+ili_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor <-
+    factor(ili_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor,
+        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE", "HHH4", "SARIMA"))
+
+ili_peak_incidence_log_score_diffs_from_equal_long$before_peak_week <- FALSE
+for(season in unique(ili_peak_incidence_log_score_diffs_from_equal_long$analysis_time_season)) {
+    ili_peak_incidence_log_score_diffs_from_equal_long$before_peak_week[
+        ili_peak_incidence_log_score_diffs_from_equal_long$analysis_time_season == season &
+            ili_peak_incidence_log_score_diffs_from_equal_long$analysis_time_season_week <
+            ili_peak_week_times$peak_week[ili_peak_week_times$analysis_time_season == season]
+    ] <- TRUE
+}
+
+#ggplot() +
+#    geom_boxplot(aes(x = reduced_model_descriptor, y = log_score_difference),
+#        data = ili_peak_incidence_log_score_diffs_from_equal_long[ili_peak_incidence_log_score_diffs_from_equal_long$before_peak_week, ]) +
+#    facet_wrap(~ analysis_time_season) +
+#    theme_bw()
+
+
+ili_peak_incidence_log_score_diffs_from_equal_long$data_set_and_season <-
+    paste0("Influenza: ", ili_peak_incidence_log_score_diffs_from_equal_long$analysis_time_season)
+dengue_peak_incidence_log_score_diffs_from_equal_long$data_set_and_season <-
+    paste0("Dengue: ", dengue_peak_incidence_log_score_diffs_from_equal_long$analysis_time_season)
+
+
+combined_test_data <- rbind(
+    dengue_sj[dengue_sj$season %in% paste0(2009:2012, "/", 2010:2013), c("total_cases", "season", "season_week")] %>%
+        `colnames<-`(c("incidence", "season", "season_week")) %>%
+        mutate(data_set_and_season = paste0("Dengue: ", season)),
+    ili_national[ili_national$season %in% paste0(2011:2013, "/", 2012:2014), c("weighted_ili", "season", "season_week")] %>%
+        `colnames<-`(c("incidence", "season", "season_week")) %>%
+        mutate(data_set_and_season = paste0("Influenza: ", season))
+)
+
+ggplot(combined_test_data) +
+    geom_line(aes(x = season_week, y = incidence)) +
+    facet_wrap(~ data_set_and_season, ncol = 1) +
+    theme_bw()
+
+
+p_boxplots <- ggplot() +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(x = reduced_model_descriptor, y = log_score_difference),
+        data = rbind.fill(
+            ili_peak_incidence_log_score_diffs_from_equal_long[ili_peak_incidence_log_score_diffs_from_equal_long$before_peak_week, ],
+            dengue_peak_incidence_log_score_diffs_from_equal_long[dengue_peak_incidence_log_score_diffs_from_equal_long$before_peak_week, ]
+        )
+    ) +
+    facet_wrap(~ data_set_and_season, ncol = 1) +
+    scale_x_discrete(labels = c("Null KCDE" = "Null KCDE",
+        "Full Bandwidth KCDE" = "Full Bandwidth\nKCDE",
+        "Periodic KCDE" = "Periodic\nKCDE",
+        "Periodic, Full Bandwidth KCDE" = "Periodic,\nFull Bandwidth\nKCDE",
+        "HHH4" = "HHH4",
+        "SARIMA" = "SARIMA")) +
+    xlab("Model") +
+    ylab("Log Score Difference from Equal Bin Probabilities") +
+#    ggtitle("Summary of Results for Peak Week Incidence") +
+    theme_bw()
+
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(nrow = 9, ncol = 2,
+            heights = unit(c(rep(1, 8), 0.75), c("lines", rep("null", 8))),
+            widths = unit(c(1, 0.25), c("null", "null")))))
+grid.text("Summary of Results for Peak Week Incidence",
+    gp = gpar(fontsize = 14),
+    vp = viewport(layout.pos.row = 1, layout.pos.col = 1:2))
+
+print(p_boxplots, vp = viewport(layout.pos.row = 2:9, layout.pos.col = 1))
+
+data_set_season_combos <- unique(combined_test_data$data_set_and_season)
+limits <- cbind(rep(0, 7), c(rep(300, 4), rep(6.2, 3)))
+left_margins <- c(rep(-5, 4), rep(-1, 3))
+for(i in rev(seq_along(data_set_season_combos))) {
+    print(
+        ggplot(combined_test_data[combined_test_data$data_set_and_season == data_set_season_combos[i], ]) +
+            geom_line(aes(x = season_week, y = incidence)) +
+#            facet_wrap(~ data_set_and_season, ncol = 1) +
+            ylim(limits[i, ]) +
+            xlab("") +
+            ylab("") +
+            theme_bw() +
+            theme(panel.margin = unit(0, "mm"),
+                plot.margin = unit(c(8, 0, -8, left_margins[i]), "mm")),
+        vp = viewport(layout.pos.row = 1 + i, layout.pos.col = 2)
+    )
+}
+
+@
+\caption{A summary of performance of each method for predicting incidence
+in the peak week.  Each boxplot summarizes all predictions made by a method in a
+given season in weeks before the actual peak week for that season.  The vertical
+axis is the difference in log scores between the given method and a naive approach assigning
+equal probability to each incidence bin.  Positive values indicate cases when the method did
+better than using equal bin probabilities.  There are 11 incidence bins for dengue
+and 27 bins for influenza.}
+\label{fig:CombinedPeakWeekIncidencePredictionLogScores}
+\end{figure}
+
+
+
+
+
+
+\begin{figure}
+<<PeakTimingLogScoreDiffFromEqualBoxplots, echo = FALSE, fig.keep = "last", fig.height = 8.3, dev = "postscript">>=
+dengue_peak_timing_log_score_diffs_from_equal_wide <- dengue_peak_week_results %>%
+    select(full_model_descriptor, analysis_time_season, analysis_time_season_week, peak_week_log_score) %>%
+    spread(full_model_descriptor, peak_week_log_score)
+
+dengue_peak_timing_log_score_diffs_from_equal_wide[, unique(dengue_peak_week_results$full_model_descriptor)] <-
+    dengue_peak_timing_log_score_diffs_from_equal_wide[, unique(dengue_peak_week_results$full_model_descriptor)] -
+    dengue_peak_timing_log_score_diffs_from_equal_wide[, "Equal Bin Probabilities"]
+
+dengue_peak_timing_log_score_diffs_from_equal_long <- dengue_peak_timing_log_score_diffs_from_equal_wide %>%
+    gather_("model", "log_score_difference", unique(dengue_prediction_results$full_model_descriptor)) %>%
+    mutate(
+        seasonal_lag = grepl("seasonal_lag_1", model),
+        differencing = grepl("differencing_TRUE", model),
+        periodic = grepl("periodic_TRUE", model),
+        bw_full = grepl("bw_full", model)
+    )
+dengue_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor <- "Null KCDE"
+dengue_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    dengue_peak_timing_log_score_diffs_from_equal_long$periodic & !dengue_peak_timing_log_score_diffs_from_equal_long$bw_full] <-
+    "Periodic KCDE"
+dengue_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    !dengue_peak_timing_log_score_diffs_from_equal_long$periodic & dengue_peak_timing_log_score_diffs_from_equal_long$bw_full] <-
+    "Full Bandwidth KCDE"
+dengue_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    dengue_peak_timing_log_score_diffs_from_equal_long$periodic & dengue_peak_timing_log_score_diffs_from_equal_long$bw_full] <-
+    "Periodic, Full Bandwidth KCDE"
+dengue_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    dengue_peak_timing_log_score_diffs_from_equal_long$model == "HHH4-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+] <- "HHH4"
+dengue_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    dengue_peak_timing_log_score_diffs_from_equal_long$model == "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+] <- "SARIMA"
+dengue_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor <-
+    factor(dengue_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor,
+        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE", "HHH4", "SARIMA"))
+
+dengue_peak_timing_log_score_diffs_from_equal_long$before_peak_week <- FALSE
+for(season in unique(dengue_peak_timing_log_score_diffs_from_equal_long$analysis_time_season)) {
+    dengue_peak_timing_log_score_diffs_from_equal_long$before_peak_week[
+        dengue_peak_timing_log_score_diffs_from_equal_long$analysis_time_season == season &
+            dengue_peak_timing_log_score_diffs_from_equal_long$analysis_time_season_week <
+            dengue_peak_week_times$peak_week[dengue_peak_week_times$analysis_time_season == season]
+    ] <- TRUE
+}
+
+
+
+ili_peak_timing_log_score_diffs_from_equal_wide <- ili_peak_week_results %>%
+    select(full_model_descriptor, analysis_time_season, analysis_time_season_week, peak_week_log_score) %>%
+    spread(full_model_descriptor, peak_week_log_score)
+
+ili_peak_timing_log_score_diffs_from_equal_wide[, unique(ili_peak_week_results$full_model_descriptor)] <-
+    ili_peak_timing_log_score_diffs_from_equal_wide[, unique(ili_peak_week_results$full_model_descriptor)] -
+    ili_peak_timing_log_score_diffs_from_equal_wide[, "Equal Bin Probabilities"]
+
+ili_peak_timing_log_score_diffs_from_equal_long <- ili_peak_timing_log_score_diffs_from_equal_wide %>%
+    gather_("model", "log_score_difference", unique(ili_prediction_results$full_model_descriptor)) %>%
+    mutate(
+        seasonal_lag = grepl("seasonal_lag_1", model),
+        differencing = grepl("differencing_TRUE", model),
+        periodic = grepl("periodic_TRUE", model),
+        bw_full = grepl("bw_full", model)
+    )
+ili_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor <- "Null KCDE"
+ili_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    ili_peak_timing_log_score_diffs_from_equal_long$periodic & !ili_peak_timing_log_score_diffs_from_equal_long$bw_full] <-
+    "Periodic KCDE"
+ili_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    !ili_peak_timing_log_score_diffs_from_equal_long$periodic & ili_peak_timing_log_score_diffs_from_equal_long$bw_full] <-
+    "Full Bandwidth KCDE"
+ili_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    ili_peak_timing_log_score_diffs_from_equal_long$periodic & ili_peak_timing_log_score_diffs_from_equal_long$bw_full] <-
+    "Periodic, Full Bandwidth KCDE"
+ili_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    ili_peak_timing_log_score_diffs_from_equal_long$model == "HHH4-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+] <- "HHH4"
+ili_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    ili_peak_timing_log_score_diffs_from_equal_long$model == "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+] <- "SARIMA"
+ili_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor <-
+    factor(ili_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor,
+        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE", "HHH4", "SARIMA"))
+
+ili_peak_timing_log_score_diffs_from_equal_long$before_peak_week <- FALSE
+for(season in unique(ili_peak_timing_log_score_diffs_from_equal_long$analysis_time_season)) {
+    ili_peak_timing_log_score_diffs_from_equal_long$before_peak_week[
+        ili_peak_timing_log_score_diffs_from_equal_long$analysis_time_season == season &
+            ili_peak_timing_log_score_diffs_from_equal_long$analysis_time_season_week <
+            ili_peak_week_times$peak_week[ili_peak_week_times$analysis_time_season == season]
+    ] <- TRUE
+}
+
+#ggplot() +
+#    geom_boxplot(aes(x = reduced_model_descriptor, y = log_score_difference),
+#        data = ili_peak_timing_log_score_diffs_from_equal_long[ili_peak_timing_log_score_diffs_from_equal_long$before_peak_week, ]) +
+#    facet_wrap(~ analysis_time_season) +
+#    theme_bw()
+
+
+ili_peak_timing_log_score_diffs_from_equal_long$data_set_and_season <-
+    paste0("Influenza: ", ili_peak_timing_log_score_diffs_from_equal_long$analysis_time_season)
+dengue_peak_timing_log_score_diffs_from_equal_long$data_set_and_season <-
+    paste0("Dengue: ", dengue_peak_timing_log_score_diffs_from_equal_long$analysis_time_season)
+
+p_boxplots <- ggplot() +
+    geom_hline(yintercept = 0) +
+    geom_boxplot(aes(x = reduced_model_descriptor, y = log_score_difference),
+        data = rbind.fill(
+            ili_peak_timing_log_score_diffs_from_equal_long[ili_peak_timing_log_score_diffs_from_equal_long$before_peak_week, ],
+            dengue_peak_timing_log_score_diffs_from_equal_long[dengue_peak_timing_log_score_diffs_from_equal_long$before_peak_week, ]
+        )
+    ) +
+    facet_wrap(~ data_set_and_season, ncol = 1) +
+    scale_x_discrete(labels = c("Null KCDE" = "Null KCDE",
+            "Full Bandwidth KCDE" = "Full Bandwidth\nKCDE",
+            "Periodic KCDE" = "Periodic\nKCDE",
+            "Periodic, Full Bandwidth KCDE" = "Periodic,\nFull Bandwidth\nKCDE",
+            "HHH4" = "HHH4",
+            "SARIMA" = "SARIMA")) +
+    xlab("Model") +
+    ylab("Log Score Difference from Equal Bin Probabilities") +
+#    ggtitle("Summary of Results for Peak Week Timing") +
+    theme_bw()
+
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(nrow = 9, ncol = 2,
+            heights = unit(c(rep(1, 8), 0.75), c("lines", rep("null", 8))),
+            widths = unit(c(1, 0.25), c("null", "null")))))
+grid.text("Summary of Results for Peak Week Timing",
+    gp = gpar(fontsize = 14),
+    vp = viewport(layout.pos.row = 1, layout.pos.col = 1:2))
+
+suppressWarnings(print(p_boxplots, vp = viewport(layout.pos.row = 2:9, layout.pos.col = 1)))
+
+data_set_season_combos <- unique(combined_test_data$data_set_and_season)
+limits <- cbind(rep(0, 7), c(rep(300, 4), rep(6.2, 3)))
+left_margins <- c(rep(-5, 4), rep(-1, 3))
+for(i in rev(seq_along(data_set_season_combos))) {
+    print(
+        ggplot(combined_test_data[combined_test_data$data_set_and_season == data_set_season_combos[i], ]) +
+            geom_line(aes(x = season_week, y = incidence)) +
+#            facet_wrap(~ data_set_and_season, ncol = 1) +
+            ylim(limits[i, ]) +
+            xlab("") +
+            ylab("") +
+            theme_bw() +
+            theme(panel.margin = unit(0, "mm"),
+                plot.margin = unit(c(8, 0, -8, left_margins[i]), "mm")),
+        vp = viewport(layout.pos.row = 1 + i, layout.pos.col = 2)
+    )
+}
+@
+\caption{A summary of performance of each method for predicting peak week
+timing.  Each boxplot summarizes all predictions made by a method in a given
+season in weeks before the actual peak week for that season.  The vertical
+axis is the difference in log scores between the given method and a naive approach assigning
+equal probability to each week of the year.  Positive values indicate cases when
+the method did better than using equal bin probabilities.}
+\label{fig:CombinedPeakWeekTimingPredictionLogScores}
+\end{figure}
+
+
+
+
+
+
 \begin{figure}
 <<FluPlotPeakWeekTimingPredictiveDistributionsByAnalysisTime, echo = FALSE, dev = "cairo_ps">>=
 models_used <- c(
@@ -3833,7 +4232,7 @@ set.seed(270128)
 
 analysis_time_season <- "2012/2013"
 analysis_time_ind <- which(ili_national$season == analysis_time_season &
-        data$season_week == 10)
+        ili_national$season_week == 10)
 
 
 ## Function borrowed from copula package and modified
@@ -4740,265 +5139,268 @@ simulated trajectory.}
 \end{figure}
 
 
-\begin{figure}
-<<ChristmasWeekPlot, echo = FALSE, fig.keep = "last", dev = "cairo_ps">>=
-christmas_week_inds <- sapply(
-  unique(year(as.Date(ili_national$time))),
-  function(year_val) {
-    max(which(year(ili_national$time) == year_val &
-      month(ili_national$time) == 12 &
-      day(ili_national$time) <= 25))
-  }
-)
-
-last_week_inds <- sapply(
-  unique(year(as.Date(ili_national$time))),
-  function(year_val) {
-    max(which(year(ili_national$time) == year_val))
-  }
-)
-
-## get legend grob
-temp_df <- ili_national
-temp_df$label <- "Incidence on\nChristmas Week"
-
-p <- ggplot() +
-    geom_point(aes(x = as.Date(time), y = weighted_ili, colour = label),
-        size = 3,
-        data = temp_df) +
-    scale_colour_manual("", values = "grey") +
-    theme_bw()
-
-suppressWarnings(print(p))
-grid_list <- capture.output(grid.ls())
-legend_grob <- grid.get(str_trim(grid_list[grep("guide-box", grid_list)]))
-
-panel_cutoff_ind <- 450
-panel_cutoff_inds <- c(0, 300, 600, nrow(ili_national))
-
-
-## set up layout for plot
-grid.newpage()
-pushViewport(viewport(layout = grid.layout(nrow = 4, ncol = 3,
-            heights = unit(c(1, 1, 1, 1), c("lines", "null", "null", "null")),
-            widths = unit(c(1, 1, 0.3), c("lines", "null", "null")))))
-
-## draw legend
-pushViewport(viewport(layout.pos.row = 2:4, layout.pos.col = 3))
-grid.draw(legend_grob)
-upViewport()
-
-#downViewport(xlab_grob_name)
-grid.text("\`\`Christmas effect\'\' in Influenza-like Illness Incidence",
-#    x = unit(0.31, "npc"),
-#    y = unit(1, "npc"),
-#    rot = 90,
-    gp = gpar(fontsize = 14),
-    vp = viewport(layout.pos.row = 1, layout.pos.col = 2))
-
-grid.text("Weighted Influenza-like Illness",
-#    x = unit(0.31, "npc"),
-#    y = unit(1, "npc"),
-    rot = 90,
-    gp = gpar(fontsize = 12),
-    vp = viewport(layout.pos.row = 2:4, layout.pos.col = 1))
-#upViewport(0)
-
-
-for(ind in 1:3) {
-    p_ind <- ggplot() +
-        geom_point(aes(x = as.Date(time), y = weighted_ili),
-            size = 3,
-            colour = "grey",
-            data = ili_national[christmas_week_inds[
-                    christmas_week_inds > panel_cutoff_inds[ind] &
-                        christmas_week_inds <= panel_cutoff_inds[ind + 1]], ]) +
-#        data = ili_national[last_week_inds, ]) +
-        geom_line(aes(x = as.Date(time), y = weighted_ili),
-            data = ili_national[seq(from = panel_cutoff_inds[ind] + 1, to = panel_cutoff_inds[ind + 1]), ]) +
-        geom_vline(aes(xintercept = as.numeric(as.Date(time))),
-            colour = "grey",
-            data = ili_national[is.na(ili_national$weighted_ili) &
-                    seq_len(nrow(ili_national)) > panel_cutoff_inds[ind] &
-                    seq_len(nrow(ili_national)) <= panel_cutoff_inds[ind + 1], ]) +
-#    geom_vline(aes(xintercept = as.numeric(as.Date(ili_train_cutoff_time))),
-#        colour = "red", linetype = 2) +
-        scale_x_date() +
-#    scale_x_date(limits = time_limits, expand = c(0, 0)) +
-        xlab("Time") +
-        ylab("") +
-        ylim(c(0, 8)) +
-#    ylab("Weighted Influenza-like Illness\n") +
-#    ggtitle("Influenza Data - National United States") +
-        theme_bw(base_size = 11)
-    
-    print(p_ind, vp = viewport(layout.pos.row = ind + 1, layout.pos.col = 2))
-}
-
-#p_1 <- ggplot() +
-#    geom_point(aes(x = as.Date(time), y = weighted_ili),
-#        size = 3,
-#        colour = "grey",
-#        data = ili_national[christmas_week_inds[christmas_week_inds <= panel_cutoff_ind], ]) +
-##        data = ili_national[last_week_inds, ]) +
-#    geom_line(aes(x = as.Date(time), y = weighted_ili),
-#        data = ili_national[seq_len(panel_cutoff_ind), ]) +
-#    geom_vline(aes(xintercept = as.numeric(as.Date(time))),
-#        colour = "grey",
-#        data = ili_national[is.na(ili_national$weighted_ili), ]) +
-##    geom_vline(aes(xintercept = as.numeric(as.Date(ili_train_cutoff_time))),
-##        colour = "red", linetype = 2) +
-#    scale_x_date() +
-##    scale_x_date(limits = time_limits, expand = c(0, 0)) +
-#    xlab("Time") +
-#    ylab("") +
-#    ylim(c(0, 8)) +
-##    ylab("Weighted Influenza-like Illness\n") +
-##    ggtitle("Influenza Data - National United States") +
-#    theme_bw(base_size = 11)
-#
-#p_2 <- ggplot() +
-#    geom_point(aes(x = as.Date(time), y = weighted_ili),
-#        size = 3,
-#        colour = "grey",
-#        data = ili_national[christmas_week_inds[christmas_week_inds > panel_cutoff_ind], ]) +
-##        data = ili_national[last_week_inds, ]) +
-#    geom_line(aes(x = as.Date(time), y = weighted_ili),
-#        data = ili_national[seq(from = panel_cutoff_ind + 1, to = nrow(ili_national)), ]) +
-#    geom_vline(aes(xintercept = as.numeric(as.Date(time))),
-#        colour = "grey",
-#        data = ili_national[is.na(ili_national$weighted_ili), ]) +
-##    geom_vline(aes(xintercept = as.numeric(as.Date(ili_train_cutoff_time))),
-##        colour = "red", linetype = 2) +
-#    scale_x_date() +
-##    scale_x_date(limits = time_limits, expand = c(0, 0)) +
-#    xlab("Time") +
-#    ylab("") +
-#    ylim(c(0, 8)) +
-##    ylab("Weighted Influenza-like Illness\n") +
-##    ggtitle("Influenza Data - National United States") +
-#    theme_bw(base_size = 11)
-
-#ggplot() +
-#    geom_line(aes(x = as.Date(time), y = weighted_ili),
-#        data = ili_national) +
-#    geom_point(aes(x = as.Date(time), y = weighted_ili),
-#        size = 3,
-#        data = ili_national[christmas_week_inds, ]) +
-##        data = ili_national[last_week_inds, ]) +
-#    geom_vline(aes(xintercept = as.numeric(as.Date(time))),
-#        colour = "grey",
-#        data = ili_national[is.na(ili_national$weighted_ili), ]) +
-#    geom_vline(aes(xintercept = as.numeric(as.Date(ili_train_cutoff_time))),
-#        colour = "red", linetype = 2) +
-#    scale_x_date() +
-##    scale_x_date(limits = time_limits, expand = c(0, 0)) +
-#    xlab("Time") +
-#    ylab("Weighted Influenza-like Illness\n") +
-#    ggtitle("Influenza Data - National United States") +
-#    theme_bw(base_size = 11)
 
 
 
-#ili_ribbons_df <- ili_prediction_results %>%
-#    select(prediction_time,
-#        prediction_horizon,
-#        full_model_descriptor,
-#        model,
-#        interval_pred_lb_95:interval_pred_ub_50) %>%
-#    gather("bound_type", "predictive_value", interval_pred_lb_95:interval_pred_ub_50) %>%
-#    mutate(interval_type = ifelse(grepl("50", bound_type), "50", "95"),
-#        bound_type = ifelse(grepl("lb", bound_type), "lower", "upper")) %>%
-#    spread(bound_type, predictive_value)
-#
-#ili_ribbons_df_christmas_effect <- ili_ribbons_df[1, , drop = FALSE]
-#ili_ribbons_df_christmas_effect$year <- 1
-#for(test_year in 2010:2013) {
-#  analysis_week_ind_in_test_season <- 
-#    max(which(year(ili_national$time) == test_year &
-#        month(ili_national$time) == 12 &
-#        day(ili_national$time) <= 25))
-#  
-#  for(relative_offset in seq(from = 1, to = 4, by = 1)) {
-#    ili_ribbons_df_christmas_effect <- rbind(
-#      ili_ribbons_df_christmas_effect,
-#      ili_ribbons_df[
-#        ili_ribbons_df$prediction_time ==
-#          ili_national$time[analysis_week_ind_in_test_season + relative_offset] & 
-#        ili_ribbons_df$prediction_horizon == relative_offset,
-#      ] %>%
-#      mutate(year = test_year)
-#      )
-#  }
-#}
-#
-#ili_ribbons_df_christmas_effect <- ili_ribbons_df_christmas_effect[-1, , drop = FALSE]
-##ili_ribbons_df_christmas_effect$year <- rep(2010:2013, each = 4)
-#
-#
-#
-#
-##phs_used <- c(1, 6, 13, 26)
-#models_used <- c("SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
-#    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
-#    
-#pi_type <- 95
-#
-#p_ili <- ggplot() +
-#    geom_ribbon(aes(x = prediction_time, ymin = lower, ymax = upper, colour = model, fill = model, alpha = model),
-##        alpha = 0.3,
-#        size = 0,
-#        data = ili_ribbons_df_christmas_effect[ili_ribbons_df_christmas_effect$full_model_descriptor %in% models_used &
-#                ili_ribbons_df_christmas_effect$interval_type == pi_type, ]) +
-#    geom_line(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2011:2014, ]) +
-##    geom_point(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
-#    geom_line(aes(x = prediction_time, y = pt_pred, colour = model, linetype = model),
-#        size = 1,
-#        data = ili_prediction_results[ili_prediction_results$full_model_descriptor %in% models_used, ]) +
-##    scale_fill_manual("Model", values = c("#0072B2", "#E69F00")) +
-##    scale_colour_manual("Model", values = c("#0072B2", "#E69F00")) +
-#    scale_fill_manual("Model", values = color_palette) +
-#    scale_colour_manual("Model", values = color_palette) +
-#    scale_linetype("Model") +
-#    facet_wrap( ~ year, ncol = 1,
-#        labeller = as_labeller(function(labels, ...) {
-#                return(paste0("Prediction Horizon = ", labels))
-#            })) +
-#    xlab("Prediction Time") +
-#    ylab("Weighted Influenza-like Illness") +
-#    ggtitle("(b) Point and 95% Interval Predictions, Influenza") +
-##    ggtitle("Point and 95% Interval Predictions") +
-##    scale_y_log10() +
-#    theme_bw(base_size = 11)
-
-#grid.newpage()
-#pushViewport(viewport(layout = grid.layout(nrow = 2, ncol = 2,
-#            heights = unit(c(1, 1), c("null", "null")),
-#            widths = unit(c(1, 1), c("lines", "null")))))
-##pushViewport(viewport(layout.pos.row = 1:2, layout.pos.col = 3))
-##grid.draw(legend_grob)
-##upViewport()
-##downViewport(xlab_grob_name)
-#grid.text("Weighted Influenza-like Illness",
-##    x = unit(0.31, "npc"),
-##    y = unit(1, "npc"),
-#    rot = 90,
-#    gp = gpar(fontsize = 12),
-#    vp = viewport(layout.pos.row = 1:2, layout.pos.col = 1))
-##upViewport(0)
-#
-#print(p_1, vp = viewport(layout.pos.row = 1, layout.pos.col = 2))
-#print(p_2, vp = viewport(layout.pos.row = 2, layout.pos.col = 2))
-##print(p_b_regular_scale, vp = viewport(layout.pos.row = 2, layout.pos.col = 1))
-@
-\caption{Illustration of short term peaks in influenza-like illness on Christmas
-week.  In every season in the data set except for two, there is a local
-peak in incidence on the week of Christmas; this peak sometimes coincides with
-the season peak.
-In those two other seasons (1997/1998 and 2008/2009), there is still a peak in the incidence measure near
-Christmas, but the peak occurs in the week after Christmas.}
-\label{fig:ChristmasEffect}
-\end{figure}
+%\begin{figure}
+%<<ChristmasWeekPlot, echo = FALSE, fig.keep = "last", dev = "cairo_ps">>=
+%christmas_week_inds <- sapply(
+%  unique(year(as.Date(ili_national$time))),
+%  function(year_val) {
+%    max(which(year(ili_national$time) == year_val &
+%      month(ili_national$time) == 12 &
+%      day(ili_national$time) <= 25))
+%  }
+%)
+%
+%last_week_inds <- sapply(
+%  unique(year(as.Date(ili_national$time))),
+%  function(year_val) {
+%    max(which(year(ili_national$time) == year_val))
+%  }
+%)
+%
+%## get legend grob
+%temp_df <- ili_national
+%temp_df$label <- "Incidence on\nChristmas Week"
+%
+%p <- ggplot() +
+%    geom_point(aes(x = as.Date(time), y = weighted_ili, colour = label),
+%        size = 3,
+%        data = temp_df) +
+%    scale_colour_manual("", values = "grey") +
+%    theme_bw()
+%
+%suppressWarnings(print(p))
+%grid_list <- capture.output(grid.ls())
+%legend_grob <- grid.get(str_trim(grid_list[grep("guide-box", grid_list)]))
+%
+%panel_cutoff_ind <- 450
+%panel_cutoff_inds <- c(0, 300, 600, nrow(ili_national))
+%
+%
+%## set up layout for plot
+%grid.newpage()
+%pushViewport(viewport(layout = grid.layout(nrow = 4, ncol = 3,
+%            heights = unit(c(1, 1, 1, 1), c("lines", "null", "null", "null")),
+%            widths = unit(c(1, 1, 0.3), c("lines", "null", "null")))))
+%
+%## draw legend
+%pushViewport(viewport(layout.pos.row = 2:4, layout.pos.col = 3))
+%grid.draw(legend_grob)
+%upViewport()
+%
+%#downViewport(xlab_grob_name)
+%grid.text("\`\`Christmas effect\'\' in Influenza-like Illness Incidence",
+%#    x = unit(0.31, "npc"),
+%#    y = unit(1, "npc"),
+%#    rot = 90,
+%    gp = gpar(fontsize = 14),
+%    vp = viewport(layout.pos.row = 1, layout.pos.col = 2))
+%
+%grid.text("Weighted Influenza-like Illness",
+%#    x = unit(0.31, "npc"),
+%#    y = unit(1, "npc"),
+%    rot = 90,
+%    gp = gpar(fontsize = 12),
+%    vp = viewport(layout.pos.row = 2:4, layout.pos.col = 1))
+%#upViewport(0)
+%
+%
+%for(ind in 1:3) {
+%    p_ind <- ggplot() +
+%        geom_point(aes(x = as.Date(time), y = weighted_ili),
+%            size = 3,
+%            colour = "grey",
+%            data = ili_national[christmas_week_inds[
+%                    christmas_week_inds > panel_cutoff_inds[ind] &
+%                        christmas_week_inds <= panel_cutoff_inds[ind + 1]], ]) +
+%#        data = ili_national[last_week_inds, ]) +
+%        geom_line(aes(x = as.Date(time), y = weighted_ili),
+%            data = ili_national[seq(from = panel_cutoff_inds[ind] + 1, to = panel_cutoff_inds[ind + 1]), ]) +
+%        geom_vline(aes(xintercept = as.numeric(as.Date(time))),
+%            colour = "grey",
+%            data = ili_national[is.na(ili_national$weighted_ili) &
+%                    seq_len(nrow(ili_national)) > panel_cutoff_inds[ind] &
+%                    seq_len(nrow(ili_national)) <= panel_cutoff_inds[ind + 1], ]) +
+%#    geom_vline(aes(xintercept = as.numeric(as.Date(ili_train_cutoff_time))),
+%#        colour = "red", linetype = 2) +
+%        scale_x_date() +
+%#    scale_x_date(limits = time_limits, expand = c(0, 0)) +
+%        xlab("Time") +
+%        ylab("") +
+%        ylim(c(0, 8)) +
+%#    ylab("Weighted Influenza-like Illness\n") +
+%#    ggtitle("Influenza Data - National United States") +
+%        theme_bw(base_size = 11)
+%    
+%    print(p_ind, vp = viewport(layout.pos.row = ind + 1, layout.pos.col = 2))
+%}
+%
+%#p_1 <- ggplot() +
+%#    geom_point(aes(x = as.Date(time), y = weighted_ili),
+%#        size = 3,
+%#        colour = "grey",
+%#        data = ili_national[christmas_week_inds[christmas_week_inds <= panel_cutoff_ind], ]) +
+%##        data = ili_national[last_week_inds, ]) +
+%#    geom_line(aes(x = as.Date(time), y = weighted_ili),
+%#        data = ili_national[seq_len(panel_cutoff_ind), ]) +
+%#    geom_vline(aes(xintercept = as.numeric(as.Date(time))),
+%#        colour = "grey",
+%#        data = ili_national[is.na(ili_national$weighted_ili), ]) +
+%##    geom_vline(aes(xintercept = as.numeric(as.Date(ili_train_cutoff_time))),
+%##        colour = "red", linetype = 2) +
+%#    scale_x_date() +
+%##    scale_x_date(limits = time_limits, expand = c(0, 0)) +
+%#    xlab("Time") +
+%#    ylab("") +
+%#    ylim(c(0, 8)) +
+%##    ylab("Weighted Influenza-like Illness\n") +
+%##    ggtitle("Influenza Data - National United States") +
+%#    theme_bw(base_size = 11)
+%#
+%#p_2 <- ggplot() +
+%#    geom_point(aes(x = as.Date(time), y = weighted_ili),
+%#        size = 3,
+%#        colour = "grey",
+%#        data = ili_national[christmas_week_inds[christmas_week_inds > panel_cutoff_ind], ]) +
+%##        data = ili_national[last_week_inds, ]) +
+%#    geom_line(aes(x = as.Date(time), y = weighted_ili),
+%#        data = ili_national[seq(from = panel_cutoff_ind + 1, to = nrow(ili_national)), ]) +
+%#    geom_vline(aes(xintercept = as.numeric(as.Date(time))),
+%#        colour = "grey",
+%#        data = ili_national[is.na(ili_national$weighted_ili), ]) +
+%##    geom_vline(aes(xintercept = as.numeric(as.Date(ili_train_cutoff_time))),
+%##        colour = "red", linetype = 2) +
+%#    scale_x_date() +
+%##    scale_x_date(limits = time_limits, expand = c(0, 0)) +
+%#    xlab("Time") +
+%#    ylab("") +
+%#    ylim(c(0, 8)) +
+%##    ylab("Weighted Influenza-like Illness\n") +
+%##    ggtitle("Influenza Data - National United States") +
+%#    theme_bw(base_size = 11)
+%
+%#ggplot() +
+%#    geom_line(aes(x = as.Date(time), y = weighted_ili),
+%#        data = ili_national) +
+%#    geom_point(aes(x = as.Date(time), y = weighted_ili),
+%#        size = 3,
+%#        data = ili_national[christmas_week_inds, ]) +
+%##        data = ili_national[last_week_inds, ]) +
+%#    geom_vline(aes(xintercept = as.numeric(as.Date(time))),
+%#        colour = "grey",
+%#        data = ili_national[is.na(ili_national$weighted_ili), ]) +
+%#    geom_vline(aes(xintercept = as.numeric(as.Date(ili_train_cutoff_time))),
+%#        colour = "red", linetype = 2) +
+%#    scale_x_date() +
+%##    scale_x_date(limits = time_limits, expand = c(0, 0)) +
+%#    xlab("Time") +
+%#    ylab("Weighted Influenza-like Illness\n") +
+%#    ggtitle("Influenza Data - National United States") +
+%#    theme_bw(base_size = 11)
+%
+%
+%
+%#ili_ribbons_df <- ili_prediction_results %>%
+%#    select(prediction_time,
+%#        prediction_horizon,
+%#        full_model_descriptor,
+%#        model,
+%#        interval_pred_lb_95:interval_pred_ub_50) %>%
+%#    gather("bound_type", "predictive_value", interval_pred_lb_95:interval_pred_ub_50) %>%
+%#    mutate(interval_type = ifelse(grepl("50", bound_type), "50", "95"),
+%#        bound_type = ifelse(grepl("lb", bound_type), "lower", "upper")) %>%
+%#    spread(bound_type, predictive_value)
+%#
+%#ili_ribbons_df_christmas_effect <- ili_ribbons_df[1, , drop = FALSE]
+%#ili_ribbons_df_christmas_effect$year <- 1
+%#for(test_year in 2010:2013) {
+%#  analysis_week_ind_in_test_season <- 
+%#    max(which(year(ili_national$time) == test_year &
+%#        month(ili_national$time) == 12 &
+%#        day(ili_national$time) <= 25))
+%#  
+%#  for(relative_offset in seq(from = 1, to = 4, by = 1)) {
+%#    ili_ribbons_df_christmas_effect <- rbind(
+%#      ili_ribbons_df_christmas_effect,
+%#      ili_ribbons_df[
+%#        ili_ribbons_df$prediction_time ==
+%#          ili_national$time[analysis_week_ind_in_test_season + relative_offset] & 
+%#        ili_ribbons_df$prediction_horizon == relative_offset,
+%#      ] %>%
+%#      mutate(year = test_year)
+%#      )
+%#  }
+%#}
+%#
+%#ili_ribbons_df_christmas_effect <- ili_ribbons_df_christmas_effect[-1, , drop = FALSE]
+%##ili_ribbons_df_christmas_effect$year <- rep(2010:2013, each = 4)
+%#
+%#
+%#
+%#
+%##phs_used <- c(1, 6, 13, 26)
+%#models_used <- c("SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
+%#    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
+%#    
+%#pi_type <- 95
+%#
+%#p_ili <- ggplot() +
+%#    geom_ribbon(aes(x = prediction_time, ymin = lower, ymax = upper, colour = model, fill = model, alpha = model),
+%##        alpha = 0.3,
+%#        size = 0,
+%#        data = ili_ribbons_df_christmas_effect[ili_ribbons_df_christmas_effect$full_model_descriptor %in% models_used &
+%#                ili_ribbons_df_christmas_effect$interval_type == pi_type, ]) +
+%#    geom_line(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2011:2014, ]) +
+%##    geom_point(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2010:2014, ]) +
+%#    geom_line(aes(x = prediction_time, y = pt_pred, colour = model, linetype = model),
+%#        size = 1,
+%#        data = ili_prediction_results[ili_prediction_results$full_model_descriptor %in% models_used, ]) +
+%##    scale_fill_manual("Model", values = c("#0072B2", "#E69F00")) +
+%##    scale_colour_manual("Model", values = c("#0072B2", "#E69F00")) +
+%#    scale_fill_manual("Model", values = color_palette) +
+%#    scale_colour_manual("Model", values = color_palette) +
+%#    scale_linetype("Model") +
+%#    facet_wrap( ~ year, ncol = 1,
+%#        labeller = as_labeller(function(labels, ...) {
+%#                return(paste0("Prediction Horizon = ", labels))
+%#            })) +
+%#    xlab("Prediction Time") +
+%#    ylab("Weighted Influenza-like Illness") +
+%#    ggtitle("(b) Point and 95% Interval Predictions, Influenza") +
+%##    ggtitle("Point and 95% Interval Predictions") +
+%##    scale_y_log10() +
+%#    theme_bw(base_size = 11)
+%
+%#grid.newpage()
+%#pushViewport(viewport(layout = grid.layout(nrow = 2, ncol = 2,
+%#            heights = unit(c(1, 1), c("null", "null")),
+%#            widths = unit(c(1, 1), c("lines", "null")))))
+%##pushViewport(viewport(layout.pos.row = 1:2, layout.pos.col = 3))
+%##grid.draw(legend_grob)
+%##upViewport()
+%##downViewport(xlab_grob_name)
+%#grid.text("Weighted Influenza-like Illness",
+%##    x = unit(0.31, "npc"),
+%##    y = unit(1, "npc"),
+%#    rot = 90,
+%#    gp = gpar(fontsize = 12),
+%#    vp = viewport(layout.pos.row = 1:2, layout.pos.col = 1))
+%##upViewport(0)
+%#
+%#print(p_1, vp = viewport(layout.pos.row = 1, layout.pos.col = 2))
+%#print(p_2, vp = viewport(layout.pos.row = 2, layout.pos.col = 2))
+%##print(p_b_regular_scale, vp = viewport(layout.pos.row = 2, layout.pos.col = 1))
+%@
+%\caption{Illustration of short term peaks in influenza-like illness on Christmas
+%week.  In every season in the data set except for two, there is a local
+%peak in incidence on the week of Christmas; this peak sometimes coincides with
+%the season peak.
+%In those two other seasons (1997/1998 and 2008/2009), there is still a peak in the incidence measure near
+%Christmas, but the peak occurs in the week after Christmas.}
+%\label{fig:ChristmasEffect}
+%\end{figure}
 
 
 \end{document}
