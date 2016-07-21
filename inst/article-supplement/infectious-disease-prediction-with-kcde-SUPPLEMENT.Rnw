@@ -49,6 +49,8 @@ Diseases,}}\\
 {\small\textit{San Juan, Puerto Rico, USA}}\\
 }
 
+\renewcommand{\figurename}{Supplemental Figure}
+
 %% Author addresses
 %$^1$\textit{Department of Biostatistics and Epidemiology,
 %School of Public Health and Health Sciences, \\
@@ -221,7 +223,7 @@ In our application, the possible values of the
 random variables are non-negative integer case counts.  In order to facilitate use of the log-normal
 kernel, we add $0.5$ to the observed case counts; the
 corresponding integration bounds are the non-negative integers as illustrated in
-Figure~\ref{fig:IncidenceKernelPlots}.
+Supplemental Figure~\ref{fig:IncidenceKernelPlots}.
 
 \subsection{Parameter Estimation}
 \label{subsec:ParamEst}
@@ -256,17 +258,31 @@ We follow a two-stage strategy for parameter estimation
 
 \subsection{Simulation Distributions}
 
-In the simulation study, we simulate data from discretized multivariate normal
-distributions.  The method for discretizing the underlying multivariate normal
-is the same as we described above for descritizing the kernel function.  As
-we discussed in the paper, the normal distribution has mean $\b0$ and covariance
+In the simulation study, we simulate data from a discretized multivariate normal
+distribution.  The method for discretizing the underlying multivariate normal
+is the same as we described above for descritizing the kernel function.  The
+normal distribution has mean $\b0$ and covariance
 matrix with $1$ on the diagonal and $0.9$ off of the diagonal.  This
 multivariate normal distribution was used in one of the simulation studies
 conducted by \citet{duong2005crossvalidationBandwidthMultivariateKDE}
-demonstrating that a fully parameterized bandwidth matrix could yield improved density estimates for joint density estimation with continuous distributions.
-We discretize this distribution at the half-integers as illustrated for the
-two-dimensional case in Figure~\ref{fig:SimStudyDistribution}.
+demonstrating that a fully parameterized bandwidth matrix could yield improved
+density estimates for joint density estimation with continuous distributions.
+We discretize this distribution at the half-integers as illustrated in
+panel (a) of Supplemental Figure~\ref{fig:SimStudyDistribution}.
 
+Panel (b) of Supplemental Figure~\ref{fig:SimStudyDistribution} gives a
+motivating example for using this particular distribution in the simulation study:
+prediction of incidence at a prediction horizon of one week.  In the simplest
+formulation this task omitting the periodic kernel component and predicting
+using only the most recent observation, our goal is to estimate the conditional
+distribution of incidence at time $t + 1$ given incidence at time $t$.  A key
+feature of the observed disease incidence in our
+data sets is the high autocorrelation of the time series, which appears as a
+linear trend in the scatter plot of incidence at adjacent time points.
+The simulation study examines how the bandwidth matrix parameterization relates
+to performance of KCDE in estimating conditional densities in the presence of
+such correlation between the variables being conditioned on and the variables
+whose density is being estimated.
 
 \subsection{Hellinger Distance}
 
@@ -310,7 +326,7 @@ week for the corresponding season.  Following the precedent set in the
 competitions, we make predictions for \textit{binned} incidence in the peak
 week.
 \end{enumerate}
-These prediction targets are illustrated in
+These prediction targets are illustrated in Supplemental
 Figure~\ref{fig:PredictionTargetsIllustration}.
 
 
@@ -389,7 +405,7 @@ from the joint distribution of $(Z_{t + h - 1}, \ldots, Z_{t + 1}) | z_t$.
 \subsection{Predictive Distributions for Individual Weeks: Additional Results}
 
 Here we present some additional results for predicting incidence in
-individual weeks in the applications. 
+individual weeks in the applications. Supplemental
 Figure~\ref{fig:AggregatedApplicationResultsContrastsBoxPlots} shows that
 including the periodic kernel in the KCDE specification yielded consistent
 performance gains in the application to influenza.  The performance gains in the
@@ -403,12 +419,13 @@ influenza.
 Additional Results}
 
 Figure 6 in the main text shows log scores for prediction of incidence in the
-peak week.  Figure~\ref{fig:CombinedPeakWeekTimingPredictionLogScores} in this
-supplement shows the corresponding results for prediction of peak week timing. 
+peak week. 
+Supplemental Figure~\ref{fig:CombinedPeakWeekTimingPredictionLogScores} in this
+supplement shows the corresponding results for prediction of peak week timing.
 As with predictions of peak incidence, there is no clear evidence that KCDE
 either outperforms or underperforms relative to the SARIMA model.  The log
 scores give us information about the values that the predictive distributions
-take at a single value: the eventual realized outcome.  Figures
+take at a single value: the eventual realized outcome.  Supplemental Figures
 \ref{fig:FluPeakWeekTimingPredictiveDistributions} through
 \ref{fig:DenguePeakWeekHeightPredictiveDistributions} give more
 information, about the predictive distributions for peak week height and timing
@@ -423,7 +440,7 @@ remaining weeks and calculate the proportion of those sampled
 trajectories where the peak fell in each incidence bin or at each week of
 the season.
 
-Figure~\ref{fig:SimTrajectories} illustrates this with the
+Supplemental Figure~\ref{fig:SimTrajectories} illustrates this with the
 Periodic, Full Bandwidth KCDE specification and the SARIMA model.  For
 reference, we have also included all observed trajectories for the seasons in
 the training and test data sets and trajectories sampled from the
@@ -985,7 +1002,7 @@ with bandwidth matrix $\begin{bmatrix}0.2 & 0.15 \\ 0.15 &
 
 
 \begin{figure}
-<<SimStudyDistributionsDiscretizedDuongHazelton, echo = FALSE, fig.height = 6, dev = "cairo_ps">>=
+<<SimStudyDistributionsDiscretizedDuongHazelton, echo = FALSE, fig.width = 5, fig.height = 8, dev = "cairo_ps">>=
 library(ggplot2)
 library(grid)
 library(plyr)
@@ -1025,7 +1042,7 @@ x_disc_grid$density <- d_pdtmvn_mixt_conditional(X = x_disc_grid,
     conditional = FALSE,
     log = FALSE)
 
-ggplot() +
+p_sim <- ggplot() +
 #    geom_contour(aes(x = X1, y = X2, z = density), bins = 7, data = continuous_density_df_b) +
     geom_point(aes(x = X1, y = X2, colour = density), data = x_disc_grid) +
     scale_colour_gradientn("Distribution\nProbability",
@@ -1049,11 +1066,27 @@ ggplot() +
     #    geom_point(aes(x = exp(log(3) - var_b - covar_b), y = exp(log(3) - var_b - covar_b)), colour = "red") +
     xlab(expression(X[1])) +
     ylab(expression(X[2])) +
-    ggtitle("Simulation Distribution") +
-    theme_bw()# +
+    ggtitle("\n(a) Simulation Distribution") +
+    theme_bw(base_size = 11)# +
 #    theme(legend.position = "none")
+
+p_obs <- ggplot() +
+    geom_point(aes(x = lag(dengue_sj$total_cases), y = dengue_sj$total_cases)) +
+    xlab("Reported Cases at Time t") +
+    ylab("Reported Cases at Time t + 1") +
+    ggtitle("(b) Reported Dengue Cases\nat Time t + 1 vs. Time t") +
+    theme_bw(base_size = 11) +
+    theme(plot.margin = unit(c(0, 30.5, 0, 0.5), "mm"))
+
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(nrow = 2, ncol = 1)))
+print(p_sim, vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
+suppressWarnings(print(p_obs, vp = viewport(layout.pos.row = 2, layout.pos.col = 1)))
 @
-\caption{The distribution that we simulate data from in the simulation study.}
+\caption{Panel (a) shows the distribution that we simulate data from in the
+simulation study.  Panel (b) shows an example motivating the choice of
+distribution for the simulation study: reported dengue cases at time $t + 1$ vs.
+at time $t$.}
 \label{fig:SimStudyDistribution}
 \end{figure}
 
@@ -3488,12 +3521,25 @@ p_boxplots <- ggplot() +
     theme_bw()
 
 grid.newpage()
-pushViewport(viewport(layout = grid.layout(nrow = 9, ncol = 2,
-            heights = unit(c(rep(1, 8), 0.75), c("lines", rep("null", 8))),
-            widths = unit(c(1, 0.25), c("null", "null")))))
+pushViewport(viewport(layout = grid.layout(nrow = 9, ncol = 3,
+            heights = unit(c(1, rep(1, 7), 0.75), c("lines", rep("null", 8))),
+            widths = unit(c(1, 1, 0.25), c("null", "lines", "null")))))
 grid.text("Summary of Results for Peak Week Incidence",
     gp = gpar(fontsize = 14),
-    vp = viewport(layout.pos.row = 1, layout.pos.col = 1:2))
+    vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
+#grid.text("Observed\nIncidence",
+#    gp = gpar(fontsize = 14),
+#    vp = viewport(layout.pos.row = 1, layout.pos.col = 2))
+grid.text("Reported Weekly Incidence",
+    rot = 90,
+    gp = gpar(fontsize = 12),
+    vp = viewport(layout.pos.row = 2:8, layout.pos.col = 2))
+grid.text("Season Week",
+#    just = "left",
+    vjust = -0.5,
+    hjust = 0.35,
+    gp = gpar(fontsize = 12),
+    vp = viewport(layout.pos.row = 9, layout.pos.col = 3))
 
 print(p_boxplots, vp = viewport(layout.pos.row = 2:9, layout.pos.col = 1))
 
@@ -3511,7 +3557,7 @@ for(i in rev(seq_along(data_set_season_combos))) {
             theme_bw() +
             theme(panel.margin = unit(0, "mm"),
                 plot.margin = unit(c(8, 0, -8, left_margins[i]), "mm")),
-        vp = viewport(layout.pos.row = 1 + i, layout.pos.col = 2)
+        vp = viewport(layout.pos.row = 1 + i, layout.pos.col = 3)
     )
 }
 
@@ -3522,7 +3568,8 @@ given season in weeks before the actual peak week for that season.  The vertical
 axis is the difference in log scores between the given method and a naive approach assigning
 equal probability to each incidence bin.  Positive values indicate cases when the method did
 better than using equal bin probabilities.  There are 11 incidence bins for dengue
-and 27 bins for influenza.}
+and 27 bins for influenza.  The plots on the right display the trajectory of
+incidence over each season.}
 \label{fig:CombinedPeakWeekIncidencePredictionLogScores}
 \end{figure}
 
@@ -3658,12 +3705,25 @@ p_boxplots <- ggplot() +
     theme_bw()
 
 grid.newpage()
-pushViewport(viewport(layout = grid.layout(nrow = 9, ncol = 2,
-            heights = unit(c(rep(1, 8), 0.75), c("lines", rep("null", 8))),
-            widths = unit(c(1, 0.25), c("null", "null")))))
-grid.text("Summary of Results for Peak Week Timing",
+pushViewport(viewport(layout = grid.layout(nrow = 9, ncol = 3,
+            heights = unit(c(1, rep(1, 7), 0.75), c("lines", rep("null", 8))),
+            widths = unit(c(1, 1, 0.25), c("null", "lines", "null")))))
+grid.text("Summary of Results for Peak Week Incidence",
     gp = gpar(fontsize = 14),
-    vp = viewport(layout.pos.row = 1, layout.pos.col = 1:2))
+    vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
+#grid.text("Observed\nIncidence",
+#    gp = gpar(fontsize = 14),
+#    vp = viewport(layout.pos.row = 1, layout.pos.col = 2))
+grid.text("Reported Weekly Incidence",
+    rot = 90,
+    gp = gpar(fontsize = 12),
+    vp = viewport(layout.pos.row = 2:8, layout.pos.col = 2))
+grid.text("Season Week",
+#    just = "left",
+    vjust = -0.5,
+    hjust = 0.35,
+    gp = gpar(fontsize = 12),
+    vp = viewport(layout.pos.row = 9, layout.pos.col = 3))
 
 suppressWarnings(print(p_boxplots, vp = viewport(layout.pos.row = 2:9, layout.pos.col = 1)))
 
@@ -3681,7 +3741,7 @@ for(i in rev(seq_along(data_set_season_combos))) {
             theme_bw() +
             theme(panel.margin = unit(0, "mm"),
                 plot.margin = unit(c(8, 0, -8, left_margins[i]), "mm")),
-        vp = viewport(layout.pos.row = 1 + i, layout.pos.col = 2)
+        vp = viewport(layout.pos.row = 1 + i, layout.pos.col = 3)
     )
 }
 @
@@ -3690,7 +3750,8 @@ timing.  Each boxplot summarizes all predictions made by a method in a given
 season in weeks before the actual peak week for that season.  The vertical
 axis is the difference in log scores between the given method and a naive approach assigning
 equal probability to each week of the year.  Positive values indicate cases when
-the method did better than using equal bin probabilities.}
+the method did better than using equal bin probabilities.  The plots on the right display the trajectory of
+incidence over each season.}
 \label{fig:CombinedPeakWeekTimingPredictionLogScores}
 \end{figure}
 
@@ -4101,7 +4162,9 @@ prediction is made.  The vertical axis represents binned incidence in
 the peak week, as described in the main text.  Each ``column'' represents one
 predictive distribution.  The
 horizontal dashed line is at the observed peak incidence for the season.  The
-vertical dashed line is at the observed peak week for the season.}
+vertical dashed line is at the observed peak week for the season.  The medians are calculated based on the unbinned predictions.
+The upper bin extends to infinity; we have cut it off at 550 cases for purposes
+of the display.}
 \label{fig:FluPeakWeekHeightPredictiveDistributions}
 \end{figure}
 
@@ -4210,9 +4273,11 @@ ggplot() +
 dengue fever.  The horizontal axis represents the week in the season at which
 the prediction is made.  The vertical axis represents binned incidence in
 the peak week, as described in the main text.  Each ``column'' represents one
-predictive distribution.  The
-horizontal dashed line is at the observed peak incidence for the season.  The
-vertical dashed line is at the observed peak week for the season.}
+predictive distribution.  The horizontal dashed line is at the observed peak
+incidence for the season.  The vertical dashed line is at the observed peak week
+for the season.  The medians are calculated based on the unbinned predictions.
+The upper bin extends to infinity; we have cut it off at 550 cases for purposes
+of the display.}
 \label{fig:DenguePeakWeekHeightPredictiveDistributions}
 \end{figure}
 

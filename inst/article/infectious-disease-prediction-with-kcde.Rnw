@@ -102,20 +102,23 @@ predictions for the timing of and incidence in the peak week of the season.
 Our implementation of KCDE incorporates two novel kernel components: a periodic
 component that captures seasonality in disease incidence, and a component that
 allows for a full parameterization of the bandwidth matrix with discrete
-variables. We demonstrate via simulation that using a fully parameterized bandwidth matrix can
-improve discrete conditional density estimates.  In applications to predicting
-dengue fever and influenza, our method yields improved predictions for dengue incidence in individual weeks
-relative to a seasonal autoregressive integrated moving average (SARIMA) model
-and a previously published generalized linear model for infectious disease
-incidence known as HHH4.  KCDE also offers more consistent
-performance than the baseline models for predictions of
-incidence in the peak week, and is comparable to the baseline models on the
-other prediction targets.  The periodic kernel function leads to improved
+variables.  We demonstrate via simulation that using a fully parameterized
+bandwidth matrix can be beneficial for estimating discrete conditional densities.
+We applied the method to predicting dengue fever and influenza, and compared to
+a seasonal autoregressive integrated moving average
+(SARIMA) model and a previously published generalized linear model for infectious disease
+incidence known as HHH4.  KCDE outperformed the baseline methods for
+predictions of dengue incidence in individual weeks.  KCDE also offered more
+consistent performance than the baseline models for predictions of
+incidence in the peak week, and was comparable to the baseline models on the
+other prediction targets.  Using the periodic kernel function led to better
 predictions of incidence in both applications.  Our approach and extensions of
 it could yield improved predictions for public health decision makers,
 particularly in diseases with heterogeneous seasonal dynamics such as dengue fever.}
-{copula, dengue fever, infectious disease, influenza, kernel conditional density estimation, prediction}
 \end{abstract}
+
+\flushleft{copula, dengue fever, infectious disease, influenza, kernel
+conditional density estimation, prediction}
 
 \maketitle
 
@@ -410,7 +413,8 @@ predictions for all remaining time points in the season.
 We obtain predictive distributions for each of three prediction targets.
 We will model the first of these prediction targets directly and frame the
 second and third as suitable integrals of a predictive
-distribution $f(\bz_{({t^*} + 1):({t^*} + H_{t^*})} | {t^*}, \bz_{1:{t^*}})$ for the trajectory of incidence over all remaining weeks in the season:
+distribution $f(\bz_{({t^*} + 1):({t^*} + H_{t^*})} | {t^*}, \bz_{1:{t^*}})$
+for the trajectory of incidence over all remaining weeks in the season:
 \begin{enumerate}
   \item Incidence in a single future week with prediction horizon $h \in \{1, ..., W\}$:
     \begin{align}
@@ -650,22 +654,36 @@ estimation.
 
 We conducted a simulation study to examine the
 utility of using a non-diagonal bandwidth matrix specification when
-estimating discrete conditional distributions with KCDE.  There are many factors that
-determine the relative performance of KCDE estimators with different bandwidth
-parameterizations.  In this simulation study, we vary just one of these factors:
-the sample size ($N = 100$ or $N = 1000$).  
+estimating discrete conditional distributions with KCDE.  The simulation study
+is motivated by the simplest case of predicting
+incidence in a single week using KCDE as outlined in
+Subsection~\ref{subsec:Methods:KCDE}: predicting incidence at time $t + h$ given
+incidence at time $t$.  A central characteristic of the disease
+incidence data we analyze in the next Section is the presence of positive
+correlation between incidence in nearby time points
+(Supplemental Figure ***).  In this simulation study we demonstrate that
+in the presence of such correlation, using fully parameterized bandwidth
+matrices can improve conditional density estimates over using a diagonal
+bandwidth.
 
-We simulate data from a discretized bivariate normal
-distribution.  To define this
-distribution, let $\bU \sim MVN(\b0, \Sigma)$ where $\Sigma$ is a $2 \times 2$ matrix with $1$ on
-the diagonal and $0.9$ off of the diagonal.  We treat $\bU$
-as a latent variable and discretize it to obtain the random variable $\bX$ using
-the approach described in the supplement.
+There are many factors that determine the relative performance of KCDE
+estimators with different bandwidth parameterizations.  In this simulation
+study, we vary just one of these factors:
+the sample size ($N = 100$ or $N = 1000$).
+
+%We simulate data from a discretized bivariate normal
+%distribution.  To define this
+%distribution, let $\bU \sim MVN(\b0, \Sigma)$ where $\Sigma$ is a $2 \times 2$ matrix with $1$ on
+%the diagonal and $0.9$ off of the diagonal.  We treat $\bU$
+%as a latent variable and discretize it to obtain the random variable $\bX$ using
+%the approach described in the supplement.
 
 We conducted 500 simulation trials for each sample size.
 In each trial, we simulated $N$ observations of
-the discretized bivariate normal random variable $\bX$.  Using these
-observations as a training data set, we estimated the bandwidth
+a discretized bivariate normal random variable $\bX$ with mean $\b0$ and
+covariance matrix $\Sigma$ where $\Sigma$ has $1$ on
+the diagonal and $0.9$ off of the diagonal (see Supplement for further detail).
+Using these observations as a training data set, we estimated the bandwidth
 parameters for two variations on a KCDE model for the conditional distribution
 of $X_1 | X_2$: one with a diagonal bandwidth matrix specification
 and one with a fully parameterized bandwidth matrix.  In this simulation study,
@@ -685,12 +703,17 @@ combination of the training set sample size, dimension, and simulation trial, we
 compute the difference between the Hellinger distance from the true conditional
 distribution achieved with a diagonal bandwidth matrix and with a fully parameterized bandwidth matrix.
 
-The results indicate that using a fully parameterized bandwidth matrix
-instead of a diagonal bandwidth generally yields improved density estimates as
-measured by the integrated Hellinger distance (Figure~\ref{fig:SimStudyResultsPlot}).
+The results indicate that in the presence of correlation between the
+conditioning variable and the density estimation target, using a fully
+parameterized bandwidth matrix instead of a diagonal bandwidth generally yields improved
+density estimates as measured by the integrated Hellinger distance (Figure~\ref{fig:SimStudyResultsPlot}).
 The average improvement from using a fully parameterized bandwidth matrix
 is larger with a sample size of $N = 100$ instead of $N = 1000$, but there is
-also more variation in performance with the smaller sample size.
+also more variation in performance with the smaller sample size.  This suggests
+that using a fully parameterized bandwidth may be helpful in applications
+similar to infectious disease prediction where there is correlation between the
+quantity being predicted (e.g., future incidence) and the quantities that we
+condition on in order to make the predictions.
 
 \section{Applications}
 \label{sec:Applications}
@@ -790,9 +813,14 @@ All three methods
 struggle at larger prediction horizons, but it appears that the SARIMA and HHH4
 models have more difficulty with aligning the predictive distribution with the
 season's peak, particularly in the two seasons with higher incidence.
-For the more regularly seasonal influenza data, there is less of a
-noticeable distinction between the predictions given by the KCDE and SARIMA
-models for incidence in individual weeks.
+%In those seasons, at a prediction horizon of 26 weeks the 95\% prediction intervals
+%from SARIMA and HHH4 miss the observed incidence by a wide margin; the
+%intervals from KCDE don't capture the entire season, but do cover the observed
+%incidence in a larger interval and are generally closer to the observed values
+%in the rest of the season.
+For the more regularly seasonal influenza data, there is less of a noticeable
+distinction between the predictions given by the KCDE and SARIMA models for
+incidence in individual weeks.
 
 <<DengueDataMergePredictionResults, echo = FALSE>>=
 ## The following relative paths assume the working directory is inst/article/
@@ -1078,11 +1106,11 @@ difference between the predictions from the Periodic, Full Bandwidth KCDE model 
 <<KCDESARIMALogScoreDiffsdLowerTertile, echo = FALSE, results = "asis">>=
 cat(paste0(
     sprintf("%.2f", round(kcde_sarima_lower_tertile_median, 2)),
-    " [interquartile range (IQR) = (",
+    " [first quartile ($Q_1$) = ",
     sprintf("%.2f", round(kcde_sarima_lower_tertile_quantiles[1], 2)),
-    ", ",
+    ", third quartile ($Q_3$) = ",
     sprintf("%.2f", round(kcde_sarima_lower_tertile_quantiles[2], 2)), 
-    ")],"
+    "],"
 ))
 @
 %<<KCDESARIMALogScoreDiffsdLowerTertile, echo = FALSE, results = "asis">>=
@@ -1094,11 +1122,11 @@ was about
 <<KCDEHHH4LogScoreDiffsdLowerTertile, echo = FALSE, results = "asis">>=
 cat(paste0(
     sprintf("%.2f", round(kcde_hhh4_lower_tertile_median, 2)),
-    " [IQR = (",
+    " ($Q_1$ = ",
     sprintf("%.2f", round(kcde_hhh4_lower_tertile_quantiles[1], 2)),
-    ", ",
+    ", $Q_3$ = ",
     sprintf("%.2f", round(kcde_hhh4_lower_tertile_quantiles[2], 2)), 
-    ")]."
+    ")."
 ))
 @
 %<<KCDEHHH4LogScoreDiffsdLowerTertile, echo = FALSE, results = "asis">>=
@@ -1110,11 +1138,11 @@ the median difference in log scores was about
 <<KCDESARIMALogScoreDiffsUpperTertile, echo = FALSE, results = "asis">>=
 cat(paste0(
     sprintf("%.2f", round(kcde_sarima_upper_tertile_median, 2)),
-    " [IQR = (",
+    " ($Q_1$ = ",
     sprintf("%.2f", round(kcde_sarima_upper_tertile_quantiles[1], 2)),
-    ", ",
+    ", $Q_3$ = ",
     sprintf("%.2f", round(kcde_sarima_upper_tertile_quantiles[2], 2)), 
-    ")]"
+    ")"
 ))
 @
 %<<KCDESARIMALogScoreDiffUpperTertile, echo = FALSE, results = "asis">>=
@@ -1125,11 +1153,11 @@ relative to SARIMA, and about
 <<KCDEHHH4LogScoreDiffsUpperTertile, echo = FALSE, results = "asis">>=
 cat(paste0(
     sprintf("%.2f", round(kcde_hhh4_upper_tertile_median, 2)),
-    " [IQR = (",
+    " ($Q_1$ = ",
     sprintf("%.2f", round(kcde_hhh4_upper_tertile_quantiles[1], 2)),
-    ", ",
+    ", $Q_3$ = ",
     sprintf("%.2f", round(kcde_hhh4_upper_tertile_quantiles[2], 2)), 
-    ")]"
+    ")"
 ))
 @
 %<<KCDEHHH4LogScoreDiffUpperTertile, echo = FALSE, results = "asis">>=
@@ -1143,6 +1171,9 @@ as SARIMA on average and almost 8 times higher probability as HHH4 on average.  
 outlying cases where the KCDE model assigned up to about 450 times as much
 probability to the realized outcome as SARIMA, and over 100 times as much probability as HHH4. 
 Similar patterns also hold with the other KCDE specifications for dengue.
+The results for predictions at times of high incidence are visible in
+Figure~\ref{fig:AggregatedFluResultsBoxPlots} as the long upper tails
+of cases when KCDE outperformed the baseline models.
 For the influenza application, the KCDE specifications including the periodic
 kernel component performed about as well as SARIMA throughout the season.
 
@@ -1792,9 +1823,11 @@ For dengue, the peak incidence in the largest season is about 30
 times larger than the peak incidence in the smallest season; this ratio is only
 about 3 for influenza.  It may be the case that the restrictive
 structure of the SARIMA and HHH4 models means that they are not able to capture
-the dynamics of dengue incidence accurately.  Relaxing that structure by using a
-non-parametric approach such as KCDE may yield improved capability to represent
-the disease dynamics.  This is less of an issue in predicting influenza where
+the dynamics of dengue incidence accurately.  For example,
+\cite{Held2012HHHSeasonality} discuss the fact that the seasonal structure in
+the HHH4 model does not explicitly allow for different onset times and amplitudes in different seasons.
+Relaxing that structure by using a non-parametric approach such as KCDE may yield
+improved capability to represent the disease dynamics.  This is less of an issue in predicting influenza where
 there is much more consistency across different seasons.
 
 %dengue_max_by_season <- tapply(dengue_sj$total_cases, dengue_sj$season, max)
@@ -2164,8 +2197,8 @@ ggplot() +
     ggtitle("Simulation Study Results\nImprovement in Integrated Hellinger Distance\nfrom Using Fully Parameterized Bandwidth") +
     theme_bw()
 @
-\caption{Results from the simulation study.  Positive values indicate simulation trials
-where the full bandwidth specification outperformed the diagonal bandwidth
+\caption{Box plots of results from the simulation study.  Positive values
+indicate simulation trials where the full bandwidth specification outperformed the diagonal bandwidth
 specification with the same training data set, as measured by Hellinger distance from the
 target conditional density.}
 \label{fig:SimStudyResultsPlot}
