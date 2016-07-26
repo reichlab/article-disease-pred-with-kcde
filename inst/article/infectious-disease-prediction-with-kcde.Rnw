@@ -2,7 +2,7 @@
 %\documentclass[times]{simauth}
 %\documentclass[]{article}
 
-\usepackage[top=1in, bottom=1.25in, left=1.25in, right=1.25in]{geometry}
+%\usepackage[top=1in, bottom=1.25in, left=1.25in, right=1.25in]{geometry}
 
 \usepackage[colorlinks=true, urlcolor=citecolor, linkcolor=citecolor, citecolor=citecolor]{hyperref}
 
