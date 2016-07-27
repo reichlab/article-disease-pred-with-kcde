@@ -91,30 +91,31 @@ Diseases,}}\\
 
 \begin{abstract}
 {
-Creating statistical models that generate accurate predicted trajectories of 
+Creating statistical models that generate accurate predictions of 
 infectious disease incidence over multiple time points is a challenging
-methodological problem whose solution could benefit public health decision makers.
-We develop a new approach for prediction of infectious disease incidence using
-kernel conditional density estimation (KCDE) and copulas.  We use KCDE to obtain
-predictive distributions for incidence in individual weeks and use copulas to tie those
-distributions together into joint distributions. This strategy enables us to create
+problem whose solution could benefit public health decision makers.
+We develop a new approach to this problem using
+kernel conditional density estimation (KCDE) and copulas.  We obtain
+predictive distributions for incidence in individual weeks using KCDE and tie those
+distributions together into joint distributions using copulas. This strategy enables us to create
 predictions for the timing of and incidence in the peak week of the season.
 Our implementation of KCDE incorporates two novel kernel components: a periodic
 component that captures seasonality in disease incidence, and a component that
 allows for a full parameterization of the bandwidth matrix with discrete
-variables.  We demonstrate via simulation that using a fully parameterized
-bandwidth matrix can be beneficial for estimating discrete conditional densities.
-We applied the method to predicting dengue fever and influenza, and compared to
+variables.  We demonstrate via simulation that a fully parameterized
+bandwidth matrix can be beneficial for estimating conditional densities.
+We apply the method to predicting dengue fever and influenza, and compare to
 a seasonal autoregressive integrated moving average
 (SARIMA) model and a previously published generalized linear model for infectious disease
-incidence known as HHH4.  KCDE outperformed the baseline methods for
-predictions of dengue incidence in individual weeks.  KCDE also offered more
+incidence known as HHH4.  KCDE outperforms the baseline methods for
+predictions of dengue incidence in individual weeks.  KCDE also offers more
 consistent performance than the baseline models for predictions of
-incidence in the peak week, and was comparable to the baseline models on the
+incidence in the peak week, and is comparable to the baseline models on the
 other prediction targets.  Using the periodic kernel function led to better
-predictions of incidence in both applications.  Our approach and extensions of
+predictions of incidence.  Our approach and extensions of
 it could yield improved predictions for public health decision makers,
-particularly in diseases with heterogeneous seasonal dynamics such as dengue fever.}
+particularly in diseases with heterogeneous seasonal dynamics such as dengue fever.
+}
 \end{abstract}
 
 \flushleft{copula, dengue fever, infectious disease, influenza, kernel
@@ -133,7 +134,7 @@ suppressMessages(library(dplyr))
 library(tidyr)
 suppressMessages(library(lubridate))
 
-library(ggplot2)
+suppressMessages(library(ggplot2))
 library(grid)
 
 suppressMessages(library(forecast))
@@ -296,10 +297,9 @@ arrival of a disease in amphibian populations using Dirichlet processes and copu
 There is also a long history of using other modeling approaches for infectious
 disease prediction, including agent-based models, compartmental models and
 more generic regression-based time series models such as seasonal autoregressive
-integrated moving average (SARIMA) models among others.  Brown \textit{and
-others} (in preparation) and
-\citet{unkel2012statisticalInfectiousDiseasePredictionReview} are recent reviews
-of work on forecasting infectious disease, and describe these alternative
+integrated moving average (SARIMA) models among others.  Brown \etal [in
+preparation] and \citet{unkel2012statisticalInfectiousDiseasePredictionReview}
+are recent reviews of work on forecasting infectious disease, and describe these alternative
 approaches in more detail.
 
 Little research has been done comparing the predictive performance of more detailed and 
@@ -620,7 +620,7 @@ as follows:
 
 The copula function $C$ maps the marginal CDF values to the joint
 CDF value.  We use the isotropic normal
-copula implemented in the {\tt R} package {\tt copula}
+copula implemented in the {\tt R} (\citet{RCoreLanguage}) package {\tt copula}
 (\citet{HofertRCopulaPackage}).  The copula function is given by
 \begin{equation}
 C(u_1, \ldots, u_H ; \bxi^H) = \Phi_{\Sigma^H}(\Phi^{-1}(u_1), \ldots, \Phi^{-1}(u_H)),
@@ -661,7 +661,7 @@ Subsection~\ref{subsec:Methods:KCDE}: predicting incidence at time $t + h$ given
 incidence at time $t$.  A central characteristic of the disease
 incidence data we analyze in the next Section is the presence of positive
 correlation between incidence in nearby time points
-(Supplemental Figure ***).  In this simulation study we demonstrate that
+(Supplemental Figure 2).  In this simulation study we demonstrate that
 in the presence of such correlation, using fully parameterized bandwidth
 matrices can improve conditional density estimates over using a diagonal
 bandwidth.
@@ -1171,7 +1171,7 @@ as SARIMA on average and almost 8 times higher probability as HHH4 on average.  
 outlying cases where the KCDE model assigned up to about 450 times as much
 probability to the realized outcome as SARIMA, and over 100 times as much probability as HHH4. 
 Similar patterns also hold with the other KCDE specifications for dengue.
-The results for predictions at times of high incidence are visible in
+These results for predictions at times of high incidence are visible in
 Figure~\ref{fig:AggregatedFluResultsBoxPlots} as the long upper tails
 of cases when KCDE outperformed the baseline models.
 For the influenza application, the KCDE specifications including the periodic
@@ -1251,113 +1251,6 @@ kernel component performed about as well as SARIMA throughout the season.
 %for the KCDE specification with both a periodic kernel component and a fully
 %parameterized bandwidth matrix, but is slightly negative for the other KCDE
 %specifications.
-
-% Overall, the
-% performance of early-season predictions of peak week timing and incidence from
-% KCDE is more stable than the predictions from either of the baseline models.
-% Generally speaking, performance of both the SARIMA and HHH4 models
-% is more variable; the methods underperform (occasionally drastically) relative to KCDE in some seasons but
-% do better than KCDE at specific times in other seasons.  
-% In the application to dengue, HHH4 is outperformed by KCDE and SARIMA for
-% predictions of peak incidence made early in the season.  In the two dengue
-% seasons with low incidence, HHH4 offered small gains in predictions for peak
-% week incidence relative to KCDE and SARIMA, but these are offset by very large 
-% drops in performance for predictions made in the first 10 to 20
-% weeks of the two seasons with higher peaks.  The SARIMA and KCDE models performed very
-% similarly in five of the seven seasons included in the testing period, including
-% all four dengue seasons.  In the application to influenza, SARIMA performed
-% better than KCDE in predicting peak incidence in the season with low incidence,
-% but was outperformed by KCDE in the season with high incidence.  However, the
-% SARIMA model was quite a bit worse than the naive prediction of assigning equal
-% probability to each incidence bin in the season with high incidence, whereas KCDE never did much worse than using equal bin
-% probabilities.  For predictions of peak week timing, performance of HHH4 and
-% KCDE is similar in the application to Dengue.  
-
-
-<<PeakIncidenceLogScoreDifferencesFromEqual, echo = FALSE>>=
-combined_peak_incidence_diffs_from_equal <- rbind.fill(
-        ili_peak_incidence_log_score_diffs_from_equal_long[ili_peak_incidence_log_score_diffs_from_equal_long$before_peak_week, ],
-        dengue_peak_incidence_log_score_diffs_from_equal_long[dengue_peak_incidence_log_score_diffs_from_equal_long$before_peak_week, ]
-    )
-peak_incidence_log_score_diffs_from_equal_means <- tapply(
-    combined_peak_incidence_diffs_from_equal$log_score_difference,
-    combined_peak_incidence_diffs_from_equal[, c("reduced_model_descriptor", "data_set_and_season")],
-    mean
-)
-peak_incidence_log_score_diffs_from_equal_sds <- tapply(
-    combined_peak_incidence_diffs_from_equal$log_score_difference,
-    combined_peak_incidence_diffs_from_equal[, c("reduced_model_descriptor", "data_set_and_season")],
-    sd
-)
-@
-
-
-KCDE offered more consistent performance than the baseline methods for
-predictions of the timing of the peak week and incidence in the peak week
-that were made before the season peak; all methods did
-well in predictions for these quantities made after the peak had passed
-(Figure~\ref{fig:CombinedPeakWeekIncidencePredictionLogScores} and Supplemental
-Figures 12 through 15).
-For predictions of peak incidence, the baseline methods occasionally struggled
-in the seasons with high peak incidence (Figure 7 and Supplemental Figure 10).
-In the two dengue seasons with relatively high incidence, predictions of
-peak incidence made by the HHH4 model before the season peak had
-much lower log scores than both KCDE and a naive model that assigns equal
-probability to each incidence bin.  Similarly, SARIMA underperformed
-relative to both KCDE and using equal bin probabilities in the
-influenza season with the highest peak.
-%: in early-season predictions, the average
-%log score difference between HHH4 and the naive model was
-%<<PeakIncHHH4Dengue20102011LogScoreDiff, echo = FALSE, results = "asis">>=
-%cat(paste0(sprintf("%.3f", round(peak_incidence_log_score_diffs_from_equal_means["HHH4", "Dengue: 2010/2011"], 3)), " (sd = ", sprintf("%.3f", round(peak_incidence_log_score_diffs_from_equal_sds["HHH4", "Dengue: 2010/2011"], 3)), ")"))
-%@
-%for the 2010/2011 season and
-%<<PeakIncHHH4Dengue20122013LogScoreDiff, echo = FALSE, results = "asis">>=
-%cat(paste0(sprintf("%.3f", round(peak_incidence_log_score_diffs_from_equal_means["HHH4", "Dengue: 2012/2013"], 3)), " (sd = ", sprintf("%.3f", round(peak_incidence_log_score_diffs_from_equal_sds["HHH4", "Dengue: 2012/2013"], 3)), ")"))
-%@
-%for the 2012/2013 season.
-Meanwhile, pre-peak predictions of peak incidence
-from the Periodic, Full Bandwidth KCDE model had higher average log scores than
-the equal bin probabilities model in three of the dengue seasons, and only did
-slightly worse than the naive model
-in the 2010/2011 season -- when both of the baseline models also did worse than
-the equal bin probabilities model on average.
-%Although the SARIMA method did about as well as KCDE in the application to
-%dengue, in the influenza season with the largest peak SARIMA's predictions for
-%peak incidence underperformed relative to both KCDE and the naive approach of
-%using equal bin probabilities. 
-In every influenza season in the test period, the
-average performance of each KCDE specification was better than using equal bin probabilities for
-predicting peak incidence.  Across both data sets, the worst performance of any
-of the KCDE specifications for predicting peak incidence was with the Null KCDE
-model in the 2012/2013 dengue season -- and that performance was much better
-than the worst-case performance of either of the baseline models.  For the most
-part, the methods were comparable to each other in the remaining seasons, and
-offered considerable improvements over equal bin probabilities.
-For predictions of peak week timing, SARIMA consistently underperformed relative
-to using equal bin probabilities in two of the dengue
-seasons (Supplemental Figures 9 and 11).  KCDE and HHH4 rarely did much worse than using equal bin
-probabilities.
-%For predictions of peak week timing and peak incidence, for both diseases
-%all methods evaluated tend to converge rapidly on the truth once the peak week
-%has passed .
-
-%For the influenza data, the SARIMA method had average log scores 
-%<<PeakIncSARIMAInfluenza20122013LogScoreDiff, echo = FALSE, results = "asis">>=
-%cat(paste0(sprintf("%.3f", round(peak_incidence_log_score_diffs_from_equal_means["SARIMA", "Influenza: 2012/2013"], 3)), " (sd = ", sprintf("%.3f", round(peak_incidence_log_score_diffs_from_equal_sds["SARIMA", "Influenza: 2012/2013"], 3)), ")"))
-%@
-%in the 2012/2013 season, but the average performance of all four KCDE
-%specifications was better than the naive model for all three seasons in the
-%influenza data.  The SARIMA model did outperform KCDE 
-
-
-% Figure~\ref{fig:CombinedPeakWeekIncidencePredictionLogScores} displays the log
-% score of the predictive distributions for incidence in the peak week
-% obtained from SARIMA and KCDE models over the course of each season in the test data sets, and
-% Figure 5 in the supplement displays log scores for predictions of
-% peak week timing.  Figures 6 through 9 of the supplement give the full
-% predictive distributions for peak week timing and incidence.
-
 
 % Overall, the
 % performance of early-season predictions of peak week timing and incidence from
@@ -1674,6 +1567,207 @@ dengue_peak_week_results$peak_week_log_score[dengue_peak_week_results$peak_week_
 dengue_peak_week_results$peak_height_log_score[dengue_peak_week_results$peak_height_log_score == -50] <- NA
 @
 
+<<PeakIncidenceLogScoreDifferencesFromEqual, echo = FALSE>>=
+dengue_peak_incidence_log_score_diffs_from_equal_wide <- dengue_peak_week_results %>%
+    select(full_model_descriptor, analysis_time_season, analysis_time_season_week, peak_height_log_score) %>%
+    spread(full_model_descriptor, peak_height_log_score)
+
+dengue_peak_incidence_log_score_diffs_from_equal_wide[, unique(dengue_peak_week_results$full_model_descriptor)] <-
+    dengue_peak_incidence_log_score_diffs_from_equal_wide[, unique(dengue_peak_week_results$full_model_descriptor)] -
+    dengue_peak_incidence_log_score_diffs_from_equal_wide[, "Equal Bin Probabilities"]
+
+dengue_peak_incidence_log_score_diffs_from_equal_long <- dengue_peak_incidence_log_score_diffs_from_equal_wide %>%
+    gather_("model", "log_score_difference", unique(dengue_prediction_results$full_model_descriptor)) %>%
+    mutate(
+        seasonal_lag = grepl("seasonal_lag_1", model),
+        differencing = grepl("differencing_TRUE", model),
+        periodic = grepl("periodic_TRUE", model),
+        bw_full = grepl("bw_full", model)
+    )
+dengue_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor <- "Null KCDE"
+dengue_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    dengue_peak_incidence_log_score_diffs_from_equal_long$periodic & !dengue_peak_incidence_log_score_diffs_from_equal_long$bw_full] <-
+    "Periodic KCDE"
+dengue_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    !dengue_peak_incidence_log_score_diffs_from_equal_long$periodic & dengue_peak_incidence_log_score_diffs_from_equal_long$bw_full] <-
+    "Full Bandwidth KCDE"
+dengue_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    dengue_peak_incidence_log_score_diffs_from_equal_long$periodic & dengue_peak_incidence_log_score_diffs_from_equal_long$bw_full] <-
+    "Periodic, Full Bandwidth KCDE"
+dengue_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    dengue_peak_incidence_log_score_diffs_from_equal_long$model == "HHH4-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+] <- "HHH4"
+dengue_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    dengue_peak_incidence_log_score_diffs_from_equal_long$model == "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+] <- "SARIMA"
+dengue_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor <-
+    factor(dengue_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor,
+        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE", "HHH4", "SARIMA"))
+
+dengue_peak_incidence_log_score_diffs_from_equal_long$before_peak_week <- FALSE
+for(season in unique(dengue_peak_incidence_log_score_diffs_from_equal_long$analysis_time_season)) {
+    dengue_peak_incidence_log_score_diffs_from_equal_long$before_peak_week[
+        dengue_peak_incidence_log_score_diffs_from_equal_long$analysis_time_season == season &
+            dengue_peak_incidence_log_score_diffs_from_equal_long$analysis_time_season_week <
+            dengue_peak_week_times$peak_week[dengue_peak_week_times$analysis_time_season == season]
+    ] <- TRUE
+}
+
+
+
+ili_peak_incidence_log_score_diffs_from_equal_wide <- ili_peak_week_results %>%
+    select(full_model_descriptor, analysis_time_season, analysis_time_season_week, peak_height_log_score) %>%
+    spread(full_model_descriptor, peak_height_log_score)
+
+ili_peak_incidence_log_score_diffs_from_equal_wide[, unique(ili_peak_week_results$full_model_descriptor)] <-
+    ili_peak_incidence_log_score_diffs_from_equal_wide[, unique(ili_peak_week_results$full_model_descriptor)] -
+    ili_peak_incidence_log_score_diffs_from_equal_wide[, "Equal Bin Probabilities"]
+
+ili_peak_incidence_log_score_diffs_from_equal_long <- ili_peak_incidence_log_score_diffs_from_equal_wide %>%
+    gather_("model", "log_score_difference", unique(ili_prediction_results$full_model_descriptor)) %>%
+    mutate(
+        seasonal_lag = grepl("seasonal_lag_1", model),
+        differencing = grepl("differencing_TRUE", model),
+        periodic = grepl("periodic_TRUE", model),
+        bw_full = grepl("bw_full", model)
+    )
+ili_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor <- "Null KCDE"
+ili_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    ili_peak_incidence_log_score_diffs_from_equal_long$periodic & !ili_peak_incidence_log_score_diffs_from_equal_long$bw_full] <-
+    "Periodic KCDE"
+ili_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    !ili_peak_incidence_log_score_diffs_from_equal_long$periodic & ili_peak_incidence_log_score_diffs_from_equal_long$bw_full] <-
+    "Full Bandwidth KCDE"
+ili_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    ili_peak_incidence_log_score_diffs_from_equal_long$periodic & ili_peak_incidence_log_score_diffs_from_equal_long$bw_full] <-
+    "Periodic, Full Bandwidth KCDE"
+ili_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    ili_peak_incidence_log_score_diffs_from_equal_long$model == "HHH4-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+] <- "HHH4"
+ili_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    ili_peak_incidence_log_score_diffs_from_equal_long$model == "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+] <- "SARIMA"
+ili_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor <-
+    factor(ili_peak_incidence_log_score_diffs_from_equal_long$reduced_model_descriptor,
+        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE", "HHH4", "SARIMA"))
+
+ili_peak_incidence_log_score_diffs_from_equal_long$before_peak_week <- FALSE
+for(season in unique(ili_peak_incidence_log_score_diffs_from_equal_long$analysis_time_season)) {
+    ili_peak_incidence_log_score_diffs_from_equal_long$before_peak_week[
+        ili_peak_incidence_log_score_diffs_from_equal_long$analysis_time_season == season &
+            ili_peak_incidence_log_score_diffs_from_equal_long$analysis_time_season_week <
+            ili_peak_week_times$peak_week[ili_peak_week_times$analysis_time_season == season]
+    ] <- TRUE
+}
+
+
+
+combined_peak_incidence_diffs_from_equal <- rbind.fill(
+        ili_peak_incidence_log_score_diffs_from_equal_long[ili_peak_incidence_log_score_diffs_from_equal_long$before_peak_week, ],
+        dengue_peak_incidence_log_score_diffs_from_equal_long[dengue_peak_incidence_log_score_diffs_from_equal_long$before_peak_week, ]
+    )
+#peak_incidence_log_score_diffs_from_equal_means <- tapply(
+#    combined_peak_incidence_diffs_from_equal$log_score_difference,
+#    combined_peak_incidence_diffs_from_equal[, c("reduced_model_descriptor", "data_set_and_season")],
+#    mean
+#)
+#peak_incidence_log_score_diffs_from_equal_sds <- tapply(
+#    combined_peak_incidence_diffs_from_equal$log_score_difference,
+#    combined_peak_incidence_diffs_from_equal[, c("reduced_model_descriptor", "data_set_and_season")],
+#    sd
+#)
+@
+
+
+KCDE offered more consistent performance than the baseline methods for
+predictions of the timing of the peak week and incidence in the peak week
+that were made before the season peak; all methods did
+well in predictions for these quantities made after the peak had passed
+(Figure~\ref{fig:CombinedPeakWeekIncidencePredictionLogScores} and Supplemental
+Figures 12 through 15).
+For predictions of peak incidence, the baseline methods occasionally struggled
+in the seasons with high peak incidence (Figure 7 and Supplemental Figure 10).
+In the two dengue seasons with relatively high incidence, predictions of
+peak incidence made by the HHH4 model before the season peak had
+much lower log scores than both KCDE and a naive model that assigns equal
+probability to each incidence bin.  Similarly, SARIMA underperformed
+relative to both KCDE and using equal bin probabilities in the
+influenza season with the highest peak.
+%: in early-season predictions, the average
+%log score difference between HHH4 and the naive model was
+%<<PeakIncHHH4Dengue20102011LogScoreDiff, echo = FALSE, results = "asis">>=
+%cat(paste0(sprintf("%.3f", round(peak_incidence_log_score_diffs_from_equal_means["HHH4", "Dengue: 2010/2011"], 3)), " (sd = ", sprintf("%.3f", round(peak_incidence_log_score_diffs_from_equal_sds["HHH4", "Dengue: 2010/2011"], 3)), ")"))
+%@
+%for the 2010/2011 season and
+%<<PeakIncHHH4Dengue20122013LogScoreDiff, echo = FALSE, results = "asis">>=
+%cat(paste0(sprintf("%.3f", round(peak_incidence_log_score_diffs_from_equal_means["HHH4", "Dengue: 2012/2013"], 3)), " (sd = ", sprintf("%.3f", round(peak_incidence_log_score_diffs_from_equal_sds["HHH4", "Dengue: 2012/2013"], 3)), ")"))
+%@
+%for the 2012/2013 season.
+Meanwhile, pre-peak predictions of peak incidence
+from the Periodic, Full Bandwidth KCDE model had higher average log scores than
+the equal bin probabilities model in three of the dengue seasons, and only did
+slightly worse than the naive model
+in the 2010/2011 season -- when both of the baseline models also did worse than
+the equal bin probabilities model on average.
+%Although the SARIMA method did about as well as KCDE in the application to
+%dengue, in the influenza season with the largest peak SARIMA's predictions for
+%peak incidence underperformed relative to both KCDE and the naive approach of
+%using equal bin probabilities. 
+In every influenza season in the test period, the
+average performance of each KCDE specification was better than using equal bin probabilities for
+predicting peak incidence.  Across both data sets, the worst performance of any
+of the KCDE specifications for predicting peak incidence was with the Null KCDE
+model in the 2012/2013 dengue season -- and that performance was much better
+than the worst-case performance of either of the baseline models.  For the most
+part, the methods were comparable to each other in the remaining seasons, and
+offered considerable improvements over equal bin probabilities.
+For predictions of peak week timing, SARIMA consistently underperformed relative
+to using equal bin probabilities in two of the dengue
+seasons (Supplemental Figures 9 and 11).  KCDE and HHH4 rarely did much worse than using equal bin
+probabilities.
+%For predictions of peak week timing and peak incidence, for both diseases
+%all methods evaluated tend to converge rapidly on the truth once the peak week
+%has passed .
+
+%For the influenza data, the SARIMA method had average log scores 
+%<<PeakIncSARIMAInfluenza20122013LogScoreDiff, echo = FALSE, results = "asis">>=
+%cat(paste0(sprintf("%.3f", round(peak_incidence_log_score_diffs_from_equal_means["SARIMA", "Influenza: 2012/2013"], 3)), " (sd = ", sprintf("%.3f", round(peak_incidence_log_score_diffs_from_equal_sds["SARIMA", "Influenza: 2012/2013"], 3)), ")"))
+%@
+%in the 2012/2013 season, but the average performance of all four KCDE
+%specifications was better than the naive model for all three seasons in the
+%influenza data.  The SARIMA model did outperform KCDE 
+
+
+% Figure~\ref{fig:CombinedPeakWeekIncidencePredictionLogScores} displays the log
+% score of the predictive distributions for incidence in the peak week
+% obtained from SARIMA and KCDE models over the course of each season in the test data sets, and
+% Figure 5 in the supplement displays log scores for predictions of
+% peak week timing.  Figures 6 through 9 of the supplement give the full
+% predictive distributions for peak week timing and incidence.
+
+
+% Overall, the
+% performance of early-season predictions of peak week timing and incidence from
+% KCDE is more stable than the predictions from either of the baseline models.
+% Generally speaking, performance of both the SARIMA and HHH4 models
+% is more variable; the methods underperform (occasionally drastically) relative to KCDE in some seasons but
+% do better than KCDE at specific times in other seasons.  
+% In the application to dengue, HHH4 is outperformed by KCDE and SARIMA for
+% predictions of peak incidence made early in the season.  In the two dengue
+% seasons with low incidence, HHH4 offered small gains in predictions for peak
+% week incidence relative to KCDE and SARIMA, but these are offset by very large 
+% drops in performance for predictions made in the first 10 to 20
+% weeks of the two seasons with higher peaks.  The SARIMA and KCDE models performed very
+% similarly in five of the seven seasons included in the testing period, including
+% all four dengue seasons.  In the application to influenza, SARIMA performed
+% better than KCDE in predicting peak incidence in the season with low incidence,
+% but was outperformed by KCDE in the season with high incidence.  However, the
+% SARIMA model was quite a bit worse than the naive prediction of assigning equal
+% probability to each incidence bin in the season with high incidence, whereas KCDE never did much worse than using equal bin
+% probabilities.  For predictions of peak week timing, performance of HHH4 and
+% KCDE is similar in the application to Dengue.  
+
+
 
 
 <<FluObtainPeakWeekTimingPredictiveDistributionsByAnalysisTime, echo = FALSE, dependson = c("FluDataMergePeakWeekPredictionResults")>>=
@@ -1824,8 +1918,8 @@ times larger than the peak incidence in the smallest season; this ratio is only
 about 3 for influenza.  It may be the case that the restrictive
 structure of the SARIMA and HHH4 models means that they are not able to capture
 the dynamics of dengue incidence accurately.  For example,
-\cite{Held2012HHHSeasonality} discuss the fact that the seasonal structure in
-the HHH4 model does not explicitly allow for different onset times and amplitudes in different seasons.
+\citet{Held2012HHHSeasonality} discuss the fact that the seasonal structure in
+the HHH4 model does not explicitly allow for different amplitudes in different seasons.
 Relaxing that structure by using a non-parametric approach such as KCDE may yield
 improved capability to represent the disease dynamics.  This is less of an issue in predicting influenza where
 there is much more consistency across different seasons.
@@ -1966,7 +2060,7 @@ maximizing the utility of these predictions to public health decision makers.
 
 \section{Software}
 
-The estimation methods were implemented in {\tt R} (\citet{RCoreLanguage}) and
+The estimation methods were implemented in {\tt R} and
 {\tt C}.  All source code and data are available in {\tt R} packages hosted on GitHub
 (\citet{ReichLabGitHubDiseasePredWithKCDEPackage}).
 

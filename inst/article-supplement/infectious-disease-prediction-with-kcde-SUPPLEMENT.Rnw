@@ -4163,7 +4163,7 @@ the peak week, as described in the main text.  Each ``column'' represents one
 predictive distribution.  The
 horizontal dashed line is at the observed peak incidence for the season.  The
 vertical dashed line is at the observed peak week for the season.  The medians are calculated based on the unbinned predictions.
-The upper bin extends to infinity; we have cut it off at 550 cases for purposes
+The upper bin extends to infinity; we have cut it off at 13.5 for purposes
 of the display.}
 \label{fig:FluPeakWeekHeightPredictiveDistributions}
 \end{figure}
