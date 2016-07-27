@@ -118,8 +118,10 @@ particularly in diseases with heterogeneous seasonal dynamics such as dengue fev
 }
 \end{abstract}
 
+{
 \flushleft{copula, dengue fever, infectious disease, influenza, kernel
 conditional density estimation, prediction}
+}
 
 \maketitle
 
