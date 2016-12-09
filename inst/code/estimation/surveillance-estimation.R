@@ -33,12 +33,15 @@ S_ar_values <- 0:3
 S_end_values <- 0:3
 lag_ar_values <- 1:3
 
-model_specifications <- as.data.frame(expand.grid(
-  family = family_values,
-  S_ar = S_ar_values,
-  S_end = S_end_values,
-  lag_ar = lag_ar_values,
-  mean_log_score = NA_real_))
+model_specifications <- as.data.frame(
+  expand.grid(
+    family = family_values,
+    S_ar = S_ar_values,
+    S_end = S_end_values,
+    lag_ar = lag_ar_values,
+    mean_log_score = NA_real_,
+    stringsAsFactors = FALSE),
+  stringsAsFactors = FALSE)
 
 fits <- vector("list", nrow(model_specifications))
 

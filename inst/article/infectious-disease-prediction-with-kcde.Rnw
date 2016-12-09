@@ -11,6 +11,7 @@
 %accepted for publication November 1, 2010}
 
 \usepackage{amssymb, amsmath, amsfonts}
+\usepackage{color}
 \usepackage[list=off]{caption} % list=off option prevents errors when using math environments within captions
 \usepackage{natbib}
 
@@ -18,6 +19,7 @@
 \newcommand{\cdf}{{c.d.f.} }
 \newcommand{\pdf}{{p.d.f.} }
 \newcommand{\ind}{\mathbb{I}}
+\newcommand{\newtext}[1]{{\color{red} \textbf{#1}}}
 
 \begin{document}
 %\documentclass[Crown, sagev]{sagej}
@@ -143,15 +145,58 @@ suppressMessages(library(forecast))
 library(kcde)
 suppressMessages(suppressWarnings(library(pdtmvn)))
 
+get_legend_grob <- function(x) {
+  data <- ggplot2:::ggplot_build(x)
+  
+  plot <- data$plot
+  panel <- data$panel
+  data <- data$data
+  theme <- ggplot2:::plot_theme(plot)
+  position <- theme$legend.position
+  if (length(position) == 2) {
+    position <- "manual"
+  }
+  
+  legend_box <- if (position != "none") {
+    ggplot2:::build_guides(plot$scales, plot$layers, plot$mapping, 
+      position, theme, plot$guides, plot$labels)
+  } else {
+    ggplot2:::zeroGrob()
+  }
+  if (ggplot2:::is.zero(legend_box)) {
+    position <- "none"
+  }
+  else {
+    legend_width <- gtable:::gtable_width(legend_box) + theme$legend.margin
+    legend_height <- gtable:::gtable_height(legend_box) + theme$legend.margin
+    just <- valid.just(theme$legend.justification)
+    xjust <- just[1]
+    yjust <- just[2]
+    if (position == "manual") {
+      xpos <- theme$legend.position[1]
+      ypos <- theme$legend.position[2]
+      legend_box <- editGrob(legend_box, vp = viewport(x = xpos, 
+        y = ypos, just = c(xjust, yjust), height = legend_height, 
+        width = legend_width))
+    }
+    else {
+      legend_box <- editGrob(legend_box, vp = viewport(x = xjust, 
+        y = yjust, just = c(xjust, yjust)))
+    }
+  }
+  return(legend_box)
+}
+
 opts_chunk$set(cache = TRUE)
 #opts_chunk$set(cache = TRUE, autodep = TRUE)
 #opts_chunk$set(cache = FALSE)
 @
 
 <<LoadFluData, echo = FALSE>>=
-junk <- capture.output({
-    usflu <- suppressMessages(get_flu_data("national", "ilinet", years=1997:2015))
-})
+# junk <- capture.output({
+#    usflu <- suppressMessages(get_flu_data("national", "ilinet", years=1997:2015))
+# })
+usflu <- read.csv("../../data-raw/usflu.csv", stringsAsFactors = FALSE)
 ili_national <- suppressWarnings(transmute(usflu,
     region.type = REGION.TYPE,
     region = REGION,
@@ -1061,6 +1106,16 @@ kcde_sarima_upper_tertile_sd <- sd(temp)
 kcde_sarima_upper_tertile_median <- median(temp)
 kcde_sarima_upper_tertile_quantiles <- quantile(temp, probs = c(0.25, 0.75))
 
+kcde_sarima_min <- min(
+  dengue_prediction_log_score_diffs_from_sarima_long_with_pred_time_covars[
+    dengue_prediction_log_score_diffs_from_sarima_long_with_pred_time_covars$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full",
+    "log_score_difference"]
+)
+kcde_sarima_max <- max(
+  dengue_prediction_log_score_diffs_from_sarima_long_with_pred_time_covars[
+    dengue_prediction_log_score_diffs_from_sarima_long_with_pred_time_covars$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full",
+    "log_score_difference"]
+)
 
 
 
@@ -1087,6 +1142,18 @@ kcde_hhh4_upper_tertile_mean <- mean(temp)
 kcde_hhh4_upper_tertile_sd <- sd(temp)
 kcde_hhh4_upper_tertile_median <- median(temp)
 kcde_hhh4_upper_tertile_quantiles <- quantile(temp, probs = c(0.25, 0.75))
+
+kcde_hhh4_min <- min(
+  dengue_prediction_log_score_diffs_from_hhh4_long_with_pred_time_covars[
+    dengue_prediction_log_score_diffs_from_hhh4_long_with_pred_time_covars$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full",
+    "log_score_difference"]
+)
+kcde_hhh4_max <- max(
+  dengue_prediction_log_score_diffs_from_hhh4_long_with_pred_time_covars[
+    dengue_prediction_log_score_diffs_from_hhh4_long_with_pred_time_covars$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full",
+    "log_score_difference"]
+)
+
 @
 
 For predictions of incidence in individual weeks in the application to dengue,
@@ -1169,9 +1236,9 @@ cat(paste0(
 relative to HHH4.
 Translating to a probability scale, in these periods of high incidence this KCDE
 specification assigned about 5 times higher probability to the observed outcome
-as SARIMA on average and almost 8 times higher probability as HHH4 on average.  Moreover, there were
-outlying cases where the KCDE model assigned up to about 450 times as much
-probability to the realized outcome as SARIMA, and over 100 times as much probability as HHH4. 
+as SARIMA on average and about \newtext{1.25} times higher probability as HHH4 on average.
+Moreover, there were cases where the KCDE model assigned up to about 450 times as much
+probability to the realized outcome as SARIMA, and over \newtext{1300} times as much probability as HHH4.  \newtext{Across all weeks in the test period and all prediction horizons, neither baseline model ever outperformed this KCDE specification by a factor of more than 9.} 
 Similar patterns also hold with the other KCDE specifications for dengue.
 These results for predictions at times of high incidence are visible in
 Figure~\ref{fig:AggregatedFluResultsBoxPlots} as the long upper tails
@@ -1315,7 +1382,7 @@ ili_peak_week_results <- rbind.fill(
         list(
             readRDS(file.path(prediction_save_path,
                         paste0("peak-week-sarima-", data_set, ".rds"))) %>%
-                mutate(model = "SARIMA")
+                `[[<-`("model", value = "SARIMA")
         ),
         lapply(seq_len(nrow(case_definitions)), function(case_row_ind) {
                 max_lag <- case_definitions$max_lag[case_row_ind]
@@ -1335,15 +1402,17 @@ ili_peak_week_results <- rbind.fill(
                     "-bw_parameterization_", bw_parameterization
                 )
                 
-                readRDS(file.path(prediction_save_path,
-                            paste0("peak-week-", case_descriptor, ".rds"))) %>%
-                    mutate(model = "KCDE",
-                        max_lag = max_lag,
-                        max_seasonal_lag = max_seasonal_lag,
-                        filtering = filtering,
-                        differencing = differencing,
-                        seasonality = seasonality,
-                        bw_parameterization = bw_parameterization)
+                temp <- readRDS(file.path(prediction_save_path,
+                            paste0("peak-week-", case_descriptor, ".rds")))
+                temp$model <- "KCDE"
+                temp$max_lag <- max_lag
+                temp$max_seasonal_lag <- max_seasonal_lag
+                temp$filtering <- filtering
+                temp$differencing <- differencing
+                temp$seasonality <- seasonality
+                temp$bw_parameterization <- bw_parameterization
+                
+                return(temp)
             })
     )
 )
@@ -1460,12 +1529,12 @@ dengue_peak_week_results <- rbind.fill(
         list(
             readRDS(file.path(prediction_save_path,
                         paste0("peak-week-sarima-", data_set, ".rds"))) %>%
-                mutate(model = "SARIMA")
+                `[[<-`("model", value = "SARIMA")
         ),
         list(
             readRDS(file.path(prediction_save_path,
                         paste0("peak-week-surveillance-", data_set, ".rds"))) %>%
-                mutate(model = "HHH4")
+                `[[<-`("model", value = "HHH4")
         ),
         lapply(seq_len(nrow(case_definitions)), function(case_row_ind) {
                 max_lag <- case_definitions$max_lag[case_row_ind]
@@ -1485,15 +1554,18 @@ dengue_peak_week_results <- rbind.fill(
                     "-bw_parameterization_", bw_parameterization
                 )
                 
-                readRDS(file.path(prediction_save_path,
-                            paste0("peak-week-", case_descriptor, ".rds"))) %>%
-                    mutate(model = "KCDE",
-                        max_lag = max_lag,
-                        max_seasonal_lag = max_seasonal_lag,
-                        filtering = filtering,
-                        differencing = differencing,
-                        seasonality = seasonality,
-                        bw_parameterization = bw_parameterization)
+                temp <- readRDS(file.path(prediction_save_path,
+                            paste0("peak-week-", case_descriptor, ".rds")))
+                
+                temp$model <- "KCDE"
+                temp$max_lag = max_lag
+                temp$max_seasonal_lag = max_seasonal_lag
+                temp$filtering = filtering
+                temp$differencing = differencing
+                temp$seasonality = seasonality
+                temp$bw_parameterization = bw_parameterization
+                
+                return(temp)
             })
     )
 )
@@ -1778,7 +1850,7 @@ ili_incidence_bins <- data.frame(
     upper = c(seq(from = 0.5, to = 13, by = 0.5), Inf))
 
 for(bin_num in seq(from = 9, to = 41)) {
-    ili_peak_week_results[, paste0("est_prob_bin_", bin_num)] <-
+   ili_peak_week_results[, paste0("est_prob_bin_", bin_num)] <-
         apply(ili_peak_week_results[, paste0("peak_week_", seq_len(10000))],
             1,
             function(x) {sum(x == bin_num) / length(x)})
@@ -2444,6 +2516,7 @@ Periodic, Full Bandwidth KCDE model.}
 
 \begin{figure}
 <<FluDataResultsAggregatedBoxplots, echo = FALSE, fig.height = 8.4, dev = "postscript">>=
+
 models_used <- c(
     unique(ili_prediction_results$full_model_descriptor[
     !ili_prediction_results$differencing & !(ili_prediction_results$max_seasonal_lag == 1)])
@@ -2460,11 +2533,20 @@ combined_prediction_log_score_diffs_from_sarima_long <-
 
 color_palette <- c("#D55E00", "#56B4E9")
 
+sarima_mean_differences_df <- combined_prediction_log_score_diffs_from_sarima_long[combined_prediction_log_score_diffs_from_sarima_long$model %in% models_used, ] %>%
+    group_by(reduced_model_descriptor, data_set) %>%
+    summarize(mean_log_score_difference = mean(log_score_difference))
+
 boxplot_sarima_contrasts <- ggplot() +
     geom_hline(yintercept = 0) +
     geom_boxplot(aes(y = log_score_difference, x = reduced_model_descriptor, colour = data_set),
         data = combined_prediction_log_score_diffs_from_sarima_long[combined_prediction_log_score_diffs_from_sarima_long$model %in% models_used, ]) +
-    ylim(c(-3, 6.5)) +
+    geom_point(aes(y = mean_log_score_difference,
+      x = reduced_model_descriptor,
+      colour = data_set),
+      size = 4, shape = 3, position = position_dodge(width = 0.75),
+      data = sarima_mean_differences_df) +
+    ylim(c(-3, 7.5)) +
     scale_colour_manual("Data Set", values = color_palette) +
     scale_x_discrete(labels = c("Periodic, Full Bandwidth KCDE" = "Periodic, Full Bandwidth\nKCDE")) +
     ggtitle("(a) Comparison of KCDE with SARIMA") +
@@ -2472,11 +2554,20 @@ boxplot_sarima_contrasts <- ggplot() +
     ylab("Log Score Difference") +
     theme_bw(base_size = 11)# +
 
+hhh4_mean_differences_df <- dengue_prediction_log_score_diffs_from_hhh4_long[dengue_prediction_log_score_diffs_from_hhh4_long$model %in% models_used, ] %>%
+    group_by(reduced_model_descriptor, data_set) %>%
+    summarize(mean_log_score_difference = mean(log_score_difference))
+
 boxplot_hhh4_contrasts <- ggplot() +
     geom_hline(yintercept = 0) +
     geom_boxplot(aes(y = log_score_difference, x = reduced_model_descriptor, colour = data_set),
         data = dengue_prediction_log_score_diffs_from_hhh4_long[dengue_prediction_log_score_diffs_from_hhh4_long$model %in% models_used, ]) +
-    ylim(c(-3, 6.5)) +
+    geom_point(aes(y = mean_log_score_difference,
+      x = reduced_model_descriptor,
+      colour = data_set),
+      size = 4, shape = 3, position = position_dodge(width = 0.75),
+      data = hhh4_mean_differences_df) +
+    ylim(c(-3, 7.5)) +
     scale_colour_manual("Data Set", values = color_palette) +
     scale_x_discrete(labels = c("Periodic, Full Bandwidth KCDE" = "Periodic, Full Bandwidth\nKCDE")) +
     ggtitle("(b) Comparison of KCDE with HHH4") +
@@ -2489,8 +2580,8 @@ grid.newpage()
 pushViewport(viewport(layout = grid.layout(nrow = 2, ncol = 1,
             heights = unit(c(1, 1), c("null", "null")),
             widths = unit(c(1), c("null")))))
-print(boxplot_sarima_contrasts, vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
-print(boxplot_hhh4_contrasts, vp = viewport(layout.pos.row = 2, layout.pos.col = 1))
+suppressWarnings(print(boxplot_sarima_contrasts, vp = viewport(layout.pos.row = 1, layout.pos.col = 1)))
+suppressWarnings(print(boxplot_hhh4_contrasts, vp = viewport(layout.pos.row = 2, layout.pos.col = 1)))
 @
 \caption{Differences in log scores for the weekly predictive distributions
 obtained from KCDE specifications and the baseline models.  For reference, a log score
@@ -2514,27 +2605,6 @@ color_palette <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442")
 
 scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
     geom_point(aes(x = total_cases, y = log_score_difference, colour = season, shape = season),
-        data = dengue_prediction_log_score_diffs_from_baseline[dengue_prediction_log_score_diffs_from_baseline$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full", ]) +
-    geom_hline(yintercept = 0) +
-    geom_smooth(aes(x = total_cases, y = log_score_difference, colour = season),
-        method = lm,
-        se = FALSE,
-        data = dengue_prediction_log_score_diffs_from_baseline[dengue_prediction_log_score_diffs_from_baseline$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full", ]) +
-    scale_colour_manual("Season", values = color_palette) +
-    scale_shape("Season") +
-    facet_wrap( ~ baseline_model, ncol = 1) +
-    xlab("Reported Dengue Cases in Prediction Target Week") +
-    ylab("Log Score Difference") +
-    ggtitle("Comparison of Periodic, Full Bandwidth KCDE Model and Baseline Models\nvs. Reported Dengue Cases in Prediction Target Week") +
-    theme_bw(base_size = 11)
-
-print(scatterplot_dengue_diff_from_baseline_by_obs_cases)
-
-grid_list <- capture.output(grid.ls())
-legend_grob <- grid.get(str_trim(grid_list[grep("guide-box", grid_list)]))
-    
-scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
-    geom_point(aes(x = total_cases, y = log_score_difference, colour = season, shape = season),
         alpha = 0.5,
         data = dengue_prediction_log_score_diffs_from_baseline[dengue_prediction_log_score_diffs_from_baseline$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full", ]) +
     geom_hline(yintercept = 0) +
@@ -2553,17 +2623,9 @@ scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
     xlab("Reported Dengue Cases in Prediction Target Week") +
     ylab("Log Score Difference") +
     ggtitle("Comparison of Periodic, Full Bandwidth KCDE Model and Baseline Models\nvs. Reported Dengue Cases in Prediction Target Week") +
-    theme_bw(base_size = 11) +
-    theme(legend.position = "none")
+    theme_bw(base_size = 11)
 
-grid.newpage()
-pushViewport(viewport(layout = grid.layout(nrow = 1, ncol = 2,
-            heights = unit(c(1), c("null")),
-            widths = unit(c(5, 1), c("null", "null")))))
-print(scatterplot_dengue_diff_from_baseline_by_obs_cases, vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
-pushViewport(viewport(layout.pos.row = 1, layout.pos.col = 2))
-grid.draw(legend_grob)
-upViewport()
+print(scatterplot_dengue_diff_from_baseline_by_obs_cases)
 @
 \caption{Differences in log scores for the weekly predictive distributions
 obtained from the Periodic, Full Bandwidth KCDE model and the baseline
@@ -2613,9 +2675,7 @@ p <- ggplot(dengue_peak_week_results[dengue_peak_week_results$full_model_descrip
     ylab("Log Score") +
     theme_bw()
 
-suppressWarnings(print(p))
-grid_list <- capture.output(grid.ls())
-legend_grob <- grid.get(str_trim(grid_list[grep("guide-box", grid_list)]))
+legend_grob <- get_legend_grob(p)
 
 p_d_1 <- ggplot(dengue_peak_week_results[dengue_peak_week_results$full_model_descriptor %in% models_used &
                 dengue_peak_week_results$analysis_time_season == "2009/2010", ]) +

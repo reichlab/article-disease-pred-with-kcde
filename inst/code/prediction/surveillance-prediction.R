@@ -5,6 +5,7 @@ library(dplyr)
 library(kcde)
 library(lubridate)
 
+selection_criteria <- "aic" # how to pick "best" hhh4 model
 data_set <- "dengue_sj"
 all_prediction_horizons <- 1:52
 all_prediction_statistics <- c("log_score",
@@ -251,8 +252,23 @@ surveillance_fits <- readRDS(file = file.path(
   data_set,
   "estimation-results/surveillance-fits.rds"))
 
-best_spec_ind <- which.min(surveillance_fits$model_specifications$mean_log_score)
-surveillance_fit <- surveillance_fits$model_fits[[best_spec_ind]]
+aic_by_surveillance_fit <- sapply(surveillance_fits$model_fits, function(sfit) {
+  summary(sfit)$AIC
+})
+bic_by_surveillance_fit <- sapply(surveillance_fits$model_fits, function(sfit) {
+  summary(sfit)$BIC
+})
+
+if(identical(selection_criteria, "log_score")) {
+  best_spec_ind <- which.min(surveillance_fits$model_specifications$mean_log_score)
+  surveillance_fit <- surveillance_fits$model_fits[[best_spec_ind]]
+} else if(identical(selection_criteria, "aic")) {
+  best_spec_ind <- which.min(aic_by_surveillance_fit)
+  surveillance_fit <- surveillance_fits$model_fits[[best_spec_ind]]
+} else if(identical(selection_criteria, "bic")) {
+  best_spec_ind <- which.min(bic_by_surveillance_fit)
+  surveillance_fit <- surveillance_fits$model_fits[[best_spec_ind]]
+}
 
 n_sims <- 10000
 

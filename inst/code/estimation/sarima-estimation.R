@@ -107,7 +107,7 @@ predictions_df$prediction_season[inds_prediction_season_next_year] <-
 	)
 predictions_df$prediction_week[inds_prediction_season_next_year] <-
 	predictions_df$prediction_week[inds_prediction_season_next_year] - 52L
-	
+
 predictions_df$log_score <- NA
 predictions_df$prediction <- NA
 predictions_df$AE <- NA
