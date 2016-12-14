@@ -1,7 +1,8 @@
-\documentclass[]{article}
-%\documentclass[oupdraft]{bio}
+\documentclass[times, doublespace]{simauth}
+%\documentclass[times]{simauth}
+%\documentclass[]{article}
 
-\usepackage[top=1in, bottom=1.25in, left=1.25in, right=1.25in]{geometry}
+%\usepackage[top=1in, bottom=1.25in, left=1.25in, right=1.25in]{geometry}
 
 \usepackage[colorlinks=true, urlcolor=citecolor, linkcolor=citecolor, citecolor=citecolor]{hyperref}
 
@@ -13,7 +14,8 @@
 \usepackage{amssymb, amsmath, amsfonts}
 \usepackage{color}
 \usepackage[list=off]{caption} % list=off option prevents errors when using math environments within captions
-\usepackage{natbib}
+%\usepackage{natbib}
+%\usepackage{cite}
 
 \include{GrandMacros}
 \newcommand{\cdf}{{c.d.f.} }
@@ -24,6 +26,7 @@
 \begin{document}
 %\documentclass[Crown, sagev]{sagej}
 
+\runninghead{E. L. Ray et al.}
 
 \title{Infectious disease prediction with\\
 kernel conditional density estimation}
@@ -35,64 +38,23 @@ kernel conditional density estimation}
 %Nicholas G. Reich\affilnum{1}}
 
 % List of authors, with corresponding author marked by asterisk
-\author{Evan L. Ray$^{1}$, Krzysztof Sakrejda$^1$, Stephen A. Lauer$^1$,\\
-Michael A. Johansson$^2$, Nicholas G. Reich$^1$\vspace{0.2cm} \\ 
-$^1${\small\textit{Department of
-Biostatistics and Epidemiology,}}\\
-{\small\textit{School of Public Health and Health Sciences,}}\\
-{\small\textit{University of Massachusetts, Amherst}}\\
-{\small\textit{415 Arnold House,
-715 N. Pleasant Street,
-Amherst, MA 01003, USA}} \vspace{0.2cm}\\
-$^2${\small\textit{Dengue Branch, Division of Vector-Borne Infectious
-Diseases,}}\\
-{\small\textit{Centers for Disease Control and Prevention,}}\\
-{\small\textit{San Juan, Puerto Rico, USA}}\\
+\author{Evan L. Ray\affil{a}\corrauth,
+Krzysztof Sakrejda\affil{a},
+Stephen A. Lauer\affil{a},
+Michael A. Johansson\affil{b}\ and
+Nicholas G. Reich\affil{a}}
+
+\address{
+\affilnum{a}Department of Biostatistics and Epidemiology, School of Public Health and Health Sciences, University of Massachusetts, Amherst, 415 Arnold House, 715 N. Pleasant Street, Amherst, MA 01003, USA\\
+\affilnum{b}Dengue Branch, Division of Vector-Borne Infectious Diseases, Centers for Disease Control and Prevention, San Juan, Puerto Rico, USA
 }
 
-%% Author addresses
-%$^1$\textit{Department of Biostatistics and Epidemiology,
-%School of Public Health and Health Sciences, \\
-%University of Massachusetts, Amherst \\
-%415 Arnold House,
-%715 N. Pleasant Street,
-%Amherst, MA 01003,
-%USA}
-%\\
-%$^2$\textit{Dengue Branch, Division of Vector-Borne Infectious Diseases,\\
-%Centers for Disease Control and Prevention,\\
-%San Juan, Puerto Rico,\\
-%USA}
-%\\[2pt]
-%% E-mail address for correspondence
-%{elray@umass.edu}}
+\corraddr{Department of Biostatistics and Epidemiology, School of Public Health
+and Health Sciences, University of Massachusetts, Amherst, 415 Arnold House, 715
+N. Pleasant Street, Amherst, MA 01003, USA.  Email: elray@umass.edu}
 
-%% Running headers of paper:
-%\markboth%
-%% First field is the short list of authors
-%{E. L. Ray and others}
-%% Second field is the short title of the paper
-%{Infectious Disease Prediction with KCDE}
-
-\date{}
-
-\maketitle
-
-% Add a footnote for the corresponding author if one has been
-% identified in the author list
-%\footnotetext{To whom correspondence should be addressed.}
-
-
-%\affiliation{\affilnum{1}Department of Biostatistics and Epidemiology,
-%University of Massachusetts, Amherst}%\\
-%%\affilnum{2}CDC, Puerto Rico}
-%
-%\corrauth{Evan Ray}
-%
-%\email{elray@umass.edu}
 
 \begin{abstract}
-{
 Creating statistical models that generate accurate predictions of 
 infectious disease incidence over multiple time points is a challenging
 problem whose solution could benefit public health decision makers.
@@ -117,13 +79,10 @@ other prediction targets.  Using the periodic kernel function led to better
 predictions of incidence.  Our approach and extensions of
 it could yield improved predictions for public health decision makers,
 particularly in diseases with heterogeneous seasonal dynamics such as dengue fever.
-}
 \end{abstract}
 
-{
-\flushleft{copula, dengue fever, infectious disease, influenza, kernel
+\keywords{copula, dengue fever, infectious disease, influenza, kernel
 conditional density estimation, prediction}
-}
 
 \maketitle
 
@@ -248,10 +207,10 @@ With the maturation of digital disease surveillance systems in recent years,
 accurate and real-time infectious disease prediction has become an achieveable goal in many contexts.
 These predictions provide valuable information to
 public health officials planning disease prevention and control measures
-(\citet{Manheim:2016ur}).
+\cite{Manheim:2016ur}.
 For example, interventions designed to reduce person-to-person transmission of disease
 have been associated with diminished outbreak intensity 
-(\citet{hatchett2007interventionsIntensity1918flu}).  Accurate 
+\cite{hatchett2007interventionsIntensity1918flu}.  Accurate 
 predictions can help target such interventions more effectively.
 
 Recent efforts by government officials and academic researchers
@@ -260,8 +219,8 @@ by public health decision makers.  In this article we focus
 on three of these features: weekly incidence, the timing of the season peak, and
 incidence in the peak week.  These quantities have emerged as being targets of
 particular utility in making planning decisions 
-(\citet{PandemicPredictionandForecastingScienceandTechnologyInteragencyWorkingGroup2015Announcement,
-EpidemicPredictionInitiative2015Index}).
+\cite{PandemicPredictionandForecastingScienceandTechnologyInteragencyWorkingGroup2015Announcement,
+EpidemicPredictionInitiative2015Index}.
 
 In this work, we use a semi-parametric approach that combines a non-parametric
 method for conditional density estimation referred to as kernel conditional
@@ -276,7 +235,7 @@ distributions relating to the timing of and incidence at the peak week can be
 obtained from this joint predictive distribution.  Methods combining non-parametric
 estimates of marginal densities with copulas have been considered previously for
 other applications such as economic time series
-(\citet{patton2012reviewCopulaEconomicTimeSeries}).
+\cite{patton2012reviewCopulaEconomicTimeSeries}.
 
 
 In addition to the novel application of these methods to predicting
@@ -286,7 +245,7 @@ obtaining multivariate kernel functions that handle discrete data while allowing
 for a fully parameterized bandwidth matrix.  
 Previous implementations of kernel methods involving discrete variables have
 employed a kernel function that is a product of univariate kernel functions
-(\citet{aitchison1976multivariateBinaryKernel,
+\cite{aitchison1976multivariateBinaryKernel,
 bowman1980ConsistencyKernelCategorical,
 grund1993kernelCellProb,
 hall2004crossvalidationKCDE,
@@ -294,13 +253,13 @@ hall2007nonparametricRegressionIrrelevantRegressors,
 li2003nonparametricEstDistnsCategoricalContinuous,
 li2008nonparametricConditionalCDFQuantile,
 ouyang2006crossvalidationEstDistnCategorical,
-racine2004kernelEstConditionalDistns}).
+racine2004kernelEstConditionalDistns}.
 This approach forces the
 kernel function to be oriented in line with the coordinate axes.  
 Motivated by results showing that multivariate
 kernel functions with a bandwidth parameterization allowing for
 flexible orientations can result in improved continuous density estimates
-(\citet{duong2005crossvalidationBandwidthMultivariateKDE}), we introduce an
+\cite{duong2005crossvalidationBandwidthMultivariateKDE}, we introduce an
 approach that allows for flexible orientation of discrete kernels by
 discretizing an underlying continuous kernel function.
 
@@ -310,7 +269,7 @@ discretizing an underlying continuous kernel function.
 %ties separate marginal distribution estimates (in our case, obtained by KCDE) together into a joint
 %distribution.  
 %This approach addresses the limitation of local methods such as KCDE that their performance may not
-%scale well with the dimension of the vector whose distribution is being estimated (\citet{HastieTibshiraniESL}).  This
+%scale well with the dimension of the vector whose distribution is being estimated (\cite{HastieTibshiraniESL}).  This
 %is particularly relevant in our application, where we wish to obtain joint
 %predictive distributions for disease incidence over the course of many weeks.
 
@@ -321,32 +280,32 @@ similar conditioning values.  Using such local methods is a natural idea in pred
 nonlinear systems because it imposes little structure on the assumed
 relationship between conditioning and outcome variables. Applications range from
 similar infectious disease settings where nearest neighbors regression has been used to make point predictions for incidence of
-measles (\citet{sugihara1990nonlinearForecasting}) and
-influenza (\citet{viboud2003predictionInfluenzaMoA}) to sports analytics
+measles \cite{sugihara1990nonlinearForecasting} and
+influenza \cite{viboud2003predictionInfluenzaMoA} to sports analytics
 where a version of nearest neighbors regression predicts the career trajectories
-of current NBA players (\citet{SilverCARMELOPrediction}).
+of current NBA players \cite{SilverCARMELOPrediction}.
 We note that KCDE can be seen as a distribution-based counterpart of nearest neighbors regression. For example, the point prediction
 obtained from nearest neighbors regression is equal to the expected value of the predictive distribution
 obtained from KCDE if a particular kernel function is used in the formulation of
-KCDE ({e.g.}, \citet{HastieTibshiraniESL} discuss the connection between
-nearest neighbors and kernel methods for regression).
+KCDE ({e.g.}, Hastie \etal \cite{HastieTibshiraniESL} discuss the connection
+between nearest neighbors and kernel methods for regression).
 
 KCDE has not previously been applied to obtain predictive distributions for
 infectious disease incidence, but it has been successfully used for prediction in other settings such as survival
-time of lung cancer patients (\citet{hall2004crossvalidationKCDE}), female
-labor force participation (\citet{hall2004crossvalidationKCDE}), bond yields
-and value at risk in financial markets (\citet{fan2004crossvalidationKCDE}),
-and wind power (\citet{jeon2012KCDEWindPower}), among others.  Similar methods
-can also be formulated in the Bayesian framework.  For example,
-\citet{zhou2015DirichletProcessCopulaAmphibianDiseaseArrival} model the time to
+time of lung cancer patients \cite{hall2004crossvalidationKCDE}, female
+labor force participation \cite{hall2004crossvalidationKCDE}, bond yields
+and value at risk in financial markets \cite{fan2004crossvalidationKCDE},
+and wind power \cite{jeon2012KCDEWindPower}, among others.  Similar methods
+can also be formulated in the Bayesian framework.  For example, Zhou \etal
+\cite{zhou2015DirichletProcessCopulaAmphibianDiseaseArrival} model the time to
 arrival of a disease in amphibian populations using Dirichlet processes and copulas.
 
 There is also a long history of using other modeling approaches for infectious
 disease prediction, including agent-based models, compartmental models and
 more generic regression-based time series models such as seasonal autoregressive
-integrated moving average (SARIMA) models among others.  Brown \etal [in
-preparation] and \citet{unkel2012statisticalInfectiousDiseasePredictionReview}
-are recent reviews of work on forecasting infectious disease, and describe these alternative
+integrated moving average (SARIMA) models among others.  Brown \etal [in preparation] and
+Unkel \etal \cite{unkel2012statisticalInfectiousDiseasePredictionReview} are
+recent reviews of work on forecasting infectious disease, and describe these alternative
 approaches in more detail.
 
 Little research has been done comparing the predictive performance of more detailed and 
@@ -354,15 +313,15 @@ disease-mechanistic modeling approaches (agent-based or compartmental
 models) to more generic models (regression or SARIMA).  One difficulty in making
 comparisons to agent-based models is that these models are often 
 highly parameterized and difficult to independently reproduce or replicate.
-An additional challenge with both agent-based and compartmental models is that
+An additional challenge with agent-based and compartmental models is that
 expert knowledge is required to tailor them to the specific disease being
 modeled, and details of the assumed model specification can
 have a large impact on the quality of predictions
-(e.g., \citet{grad2012cholera}).
+\cite{grad2012cholera}.
 
 One of the most well-developed modern statistical frameworks for infectious
 disease prediction is the ``HHH4'' model
-(\citet{Held2005HHHIntro, Paul2008MultivariateHHH4, Held2012HHHSeasonality}),
+\cite{Held2005HHHIntro, Paul2008MultivariateHHH4, Held2012HHHSeasonality},
 a specific variation of a generalized linear model developed for infectious
 disease. Another commonly used and widely studied approach is the seasonal
 autoregressive integrated moving average (SARIMA) model. However, both of these approaches 
@@ -371,7 +330,7 @@ discrete distribution for the observed incidence measure, an appropriate
 assumption for some data sets, but not for others. The standard SARIMA
 specification is based on continuous distributions which means that it cannot be
 directly applied to modeling discrete case count data if low case counts are
-observed (\citet{unkel2012statisticalInfectiousDiseasePredictionReview}).
+observed \cite{unkel2012statisticalInfectiousDiseasePredictionReview}.
 
 
 % Each of these classes of models has advantages and disadvantages.
@@ -384,7 +343,7 @@ observed (\citet{unkel2012statisticalInfectiousDiseasePredictionReview}).
 % same compartmental or agent-based model specification will not be applicable across a wide variety of
 % diseases.  The details of the assumed model specification are important and can
 % have a large impact on the quality of predictions obtained from these models
-% (\citet{grad2012cholera}).
+% (\cite{grad2012cholera}).
 % Additionally, inference in fine-grained agent-based and compartmental models
 % can entail considerable computational costs.  For example, recent
 % realistic compartmental models for dengue fever strain the limits of modern
@@ -394,7 +353,7 @@ observed (\citet{unkel2012statisticalInfectiousDiseasePredictionReview}).
 % have also been applied to infectious disease.  These approaches sacrifice some of the
 % representative power of agent-based and compartmental models, but may
 % offer advantages in terms of ease of use.  One of the most well-developed
-% approaches in this category is the HHH4 model (\citet{Held2005HHHIntro,
+% approaches in this category is the HHH4 model (\cite{Held2005HHHIntro,
 % Paul2008MultivariateHHH4, Held2012HHHSeasonality}), a specific variation of a
 % generalized linear model developed for infectious disease.
 % Another commonly used approach in this category is the seasonal autoregressive
@@ -405,7 +364,7 @@ observed (\citet{unkel2012statisticalInfectiousDiseasePredictionReview}).
 % for some data sets, but not for others.  On the other hand, the standard SARIMA
 % specification is based on continuous distributions which means that it cannot be
 % directly applied to modeling discrete case count data if low case counts are
-% observed (\citet{unkel2012statisticalInfectiousDiseasePredictionReview}).
+% observed (\cite{unkel2012statisticalInfectiousDiseasePredictionReview}).
 % As we will see, the mechanisms used in these models to capture seasonality may also be more or less appropriate for
 % some diseases.
 
@@ -466,16 +425,16 @@ for the trajectory of incidence over all remaining weeks in the season:
   \item Incidence in a single future week with prediction horizon $h \in \{1, ..., W\}$:
     \begin{align}
     &f(z_{{t^*} + h} | {t^*}, \bz_{1:{t^*}}) \nonumber
-    \end{align} %    &\qquad = \int \cdots \int f(\bz_{(T + 1):(T + H_T)} | T, \bz_{1:T}) \, d z_{T + 1} \cdots d z_{T + h - 1} \, d z_{T + h + 1} \cdots d z_{T + H_T}
+    \end{align} %    &\quad = \int \cdots \int f(\bz_{(T + 1):(T + H_T)} | T, \bz_{1:T}) \, d z_{T + 1} \cdots d z_{T + h - 1} \, d z_{T + h + 1} \cdots d z_{T + H_T}
   \item Timing of the peak week of the current season, $w^* \in \{1, \ldots, W\}$:
     \begin{align}
     &P(\text{Peak Week} = w^*) = P(Z_{S_{t^*} + w^*} = \max_{w} Z_{S_{t^*} + w} | {t^*}, \bz_{1:{t^*}}) \nonumber \\
-    &\qquad = \int_{\{\bz_{({t^*} + 1):({t^*} + H_{t^*})}: z_{S_{t^*} + w^*} = \max_{w} z_{S_{t^*} + w} \}} f(\bz_{({t^*} + 1):({t^*} + H_{t^*})} | {t^*}, \bz_{1:{t^*}}) \, d \bz_{({t^*} + 1):({t^*} + H_{t^*})}. \label{eqn:PeakPredTimingIntegral}
+    &\quad = \int_{\{\bz_{({t^*} + 1):({t^*} + H_{t^*})}: z_{S_{t^*} + w^*} = \max_{w} z_{S_{t^*} + w} \}} f(\bz_{({t^*} + 1):({t^*} + H_{t^*})} | {t^*}, \bz_{1:{t^*}}) \, d \bz_{({t^*} + 1):({t^*} + H_{t^*})}. \label{eqn:PeakPredTimingIntegral}
     \end{align}
   \item Binned incidence in the peak week of the current season:
     \begin{align}
     &P(\text{Incidence in Peak Week} \in [a, b)) = P(a \leq \max_{w} Z_{S_{t^*} + w} < b | {t^*}, \bz_{1:{t^*}}) \nonumber \\
-    &\qquad = \int_{\{(\bz_{({t^*} + 1):({t^*} + H_{t^*})}): a \leq \max_{w} z_{S_{t^*} + w} < b\}} f(\bz_{({t^*} + 1):({t^*} + H_{t^*})} | {t^*}, \bz_{1:{t^*}}) \, d \bz_{({t^*} + 1):({t^*} + H_{t^*})}. \label{eqn:PeakPredIncidenceIntegral}
+    &\quad = \int_{\{(\bz_{({t^*} + 1):({t^*} + H_{t^*})}): a \leq \max_{w} z_{S_{t^*} + w} < b\}} f(\bz_{({t^*} + 1):({t^*} + H_{t^*})} | {t^*}, \bz_{1:{t^*}}) \, d \bz_{({t^*} + 1):({t^*} + H_{t^*})}. \label{eqn:PeakPredIncidenceIntegral}
     \end{align}
 \end{enumerate}
 In practice, we use Monte Carlo integration to evaluate
@@ -494,7 +453,7 @@ l_M})$.  For notational simplicity, we take $l_M$ to be the largest of these
 lags.  The model represents this density as follows:
 \begin{align}
 &f(z_{(t^* + 1):(t^* + H_{t^*})} | t^*, z_{t^* - l_1}, \ldots, z_{t^* - l_M}) = \nonumber \\
-&\qquad c^{H_{t^*}}\{f^{1}(z_{t^* + 1} | t^*, z_{t^* - l_1}, \ldots, z_{t^* - l_M}; \btheta^1), \ldots, f^{H_{t^*}}(z_{t^* + H_{t^*}} | t^*, z_{t^* - l_1}, \ldots, z_{t^* - l_M}; \btheta^{H_{t^*}}) ; \bxi^{H_{t^*}}\}. \label{eqn:ModelKCDECopula}
+&\quad c^{H_{t^*}}\{f^{1}(z_{t^* + 1} | t^*, z_{t^* - l_1}, \ldots, z_{t^* - l_M}; \btheta^1), \ldots, f^{H_{t^*}}(z_{t^* + H_{t^*}} | t^*, z_{t^* - l_1}, \ldots, z_{t^* - l_M}; \btheta^{H_{t^*}}) ; \bxi^{H_{t^*}}\}. \label{eqn:ModelKCDECopula}
 \end{align}
 Here, each $f^{h}(z_{t^* + h} | t^*, z_{t^* - l_1}, \ldots, z_{t^* - l_M};
 \btheta^h)$ is a predictive density for one prediction horizon obtained through KCDE.  The
@@ -525,11 +484,11 @@ $y_t^{h}$).  We then regard these pairs as a (dependent) sample from the joint
 distribution of $(\bX, Y^h)$ and estimate the conditional distribution of $Y^h | \bX$ via KCDE:
 \begin{align}
 \hat{f}^h(y^h_{t^*} | \bx_{t^*}) &= \frac{\sum_{t \in \btau} K^{\bX, Y}\left\{(\bx_{t^*}, y^h_{t^*}), (\bx_t, y^h_t); \btheta^h \right\}}{\sum_{t \in \btau}K^{\bX}(\bx_{t^*}, \bx_t ; \btheta^h)} \label{eqn:KCDEDefinition} \\
-\qquad &= \sum_{t \in \btau} \zeta^h_{t^*, t} K^{Y | \bX}(y^h_{t^*}, y^h_t | \bx_{t^*}, \bx_t; \btheta^h) \text{, where} \label{eqn:KDEwt} \\
+\quad &= \sum_{t \in \btau} \zeta^h_{t^*, t} K^{Y | \bX}(y^h_{t^*}, y^h_t | \bx_{t^*}, \bx_t; \btheta^h) \text{, where} \label{eqn:KDEwt} \\
 \zeta^h_{t^*, t} &= \frac{ K^{\bX}(\bx_{t^*}, \bx_t; \btheta^h) }{\sum_{s \in \btau} K^{\bX}(\bx_{t^*}, \bx_{s}; \btheta^h) }. \label{eqn:KCDEWeightsDef}
 \end{align}
 
-%&\qquad = \frac{\sum_{t \in \btau} K^{Y | \bX}(y^h_{t^*}, y^h_t | \bx_{t^*},
+%&\quad = \frac{\sum_{t \in \btau} K^{Y | \bX}(y^h_{t^*}, y^h_t | \bx_{t^*},
 % \bx_t; \btheta^h) K^{\bX}(\bx_{t^*}, \bx_t; \btheta^h)}{\sum_{t \in \btau} K^{\bX}(\bx_{t^*}, \bx_t; \btheta^h) } \label{eqn:KDESubKDEJtMarginal} \\
 
 Here we are working with a slightly restricted specification in which
@@ -555,14 +514,14 @@ component being a periodic kernel in time and the other component capturing the
 remaining covariates, which are measures of disease incidence:
 \begin{align}
 &K^{\bX, Y}\left\{(\bx_{t^*}, y^h_{t^*}), (\bx_t, y^h_t); \btheta^h \right\} \nonumber \\
-&\qquad = K^{\text{per}}(t^*, t; \btheta^h_{\text{per}}) K^{\text{inc}}\{(z_{t^* - l_1}, \ldots, z_{t^* - l_M}, z_{t^* + h}), (z_{t - l_1}, \ldots, z_{t - l_M}, z_{t + h}); \btheta^h_{\text{inc}}\}. \nonumber
+&\quad = K^{\text{per}}(t^*, t; \btheta^h_{\text{per}}) K^{\text{inc}}\{(z_{t^* - l_1}, \ldots, z_{t^* - l_M}, z_{t^* + h}), (z_{t - l_1}, \ldots, z_{t - l_M}, z_{t + h}); \btheta^h_{\text{inc}}\}. \nonumber
 \end{align}
 Here we have set $\btheta^h = (\btheta^h_{\text{per}}, \btheta^h_{\text{inc}})$.
-%&\qquad = K^{\bX, Y}\left\{(t^*, z_{t^* - l_1}, \ldots, z_{t^* - l_M}, z_{t^* +
+%&\quad = K^{\bX, Y}\left\{(t^*, z_{t^* - l_1}, \ldots, z_{t^* - l_M}, z_{t^* +
 % h}), (t, z_{t - l_1}, \ldots, z_{t - l_M}, z_{t + h}); \btheta^h \right\} \nonumber \\
 
 The periodic kernel function was originally developed in the
-literature on Gaussian Processes (\citet{mackay1998introductionGP}), and is
+literature on Gaussian Processes \cite{mackay1998introductionGP}, and is
 defined by
 \begin{equation}
 K^{\text{per}}(t^*, t; \rho^h, \eta^h) = \exp\left[- \frac{\sin^2\{\rho^h (t^* - t)\}}{2(\eta^h)^2} \right]. \label{eqn:PeriodicKernel}
@@ -618,27 +577,27 @@ Our primary motivation for using the log score as the optimization target during
 estimation is that this is the criteria that has been used to evaluate and
 compare prediction methods in two recent government-sponsored infectious disease
 prediction contests
-(\citet{PandemicPredictionandForecastingScienceandTechnologyInteragencyWorkingGroup2015Announcement,
-EpidemicPredictionInitiative2015Index}).
+\cite{PandemicPredictionandForecastingScienceandTechnologyInteragencyWorkingGroup2015Announcement,
+EpidemicPredictionInitiative2015Index}.
 We apply our method to the data sets
 from those competitions in the applications section below, and report log
 scores to facilitate comparisons with other results from those
 competitions that may be published in the future.
 In general, the log score is a strictly proper scoring rule; i.e., its
 expectation is uniquely maximized by the true predictive
-distribution (\citet{gneiting2007strictlyProperScoringRules}).
+distribution \cite{gneiting2007strictlyProperScoringRules}.
 However, its use as an optimization criterion has been criticised for being
-sensitive to outliers (\citet{gneiting2007strictlyProperScoringRules}).  In
+sensitive to outliers \cite{gneiting2007strictlyProperScoringRules}.  In
 the kernel density estimation literature, this approach to estimation is referred to
 as likelihood cross-validation, and similar criticisms have been made regarding
 its performance in handling outliers and estimating heavy-tailed distributions
-(\citet{schuster1981nonconsistencyLCVforKDE,
-scott1981MonteCarloStudyNonparDensityEstimators}).
+\cite{schuster1981nonconsistencyLCVforKDE,
+scott1981MonteCarloStudyNonparDensityEstimators}.
 
 \subsection{Combining Marginal Predictive Distributions with Copulas}
 \label{subsec:Methods:Copulas}
 
-We use copulas (\citet{nelsen2007introductionCopulas}) to tie the marginal
+We use copulas \cite{nelsen2007introductionCopulas} to tie the marginal
 predictive distributions for individual prediction horizons obtained from KCDE together into a joint predictive
 distribution for the trajectory of incidence over multiple time points. 
 The copula is a parametric function that captures the dependence relations among
@@ -662,13 +621,13 @@ Our model specifies the joint CDF for $(Y_{t^*}^1, \ldots, Y_{t^*}^{H_{t^*}})$
 as follows:
 \begin{align}
 &F^{H_{t^*}}(y_{t^*}^1, \ldots, y_{t^*}^{H_{t^*}} | \bx_{t^*}; \btheta^1, \ldots, \btheta^{H_{t^*}}, \bxi^{H_{t^*}}) = \nonumber \\
-&\qquad C\{F^{1}(y_{t^*}^1 | \bx_{t^*}; \btheta^1), \ldots, F^{H_{t^*}}(y_{t^*}^{H_{t^*}} | \bx_{t^*}; \btheta^{H_{t^*}}); \bxi^{H_{t^*}}\}
+&\quad C\{F^{1}(y_{t^*}^1 | \bx_{t^*}; \btheta^1), \ldots, F^{H_{t^*}}(y_{t^*}^{H_{t^*}} | \bx_{t^*}; \btheta^{H_{t^*}}); \bxi^{H_{t^*}}\}
 \end{align}
 
 The copula function $C$ maps the marginal CDF values to the joint
 CDF value.  We use the isotropic normal
-copula implemented in the {\tt R} (\citet{RCoreLanguage}) package {\tt copula}
-(\citet{HofertRCopulaPackage}).  The copula function is given by
+copula implemented in the {\tt R} \cite{RCoreLanguage} package {\tt copula}
+\cite{HofertRCopulaPackage}.  The copula function is given by
 \begin{equation}
 C(u_1, \ldots, u_H ; \bxi^H) = \Phi_{\Sigma^H}(\Phi^{-1}(u_1), \ldots, \Phi^{-1}(u_H)),
 \end{equation}
@@ -692,7 +651,7 @@ We give a more detailed description of this estimation
 procedure in the supplement.  In general the two-stage approach may result in
 some loss of efficiency relative to one-stage methods, but this efficiency 
 loss is small for some model specifications
-(\citet{joe2005asymptoticEfficiencyTwoStageCopula}).
+\cite{joe2005asymptoticEfficiencyTwoStageCopula}.
 Also, it results in a large reduction in the computational cost of parameter
 estimation.
 
@@ -745,7 +704,7 @@ the conditioning variables (see supplement).
 The Hellinger distance lies between 0 and 1, with smaller values indicating that the
 density estimate is better.  It has been argued that the Hellinger distance is
 preferred to other measures of the quality of kernel density estimates such as
-integrated squared error (\citet{kanazawa1993hellingerDistanceKDE}). For each
+integrated squared error \cite{kanazawa1993hellingerDistanceKDE}. For each
 combination of the training set sample size, dimension, and simulation trial, we
 compute the difference between the Hellinger distance from the true conditional
 distribution achieved with a diagonal bandwidth matrix and with a fully parameterized bandwidth matrix.
@@ -772,8 +731,8 @@ Juan, Puerto Rico. The second provides a weekly weighted proportion of
 doctor visits with influenza-like illness in the United States.  
 These data sets were used in two recent
 prediction competitions sponsored by the United States federal government
-(\citet{PandemicPredictionandForecastingScienceandTechnologyInteragencyWorkingGroup2015Announcement,
-EpidemicPredictionInitiative2015Index}).  
+\cite{PandemicPredictionandForecastingScienceandTechnologyInteragencyWorkingGroup2015Announcement,
+EpidemicPredictionInitiative2015Index}.  
 
 We divided each data set into two subsets.  The first period is used as a training set in
 estimating the model parameters.  The last four years of each data set are
@@ -816,7 +775,7 @@ the dengue data set, which included some observations of $0$ cases); this
 transformation makes the normality assumptions of the SARIMA model more plausible.
 We then performed first-order seasonal differencing, and obtained the final
 model fits using the {\tt auto.arima} function in {\tt R}'s {\tt forecast}
-package (\citet{hyndmanRForecastPackage}); this function uses a stepwise
+package \cite{hyndmanRForecastPackage}; this function uses a stepwise
 procedure to determine the terms to include in the model.
 This procedure resulted in a 
 <<ILISarimaModelFitSummary, echo = FALSE, results = "asis">>=
@@ -838,12 +797,12 @@ methods that we used for KCDE.  This discretization was not used in model
 estimation since it is not available in the standard estimation software.
 
 The second baseline model is the ``HHH4'' model for infectious disease incidence
-(\citet{Held2005HHHIntro, Paul2008MultivariateHHH4, Held2012HHHSeasonality}),
-available in the {\tt surveillance} (\citet{Hohle:R:surveillance}) package in R.
+\cite{Held2005HHHIntro, Paul2008MultivariateHHH4, Held2012HHHSeasonality},
+available in the {\tt surveillance} \cite{Hohle:R:surveillance} package in R.
 This is a generalized linear model with either a Poisson or Negative Binomial family.
 The mean is a linear combination of autoregressive and sinusoidal components. 
-We followed the model selection and estimation procedures outlined in \citet{Held2012HHHSeasonality}
-(see Supplement for details).  Because
+We followed the model selection and estimation procedures outlined in Held and
+Paul \cite{Held2012HHHSeasonality} (see Supplement for details).  Because
 the HHH4 model specifies a Poisson or Negative Binomial distribution for
 incidence, it cannot be used with continuous data; therefore, we have only applied this
 model with the dengue data.
@@ -1991,8 +1950,8 @@ For dengue, the peak incidence in the largest season is about 30
 times larger than the peak incidence in the smallest season; this ratio is only
 about 3 for influenza.  It may be the case that the restrictive
 structure of the SARIMA and HHH4 models means that they are not able to capture
-the dynamics of dengue incidence accurately.  For example,
-\citet{Held2012HHHSeasonality} discuss the fact that the seasonal structure in
+the dynamics of dengue incidence accurately.  For example, Held and Paul
+\cite{Held2012HHHSeasonality} discuss the fact that the seasonal structure in
 the HHH4 model does not explicitly allow for different amplitudes in different seasons.
 Relaxing that structure by using a non-parametric approach such as KCDE may yield
 improved capability to represent the disease dynamics.  This is less of an issue in predicting influenza where
@@ -2054,12 +2013,13 @@ used incidence at the two most recent time points, and possibly the observation
 time, as conditioning variables.  We considered using a stepwise
 variable selection approach to select the model specification,
 but we found this to be too computationally expensive to be practical; the full
-grid search suggested by \citet{de2000nonparametricConditionalPredictiveRegions}
-would be far too slow for our methods.
+grid search suggested by De Gooijer and Gannoun
+\cite{de2000nonparametricConditionalPredictiveRegions} would be far too slow for
+our methods.
 
 Another possibility for addressing this problem would be to replace
-variable selection with shrinkage.  \citet{hall2004crossvalidationKCDE}
-show that when cross-validation is used to select the bandwidth parameters in
+variable selection with shrinkage.  Hall \etal
+\cite{hall2004crossvalidationKCDE} show that when cross-validation is used to select the bandwidth parameters in
 KCDE using product kernels, the estimated bandwidths corresponding to
 irrelevant conditioning variables tend to infinity asymptotically as the sample
 size increases.
@@ -2094,9 +2054,9 @@ The log score has the advantage of defining a proper scoring
 rule, but it has the disadvantage of being sensitive to outlying values.
 Previous authors have suggested the use of other loss functions in estimation
 for kernel-based density estimation methods that reduce these effects, such as
-variations on integrated squared error (e.g.,
-\citet{fan2004crossvalidationKCDE}) or the continuous ranked probability
-score (\citet{jeon2012KCDEWindPower}).
+variations on integrated squared error
+\cite{fan2004crossvalidationKCDE} or the continuous ranked probability
+score \cite{jeon2012KCDEWindPower}.
 
 There is also a long history of using other modeling approaches such as
 compartmental models for infectious disease prediction.  KCDE is distinguished
@@ -2134,9 +2094,9 @@ maximizing the utility of these predictions to public health decision makers.
 
 \section{Software}
 
-The estimation methods were implemented in {\tt R} and
-{\tt C}.  All source code and data are available in {\tt R} packages hosted on GitHub
-(\citet{ReichLabGitHubDiseasePredWithKCDEPackage}).
+The estimation methods were implemented in {\tt R} and {\tt C}.  All source code
+and data are available in {\tt R} packages hosted on GitHub
+\cite{ReichLabGitHubDiseasePredWithKCDEPackage}.
 
 \section{Supplementary Material}
 
@@ -2152,9 +2112,8 @@ Infectious Diseases at the National Institutes of Health (grants R21AI115173 and
 R01AI102939).
 
 
-\bibliographystyle{plainnat}
-%\bibliographystyle{biorefs}
-%\bibliographystyle{natbib}
+%\bibliographystyle{plainnat}
+\bibliographystyle{wileyj}
 \bibliography{kde-bib}
 
 \begin{figure}
