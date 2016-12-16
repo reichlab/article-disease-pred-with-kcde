@@ -458,6 +458,27 @@ variable $t^* \in \{1, \ldots, T\}$ will be used to represent a time at which we
 desire to form a predictive distribution, using observed data up through $t^*$
 to predict incidence after $t^*$.  
 
+We introduce the overall structure of our model here and describe its
+components and parameter estimation in more detail in the
+following Subsections.
+At time $t^*$, our model approximates $f(\bz_{(t^* + 1):(t^* + H_{t^*})} | t^*, \bz_{1:t^*})$
+by conditioning only on the time at which we are making the predictions and
+observed incidence at a few recent time points with lags given by the non-negative integers $l_1, \ldots, l_M$:
+$f(\bz_{(t^* + 1):(t^* + H_{t^*})} | t^*, z_{t^* - l_1}, \ldots, z_{t^* -
+l_M})$.  For notational simplicity, we take $l_M$ to be the largest of these
+lags.  The model represents this density as follows:
+\begin{align}
+&f(z_{(t^* + 1):(t^* + H_{t^*})} | t^*, z_{t^* - l_1}, \ldots, z_{t^* - l_M}) = \nonumber \\
+&\qquad c^{H_{t^*}}\{f^{1}(z_{t^* + 1} | t^*, z_{t^* - l_1}, \ldots, z_{t^* - l_M}; \btheta^1), \ldots, f^{H_{t^*}}(z_{t^* + H_{t^*}} | t^*, z_{t^* - l_1}, \ldots, z_{t^* - l_M}; \btheta^{H_{t^*}}) ; \bxi^{H_{t^*}}\}. \label{eqn:ModelKCDECopula}
+\end{align}
+Here, each $f^{h}(z_{t^* + h} | t^*, z_{t^* - l_1}, \ldots, z_{t^* - l_M};
+\btheta^h)$ is a predictive density for one prediction horizon obtained through KCDE.  The
+distribution for each prediction horizon depends on a separate parameter vector $\btheta^h$.
+The function $c^{H_{t^*}}(\cdot)$ is a copula
+used to tie these marginal predictive densities together into a joint predictive
+density, and depends on parameters $\bxi^{H_{t^*}}$.  In our
+applications, we will obtain a separate copula fit for each trajectory length
+$H_{t^*}$ of interest for the prediction task.
 
 
 When we apply the method to
@@ -498,27 +519,6 @@ the integrals in Equations \eqref{eqn:PeakPredTimingIntegral} and
 \eqref{eqn:PeakPredIncidenceIntegral} by sampling incidence trajectories from
 the joint predictive distribution.
 
-We introduce the overall structure of our model here and describe its
-components and parameter estimation in more detail in the
-following Subsections.
-At time $t^*$, our model approximates $f(\bz_{(t^* + 1):(t^* + H_{t^*})} | t^*, \bz_{1:t^*})$
-by conditioning only on the time at which we are making the predictions and
-observed incidence at a few recent time points with lags given by the non-negative integers $l_1, \ldots, l_M$:
-$f(\bz_{(t^* + 1):(t^* + H_{t^*})} | t^*, z_{t^* - l_1}, \ldots, z_{t^* -
-l_M})$.  For notational simplicity, we take $l_M$ to be the largest of these
-lags.  The model represents this density as follows:
-\begin{align}
-&f(z_{(t^* + 1):(t^* + H_{t^*})} | t^*, z_{t^* - l_1}, \ldots, z_{t^* - l_M}) = \nonumber \\
-&\qquad c^{H_{t^*}}\{f^{1}(z_{t^* + 1} | t^*, z_{t^* - l_1}, \ldots, z_{t^* - l_M}; \btheta^1), \ldots, f^{H_{t^*}}(z_{t^* + H_{t^*}} | t^*, z_{t^* - l_1}, \ldots, z_{t^* - l_M}; \btheta^{H_{t^*}}) ; \bxi^{H_{t^*}}\}. \label{eqn:ModelKCDECopula}
-\end{align}
-Here, each $f^{h}(z_{t^* + h} | t^*, z_{t^* - l_1}, \ldots, z_{t^* - l_M};
-\btheta^h)$ is a predictive density for one prediction horizon obtained through KCDE.  The
-distribution for each prediction horizon depends on a separate parameter vector $\btheta^h$.
-The function $c^{H_{t^*}}(\cdot)$ is a copula
-used to tie these marginal predictive densities together into a joint predictive
-density, and depends on parameters $\bxi^{H_{t^*}}$.  In our
-applications, we will obtain a separate copula fit for each trajectory length
-$H_{t^*}$ of interest for the prediction task.
 
 \subsection{KCDE for Predictive Densities at Individual Prediction Horizons}
 \label{subsec:Methods:KCDE}
