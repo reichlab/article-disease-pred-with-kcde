@@ -254,30 +254,33 @@ have been associated with diminished outbreak intensity
 (\citet{hatchett2007interventionsIntensity1918flu}).  Accurate 
 predictions can help target such interventions more effectively.
 
-Recent efforts by government officials and academic researchers
-have identified features of outbreaks that can be used
-by public health decision makers.  In this article we focus
-on three of these features: weekly incidence, the timing of the season peak, and
-incidence in the peak week.  These quantities have emerged as being targets of
-particular utility in making planning decisions 
-(\citet{PandemicPredictionandForecastingScienceandTechnologyInteragencyWorkingGroup2015Announcement,
-EpidemicPredictionInitiative2015Index}).
-
 In this work, we use a semi-parametric approach that combines a non-parametric
 method for conditional density estimation referred to as kernel conditional
 density estimation (KCDE) with a parametric method for modeling joint dependence
-structures known as copulas.
-Using data available up through a given time point, we employ KCDE
-to obtain separate predictive distributions for
-disease incidence in each subsequent week of the season.  We then
-combine those marginal distributions using copulas to obtain joint predictive distributions for the
+structures known as copulas.  We focus our evaluation of prediction methods using targets chosen by the CDC as 
+relevant to public health.  The CDC has identified three features of outbreaks that can be used
+by public health decision makers and we use these as our prediction targets.
+
+\begin{enumerate}
+  \item Incidence $h$ time steps in the future (at ``prediction horizon'' $h$).  
+  \item Timing of the peak week of the current season, $w^* \in \{1, \ldots, W\}$.
+  \item Binned incidence in the peak week of the current season.
+\end{enumerate}
+
+These quantities have emerged as being targets of particular utility in making planning decisions 
+(\citet{PandemicPredictionandForecastingScienceandTechnologyInteragencyWorkingGroup2015Announcement,
+EpidemicPredictionInitiative2015Index}).
+
+To simplify our modeling efforts we focus on the first target and generate predictions
+for the second and third as derived quantities.  Using data available up through time $t^*$, we employ KCDE
+to obtain separate predictive distributions for disease incidence in each subsequent week of the season.  
+We then combine those marginal distributions using copulas to obtain joint predictive distributions for the
 trajectory of incidence over the following weeks.  Predictive
-distributions relating to the timing of and incidence at the peak week can be
+distributions relating to the timing of, and incidence at, the peak week can be
 obtained from this joint predictive distribution.  Methods combining non-parametric
 estimates of marginal densities with copulas have been considered previously for
 other applications such as economic time series
 (\citet{patton2012reviewCopulaEconomicTimeSeries}).
-
 
 In addition to the novel application of these methods to predicting
 disease incidence, our contributions include the use of a periodic kernel
@@ -447,7 +450,6 @@ Suppose we observe a measure $z_t$ of disease incidence at evenly spaced times
 indexed by $t = 1, \ldots, T$.  Our goal is to obtain predictions relating to
 incidence after time $T$ using time series of incidence up to time $T$
 as well as time series of covariates up to time $T$.  
-
 
 We allow the incidence measure to be either
 continuous or discrete and use the term density to refer to the Radon-Nikodym
