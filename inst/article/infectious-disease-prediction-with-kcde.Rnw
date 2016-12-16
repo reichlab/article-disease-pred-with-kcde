@@ -275,7 +275,10 @@ To simplify our modeling efforts we focus on the first target and generate predi
 for the second and third as derived quantities.  Using data available up through time $t^*$, we employ KCDE
 to obtain separate predictive distributions for disease incidence in each subsequent week of the season.  
 We then combine those marginal distributions using copulas to obtain joint predictive distributions for the
-trajectory of incidence over the following weeks.  Predictive
+trajectory of incidence over the following weeks.  Without a techinque
+like copulas to introduce correlation among week-specific predictions
+the predictions would not realistically represent the time-series nature
+of infectious disease dynamics.  Predictive
 distributions relating to the timing of, and incidence at, the peak week can be
 obtained from this joint predictive distribution.  Methods combining non-parametric
 estimates of marginal densities with copulas have been considered previously for
