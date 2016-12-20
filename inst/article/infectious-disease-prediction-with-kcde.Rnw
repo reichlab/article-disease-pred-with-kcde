@@ -216,13 +216,12 @@ predictions can help target such interventions more effectively.
 In this work, we use a semi-parametric approach that combines a non-parametric
 method for conditional density estimation referred to as kernel conditional
 density estimation (KCDE) with a parametric method for modeling joint dependence
-structures known as copulas.  We focus our evaluation of prediction methods using targets chosen by the CDC as 
-relevant to public health.  The CDC has identified three features of outbreaks that can be used
-by public health decision makers and we use these as our prediction targets.
+structures known as copulas.  We apply this method to make predictions for three targets
+chosen by the CDC as relevant to public health:
 
 \begin{enumerate}
   \item Incidence $h$ time steps in the future (at ``prediction horizon'' $h$).  
-  \item Timing of the peak week of the current season, $w^* \in \{1, \ldots, W\}$.
+  \item Timing of the peak week of the current season, $w^* \in \{1, \ldots, W\}$, where $W$ is the total number of weeks in the season.
   \item Binned incidence in the peak week of the current season.
 \end{enumerate}
 
@@ -230,8 +229,7 @@ These quantities have emerged as being targets of particular utility in making p
 (\citet{PandemicPredictionandForecastingScienceandTechnologyInteragencyWorkingGroup2015Announcement,
 EpidemicPredictionInitiative2015Index}).
 
-To simplify our modeling efforts we focus on the first target and generate predictions
-for the second and third as derived quantities.  Using data available up through time $t^*$, we employ KCDE
+We model incidence in each remaining week of the season directly; predictions for the second and third prediction targets are derived from a model for the joint distribution of incidence in each remaining week of the season.  Using data available up through time $t^*$, we employ KCDE
 to obtain separate predictive distributions for disease incidence in each subsequent week of the season.  
 We then combine those marginal distributions using copulas to obtain joint predictive distributions for the
 trajectory of incidence over the following weeks.  Without a techinque
@@ -282,14 +280,12 @@ discretizing an underlying continuous kernel function.
 In a time-series context, KCDE is a local method in the sense that the density
 estimate for future observations conditional on covariates is a weighted
 combination of contributions from previous observations with
-similar covariates.  Using such local methods is a natural idea in predicting
+similar covariate values.  Using such local methods is a natural idea in predicting
 nonlinear systems because it imposes little structure on the assumed
 relationship between conditioning and outcome variables. 
 The covariates we condition on could include past history of the time
 series we are predicting as well as other variables such as weather or
-the time of the season.  Throughout the manuscript we use the term
-covariates to refer to both.
-
+the time of the season.
 
 Applications range from
 similar infectious disease settings where nearest neighbors regression has been used to make point predictions for incidence of
@@ -414,13 +410,13 @@ incidence after time $T$ using time series of incidence up to time $T$
 as well as time series of covariates up to time $T$.  
 
 We allow the incidence measure to be either
-continuous or discrete and use the term density to refer to the Radon-Nikodym
-derivative of a (conditional) probability measure with respect to an
-appropriately defined reference measure.  We will use a colon notation to
+continuous or discrete and use the term density to refer to either the probability density function or probability mass function as appropriate.  We will use a colon notation to
 specify vectors: for example, $\bz_{s:t} = (z_s, \ldots, z_t)$.  The
 variable $t^* \in \{1, \ldots, T\}$ will be used to represent a time at which we
 desire to form a predictive distribution, using observed data up through $t^*$
-to predict incidence after $t^*$.  
+to predict incidence after $t^*$.  When we apply the method to
+perform prediction for incidence after time $T$, $t^*$ is equal to $T$; however, $t^*$
+takes other values in the estimation procedure we describe below.
 
 We introduce the overall structure of our model here and describe its
 components and parameter estimation in more detail in the
@@ -444,10 +440,7 @@ density, and depends on parameters $\bxi^{H_{t^*}}$.  In our
 applications, we will obtain a separate copula fit for each trajectory length
 $H_{t^*}$ of interest for the prediction task.
 
-
-When we apply the method to
-perform prediction for incidence after time $T$, $t^*$ is equal to $T$; however, $t^*$
-takes other values in the estimation procedure we describe below.  Let $W$ denote the number of time
+Let $W$ denote the number of time
 points in a disease season ({e.g.}, $W = 52$ if we have weekly data).
 For each time $t^*$, let $S_{t^*}$ denote the time index of the last time
 point in the \textit{previous} season, so that the times in the same season
@@ -831,11 +824,11 @@ The mean is a linear combination of autoregressive and sinusoidal components.
 We followed the model selection and estimation procedures outlined in \citet{Held2012HHHSeasonality}
 (see Supplement for details).  The prediction target for dengue data is
 discrete case counts and easily implemented in the HHH4 software
-(Figure~\ref{fig:DengueRibbonsPredictions}.  The prediction target for
+(Figure~\ref{fig:DengueRibbonsPredictions}).  The prediction target for
 flu requested by the CDC is proportion of doctor visits with flu-like
 illness weighted by state population.  Implementing this in HHH4
 would require weighting state-level predictions.  As we did not attempt
-state level predictions we did not use HHH4 as a reference
+to make state level predictions we did not use HHH4 as a reference
 model for the flu data.
 
 The predictions showed similar performance across the methods in many scenarios,
