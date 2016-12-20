@@ -155,6 +155,48 @@ suppressMessages(library(forecast))
 opts_chunk$set(cache = TRUE)
 #opts_chunk$set(cache = TRUE, autodep = TRUE)
 #opts_chunk$set(cache = FALSE)
+
+get_legend_grob <- function(x) {
+  data <- ggplot2:::ggplot_build(x)
+  
+  plot <- data$plot
+  panel <- data$panel
+  data <- data$data
+  theme <- ggplot2:::plot_theme(plot)
+  position <- theme$legend.position
+  if (length(position) == 2) {
+    position <- "manual"
+  }
+  
+  legend_box <- if (position != "none") {
+    ggplot2:::build_guides(plot$scales, plot$layers, plot$mapping, 
+      position, theme, plot$guides, plot$labels)
+  } else {
+    ggplot2:::zeroGrob()
+  }
+  if (ggplot2:::is.zero(legend_box)) {
+    position <- "none"
+  }
+  else {
+    legend_width <- gtable:::gtable_width(legend_box) + theme$legend.margin
+    legend_height <- gtable:::gtable_height(legend_box) + theme$legend.margin
+    just <- valid.just(theme$legend.justification)
+    xjust <- just[1]
+    yjust <- just[2]
+    if (position == "manual") {
+      xpos <- theme$legend.position[1]
+      ypos <- theme$legend.position[2]
+      legend_box <- editGrob(legend_box, vp = viewport(x = xpos, 
+        y = ypos, just = c(xjust, yjust), height = legend_height, 
+        width = legend_width))
+    }
+    else {
+      legend_box <- editGrob(legend_box, vp = viewport(x = xjust, 
+        y = yjust, just = c(xjust, yjust)))
+    }
+  }
+  return(legend_box)
+}
 @
 
 
@@ -827,8 +869,7 @@ p_a_regular_scale <- ggplot() +
     ggtitle("(a) Diagonal bandwidth\nLinear axes") +
     theme_bw()
 
-print(p_a_regular_scale)
-legend_grob <- grid.get("guide-box.3-5-3-5")
+legend_grob <- get_legend_grob(p_a_regular_scale)
 
 ## update p_a_regular_scale to not print legend
 p_a_regular_scale <- p_a_regular_scale +
@@ -1508,6 +1549,7 @@ dengue_ribbons_df <- dengue_prediction_results %>%
     select(prediction_time,
         prediction_horizon,
         full_model_descriptor,
+#        reduced_model_descriptor,
         model,
         interval_pred_lb_95:interval_pred_ub_50) %>%
     gather("bound_type", "predictive_value", interval_pred_lb_95:interval_pred_ub_50) %>%
@@ -1564,6 +1606,89 @@ Periodic, Full Bandwidth KCDE model.}
 \label{fig:DengueRibbonsPredictions} %fig.height = 4.3
 \end{figure}
 
+\begin{figure}
+<<Coverage, echo = FALSE>>=
+ili_ribbons_df <- ili_prediction_results %>%
+    select(prediction_time,
+        prediction_horizon,
+        full_model_descriptor,
+#        reduced_model_descriptor,
+        model,
+        interval_pred_lb_95:interval_pred_ub_50) %>%
+    gather("bound_type", "predictive_value", interval_pred_lb_95:interval_pred_ub_50) %>%
+    mutate(interval_type = ifelse(grepl("50", bound_type), "50", "95"),
+        bound_type = ifelse(grepl("lb", bound_type), "lower", "upper")) %>%
+    spread(bound_type, predictive_value)
+
+ili_coverage <- left_join(ili_ribbons_df %>% mutate(time = prediction_time),
+    ili_national,
+    by = "time") %>%
+  mutate(in_interval = (weighted_ili <= upper & weighted_ili >= lower)) %>%
+  group_by(full_model_descriptor, interval_type) %>%
+  summarize(coverage = mean(in_interval) * 100) %>%
+  mutate(disease = "influenza")
+
+ 
+dengue_coverage <- left_join(dengue_ribbons_df %>% mutate(time = prediction_time),
+  dengue_sj,
+  by = "time") %>%
+  mutate(in_interval = (total_cases <= upper & total_cases >= lower)) %>%
+  group_by(full_model_descriptor, interval_type) %>%
+  summarize(coverage = mean(in_interval) * 100) %>%
+  mutate(disease = "dengue")
+
+combined_coverage <- rbind.fill(ili_coverage, dengue_coverage) %>%
+    mutate(
+        periodic = grepl("periodic_TRUE", full_model_descriptor),
+        bw_full = grepl("bw_full", full_model_descriptor)
+    )
+
+combined_coverage$reduced_model_descriptor <- "Null KCDE"
+combined_coverage$reduced_model_descriptor[
+    combined_coverage$periodic & !combined_coverage$bw_full] <-
+    "Periodic KCDE"
+combined_coverage$reduced_model_descriptor[
+    !combined_coverage$periodic & combined_coverage$bw_full] <-
+    "Full Bandwidth KCDE"
+combined_coverage$reduced_model_descriptor[
+    combined_coverage$periodic & combined_coverage$bw_full] <-
+    "Periodic, Full Bandwidth KCDE"
+combined_coverage$reduced_model_descriptor[
+    combined_coverage$full_model_descriptor == "HHH4-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+    ] <- "HHH4"
+combined_coverage$reduced_model_descriptor[
+    combined_coverage$full_model_descriptor == "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+    ] <- "SARIMA"
+combined_coverage$reduced_model_descriptor <-
+    factor(combined_coverage$reduced_model_descriptor,
+        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE", "HHH4", "SARIMA"))
+
+
+# ggplot(res) +
+#   geom_line(aes(x = interval_type, y = coverage, colour = full_model_descriptor, group = full_model_descriptor)) +
+#   theme_bw()
+
+target_coverage <- data.frame(
+  interval_type = as.character(c(50, 50, 95, 95)),
+  coverage = c(0.50, 0.50, 0.95, 0.95) * 100,
+  disease = c("dengue", "influenza", "dengue", "influenza")
+)
+
+ggplot(combined_coverage) +
+  geom_line(aes(x = interval_type, y = coverage, colour = reduced_model_descriptor, linetype = reduced_model_descriptor, group = reduced_model_descriptor)) +
+  geom_point(aes(x = interval_type, y = coverage), shape = "-", size = 10, data = target_coverage) +
+  scale_colour_manual("Model", breaks = reduced_models_used, 
+    values = c("SARIMA" = "#D55E00", "HHH4" = "#0072B2", "Null KCDE" = "#E69F00",
+      "Full Bandwidth KCDE" = "#56B4E9", "Periodic KCDE" = "#009E73", "Periodic, Full Bandwidth KCDE" = "#F0E442")) +
+  scale_linetype_manual("Model",
+    breaks = reduced_models_used,
+    values = c("SARIMA" = 1, "HHH4" = 2, "Null KCDE" = 3, "Full Bandwidth KCDE" = 4, "Periodic KCDE" = 5, "Periodic, Full Bandwidth KCDE" = 6)) +
+  facet_wrap( ~ disease, ncol = 1) +
+  xlab("Target Interval Coverage Rate") +
+  ylab("Interval Coverage Rate in Test Seasons") +
+  theme_bw()
+@
+\end{figure}
 
 \begin{figure}
 <<FluDataResultsAggregatedBoxplots, echo = FALSE, dev = "cairo_ps">>=
@@ -1767,12 +1892,8 @@ scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
     ggtitle("Comparison of Null KCDE Model and Baseline Models\nvs. Reported Dengue Cases in Prediction Target Week") +
     theme_bw(base_size = 11)
 
-print(scatterplot_dengue_diff_from_baseline_by_obs_cases)
+legend_grob <- get_legend_grob(scatterplot_dengue_diff_from_baseline_by_obs_cases)
 
-#suppressWarnings(print(p))
-grid_list <- capture.output(grid.ls())
-legend_grob <- grid.get(str_trim(grid_list[grep("guide-box", grid_list)]))
-    
 scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
     geom_point(aes(x = total_cases, y = log_score_difference, colour = season, shape = season),
         alpha = 0.5,
@@ -1883,12 +2004,8 @@ scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
     ggtitle("Comparison of Full Bandwidth KCDE Model and Baseline Models\nvs. Reported Dengue Cases in Prediction Target Week") +
     theme_bw(base_size = 11)
 
-print(scatterplot_dengue_diff_from_baseline_by_obs_cases)
+legend_grob <- get_legend_grob(scatterplot_dengue_diff_from_baseline_by_obs_cases)
 
-#suppressWarnings(print(p))
-grid_list <- capture.output(grid.ls())
-legend_grob <- grid.get(str_trim(grid_list[grep("guide-box", grid_list)]))
-    
 scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
     geom_point(aes(x = total_cases, y = log_score_difference, colour = season, shape = season),
         alpha = 0.5,
@@ -1999,12 +2116,8 @@ scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
     ggtitle("Comparison of Periodic, Diagonal Bandwidth KCDE Model and Baseline Models\nvs. Reported Dengue Cases in Prediction Target Week") +
     theme_bw(base_size = 11)
 
-print(scatterplot_dengue_diff_from_baseline_by_obs_cases)
+legend_grob <- get_legend_grob(scatterplot_dengue_diff_from_baseline_by_obs_cases)
 
-#suppressWarnings(print(p))
-grid_list <- capture.output(grid.ls())
-legend_grob <- grid.get(str_trim(grid_list[grep("guide-box", grid_list)]))
-    
 scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
     geom_point(aes(x = total_cases, y = log_score_difference, colour = season, shape = season),
         alpha = 0.5,
@@ -3090,9 +3203,7 @@ p <- ggplot(dengue_peak_week_results[dengue_peak_week_results$full_model_descrip
     ylab("Log Score") +
     theme_bw()
 
-suppressWarnings(print(p))
-grid_list <- capture.output(grid.ls())
-legend_grob <- grid.get(str_trim(grid_list[grep("guide-box", grid_list)]))
+legend_grob <- get_legend_grob(p)
 
 p_d_1 <- ggplot(dengue_peak_week_results[dengue_peak_week_results$full_model_descriptor %in% models_used &
                 dengue_peak_week_results$analysis_time_season == "2009/2010", ]) +
