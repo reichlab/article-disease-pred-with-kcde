@@ -1018,7 +1018,7 @@ dengue_prediction_log_score_diffs_from_hhh4_long_with_pred_time_covars$baseline_
 
 
 We evaluated the performance of all KCDE specifications relative to the baseline 
-model(s) for each dataset using log scores.
+model(s) for each dataset using log scores (discussed previously in Section \ref{subsec:Methods:KCDE}).
 Across both data sets, including the periodic kernel component in the KCDE
 specification led to consistent improvements in predictions of incidence in
 individual weeks.
