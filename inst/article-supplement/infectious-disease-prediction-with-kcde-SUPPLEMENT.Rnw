@@ -12,7 +12,7 @@
 
 \usepackage{amssymb, amsmath, amsfonts}
 \usepackage[list=off]{caption} % list=off option prevents errors when using math environments within captions
-\usepackage{natbib}
+%\usepackage{natbib}
 
 \include{GrandMacros}
 \newcommand{\cdf}{{c.d.f.} }
@@ -34,16 +34,16 @@ Supplementary Material}
 %Nicholas G. Reich\affilnum{1}}
 
 % List of authors, with corresponding author marked by asterisk
-\author{Evan L. Ray$^{1}$, Krzysztof Sakrejda$^1$, Stephen A. Lauer$^1$,\\
-Michael A. Johansson$^2$, Nicholas G. Reich$^1$\vspace{0.2cm} \\ 
-$^1${\small\textit{Department of
+\author{Evan L. Ray$^{a}$, Krzysztof Sakrejda$^a$, Stephen A. Lauer$^a$,\\
+Michael A. Johansson$^b$, Nicholas G. Reich$^a$\vspace{0.2cm} \\ 
+$^a${\small\textit{Department of
 Biostatistics and Epidemiology,}}\\
 {\small\textit{School of Public Health and Health Sciences,}}\\
 {\small\textit{University of Massachusetts, Amherst}}\\
 {\small\textit{415 Arnold House,
 715 N. Pleasant Street,
 Amherst, MA 01003, USA}} \vspace{0.2cm}\\
-$^2${\small\textit{Dengue Branch, Division of Vector-Borne Infectious
+$^b${\small\textit{Dengue Branch, Division of Vector-Borne Infectious
 Diseases,}}\\
 {\small\textit{Centers for Disease Control and Prevention,}}\\
 {\small\textit{San Juan, Puerto Rico, USA}}\\
@@ -155,6 +155,48 @@ suppressMessages(library(forecast))
 opts_chunk$set(cache = TRUE)
 #opts_chunk$set(cache = TRUE, autodep = TRUE)
 #opts_chunk$set(cache = FALSE)
+
+get_legend_grob <- function(x) {
+  data <- ggplot2:::ggplot_build(x)
+  
+  plot <- data$plot
+  panel <- data$panel
+  data <- data$data
+  theme <- ggplot2:::plot_theme(plot)
+  position <- theme$legend.position
+  if (length(position) == 2) {
+    position <- "manual"
+  }
+  
+  legend_box <- if (position != "none") {
+    ggplot2:::build_guides(plot$scales, plot$layers, plot$mapping, 
+      position, theme, plot$guides, plot$labels)
+  } else {
+    ggplot2:::zeroGrob()
+  }
+  if (ggplot2:::is.zero(legend_box)) {
+    position <- "none"
+  }
+  else {
+    legend_width <- gtable:::gtable_width(legend_box) + theme$legend.margin
+    legend_height <- gtable:::gtable_height(legend_box) + theme$legend.margin
+    just <- valid.just(theme$legend.justification)
+    xjust <- just[1]
+    yjust <- just[2]
+    if (position == "manual") {
+      xpos <- theme$legend.position[1]
+      ypos <- theme$legend.position[2]
+      legend_box <- editGrob(legend_box, vp = viewport(x = xpos, 
+        y = ypos, just = c(xjust, yjust), height = legend_height, 
+        width = legend_width))
+    }
+    else {
+      legend_box <- editGrob(legend_box, vp = viewport(x = xjust, 
+        y = yjust, just = c(xjust, yjust)))
+    }
+  }
+  return(legend_box)
+}
 @
 
 
@@ -229,7 +271,7 @@ Supplemental Figure~\ref{fig:IncidenceKernelPlots}.
 \label{subsec:ParamEst}
 
 We follow a two-stage strategy for parameter estimation
-(\citealp{joe2005asymptoticEfficiencyTwoStageCopula}):
+\cite{joe2005asymptoticEfficiencyTwoStageCopula}:
 \begin{enumerate}
   \item Estimate the parameters for marginal predictive distributions
   using the cross-validation procedure described in Section 2.1 of the main
@@ -264,9 +306,9 @@ is the same as we described above for descritizing the kernel function.  The
 normal distribution has mean $\b0$ and covariance
 matrix with $1$ on the diagonal and $0.9$ off of the diagonal.  This
 multivariate normal distribution was used in one of the simulation studies
-conducted by \citet{duong2005crossvalidationBandwidthMultivariateKDE}
-demonstrating that a fully parameterized bandwidth matrix could yield improved
-density estimates for joint density estimation with continuous distributions.
+conducted by Duong and
+Hazelton \cite{duong2005crossvalidationBandwidthMultivariateKDE} demonstrating
+that a fully parameterized bandwidth matrix could yield improved density estimates for joint density estimation with continuous distributions.
 We discretize this distribution at the half-integers as illustrated in
 panel (a) of Supplemental Figure~\ref{fig:SimStudyDistribution}.
 
@@ -370,8 +412,8 @@ E[Z_t] &= \lambda_t Z_{t - l} + \nu_t \text{, where} \\
 
 In these equations, $l$ is a lag to use in the autoregressive term and
 $S^{(\lambda)}$ and $S^{(\nu)}$ specify the number of sinusoidal terms used to
-capture seasonality.  \citet{Held2012HHHSeasonality} advocate using performance
-of one-step-ahead predictions (as measured by the log score, ranked probability
+capture seasonality.  Held and Paul \cite{Held2012HHHSeasonality} advocate
+using performance of one-step-ahead predictions (as measured by the log score, ranked probability
 score, or squared error score) to select the model specification.
 In practice, they fix $l = 1$, vary $S^{(\lambda)} \in \{0, 1\}$, and either vary
 $S^{(\nu)} \in \{0, 1\}$ or fix $S^{(\nu)} = 3$ depending on the
@@ -384,8 +426,8 @@ could be obtained by varying the following four factors:
 \item $S^{(\nu)} \in \{0, 1, 2, 3\}$
 \end{enumerate}
 
-Following the examples in \citet{Held2012HHHSeasonality}, we selected the model
-with the best mean log score for predictions for the final two years of the
+Following the examples in Held and Paul \cite{Held2012HHHSeasonality}, we
+selected the model with the best mean log score for predictions for the final two years of the
 training data.  The selected model had a Poisson family, $l = 1$,
 $S^{(\lambda)} = 0$, and $S^{(\nu)} = 3$.
 
@@ -481,7 +523,8 @@ trajectories obtained with an independence assumption.
 %distributions obtained from KCDE may be preferred from the perspective of
 %communicating with decision makers.
 
-\bibliographystyle{plainnat}
+%\bibliographystyle{plainnat}
+\bibliographystyle{wileyj}
 \bibliography{kde-bib}
 
 
@@ -827,8 +870,7 @@ p_a_regular_scale <- ggplot() +
     ggtitle("(a) Diagonal bandwidth\nLinear axes") +
     theme_bw()
 
-print(p_a_regular_scale)
-legend_grob <- grid.get("guide-box.3-5-3-5")
+legend_grob <- get_legend_grob(p_a_regular_scale)
 
 ## update p_a_regular_scale to not print legend
 p_a_regular_scale <- p_a_regular_scale +
@@ -1508,6 +1550,7 @@ dengue_ribbons_df <- dengue_prediction_results %>%
     select(prediction_time,
         prediction_horizon,
         full_model_descriptor,
+#        reduced_model_descriptor,
         model,
         interval_pred_lb_95:interval_pred_ub_50) %>%
     gather("bound_type", "predictive_value", interval_pred_lb_95:interval_pred_ub_50) %>%
@@ -1564,6 +1607,89 @@ Periodic, Full Bandwidth KCDE model.}
 \label{fig:DengueRibbonsPredictions} %fig.height = 4.3
 \end{figure}
 
+\begin{figure}
+<<Coverage, echo = FALSE>>=
+ili_ribbons_df <- ili_prediction_results %>%
+    select(prediction_time,
+        prediction_horizon,
+        full_model_descriptor,
+#        reduced_model_descriptor,
+        model,
+        interval_pred_lb_95:interval_pred_ub_50) %>%
+    gather("bound_type", "predictive_value", interval_pred_lb_95:interval_pred_ub_50) %>%
+    mutate(interval_type = ifelse(grepl("50", bound_type), "50", "95"),
+        bound_type = ifelse(grepl("lb", bound_type), "lower", "upper")) %>%
+    spread(bound_type, predictive_value)
+
+ili_coverage <- left_join(ili_ribbons_df %>% mutate(time = prediction_time),
+    ili_national,
+    by = "time") %>%
+  mutate(in_interval = (weighted_ili <= upper & weighted_ili >= lower)) %>%
+  group_by(full_model_descriptor, interval_type) %>%
+  summarize(coverage = mean(in_interval) * 100) %>%
+  mutate(disease = "influenza")
+
+ 
+dengue_coverage <- left_join(dengue_ribbons_df %>% mutate(time = prediction_time),
+  dengue_sj,
+  by = "time") %>%
+  mutate(in_interval = (total_cases <= upper & total_cases >= lower)) %>%
+  group_by(full_model_descriptor, interval_type) %>%
+  summarize(coverage = mean(in_interval) * 100) %>%
+  mutate(disease = "dengue")
+
+combined_coverage <- rbind.fill(ili_coverage, dengue_coverage) %>%
+    mutate(
+        periodic = grepl("periodic_TRUE", full_model_descriptor),
+        bw_full = grepl("bw_full", full_model_descriptor)
+    )
+
+combined_coverage$reduced_model_descriptor <- "Null KCDE"
+combined_coverage$reduced_model_descriptor[
+    combined_coverage$periodic & !combined_coverage$bw_full] <-
+    "Periodic KCDE"
+combined_coverage$reduced_model_descriptor[
+    !combined_coverage$periodic & combined_coverage$bw_full] <-
+    "Full Bandwidth KCDE"
+combined_coverage$reduced_model_descriptor[
+    combined_coverage$periodic & combined_coverage$bw_full] <-
+    "Periodic, Full Bandwidth KCDE"
+combined_coverage$reduced_model_descriptor[
+    combined_coverage$full_model_descriptor == "HHH4-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+    ] <- "HHH4"
+combined_coverage$reduced_model_descriptor[
+    combined_coverage$full_model_descriptor == "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+    ] <- "SARIMA"
+combined_coverage$reduced_model_descriptor <-
+    factor(combined_coverage$reduced_model_descriptor,
+        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE", "HHH4", "SARIMA"))
+
+
+# ggplot(res) +
+#   geom_line(aes(x = interval_type, y = coverage, colour = full_model_descriptor, group = full_model_descriptor)) +
+#   theme_bw()
+
+target_coverage <- data.frame(
+  interval_type = as.character(c(50, 50, 95, 95)),
+  coverage = c(0.50, 0.50, 0.95, 0.95) * 100,
+  disease = c("dengue", "influenza", "dengue", "influenza")
+)
+
+ggplot(combined_coverage) +
+  geom_line(aes(x = interval_type, y = coverage, colour = reduced_model_descriptor, linetype = reduced_model_descriptor, group = reduced_model_descriptor)) +
+  geom_point(aes(x = interval_type, y = coverage), shape = "-", size = 10, data = target_coverage) +
+  scale_colour_manual("Model", breaks = reduced_models_used, 
+    values = c("SARIMA" = "#D55E00", "HHH4" = "#0072B2", "Null KCDE" = "#E69F00",
+      "Full Bandwidth KCDE" = "#56B4E9", "Periodic KCDE" = "#009E73", "Periodic, Full Bandwidth KCDE" = "#F0E442")) +
+  scale_linetype_manual("Model",
+    breaks = reduced_models_used,
+    values = c("SARIMA" = 1, "HHH4" = 2, "Null KCDE" = 3, "Full Bandwidth KCDE" = 4, "Periodic KCDE" = 5, "Periodic, Full Bandwidth KCDE" = 6)) +
+  facet_wrap( ~ disease, ncol = 1) +
+  xlab("Target Interval Coverage Rate") +
+  ylab("Interval Coverage Rate in Test Seasons") +
+  theme_bw()
+@
+\end{figure}
 
 \begin{figure}
 <<FluDataResultsAggregatedBoxplots, echo = FALSE, dev = "cairo_ps">>=
@@ -1767,12 +1893,8 @@ scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
     ggtitle("Comparison of Null KCDE Model and Baseline Models\nvs. Reported Dengue Cases in Prediction Target Week") +
     theme_bw(base_size = 11)
 
-print(scatterplot_dengue_diff_from_baseline_by_obs_cases)
+legend_grob <- get_legend_grob(scatterplot_dengue_diff_from_baseline_by_obs_cases)
 
-#suppressWarnings(print(p))
-grid_list <- capture.output(grid.ls())
-legend_grob <- grid.get(str_trim(grid_list[grep("guide-box", grid_list)]))
-    
 scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
     geom_point(aes(x = total_cases, y = log_score_difference, colour = season, shape = season),
         alpha = 0.5,
@@ -1883,12 +2005,8 @@ scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
     ggtitle("Comparison of Full Bandwidth KCDE Model and Baseline Models\nvs. Reported Dengue Cases in Prediction Target Week") +
     theme_bw(base_size = 11)
 
-print(scatterplot_dengue_diff_from_baseline_by_obs_cases)
+legend_grob <- get_legend_grob(scatterplot_dengue_diff_from_baseline_by_obs_cases)
 
-#suppressWarnings(print(p))
-grid_list <- capture.output(grid.ls())
-legend_grob <- grid.get(str_trim(grid_list[grep("guide-box", grid_list)]))
-    
 scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
     geom_point(aes(x = total_cases, y = log_score_difference, colour = season, shape = season),
         alpha = 0.5,
@@ -1999,12 +2117,8 @@ scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
     ggtitle("Comparison of Periodic, Diagonal Bandwidth KCDE Model and Baseline Models\nvs. Reported Dengue Cases in Prediction Target Week") +
     theme_bw(base_size = 11)
 
-print(scatterplot_dengue_diff_from_baseline_by_obs_cases)
+legend_grob <- get_legend_grob(scatterplot_dengue_diff_from_baseline_by_obs_cases)
 
-#suppressWarnings(print(p))
-grid_list <- capture.output(grid.ls())
-legend_grob <- grid.get(str_trim(grid_list[grep("guide-box", grid_list)]))
-    
 scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
     geom_point(aes(x = total_cases, y = log_score_difference, colour = season, shape = season),
         alpha = 0.5,
@@ -3090,9 +3204,7 @@ p <- ggplot(dengue_peak_week_results[dengue_peak_week_results$full_model_descrip
     ylab("Log Score") +
     theme_bw()
 
-suppressWarnings(print(p))
-grid_list <- capture.output(grid.ls())
-legend_grob <- grid.get(str_trim(grid_list[grep("guide-box", grid_list)]))
+legend_grob <- get_legend_grob(p)
 
 p_d_1 <- ggplot(dengue_peak_week_results[dengue_peak_week_results$full_model_descriptor %in% models_used &
                 dengue_peak_week_results$analysis_time_season == "2009/2010", ]) +
