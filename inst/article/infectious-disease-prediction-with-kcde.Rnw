@@ -226,10 +226,10 @@ chosen by the CDC as relevant to public health:
 \end{enumerate}
 
 These quantities have emerged as being targets of particular utility in making planning decisions 
-(\citet{PandemicPredictionandForecastingScienceandTechnologyInteragencyWorkingGroup2015Announcement,
-EpidemicPredictionInitiative2015Index}).
+\cite{PandemicPredictionandForecastingScienceandTechnologyInteragencyWorkingGroup2015Announcement,
+EpidemicPredictionInitiative2015Index}.
 
-We model incidence in each remaining week of the season directly; predictions for the second and third prediction targets are derived from a model for the joint distribution of incidence in each remaining week of the season.  Using data available up through time $t^*$, we employ KCDE
+We model the first of these prediction targets directly; predictions for the second and third prediction targets are derived from a joint predictive distribution of incidence in each remaining week of the season.  Using data available up through time $t^*$, we employ KCDE
 to obtain separate predictive distributions for disease incidence in each subsequent week of the season.  
 We then combine those marginal distributions using copulas to obtain joint predictive distributions for the
 trajectory of incidence over the following weeks.  Without a techinque
@@ -330,7 +330,7 @@ have a large impact on the quality of predictions
 
 One of the most well-developed modern statistical frameworks for infectious
 disease prediction is the ``HHH4'' model
-\cite{Held2005HHHIntro, Paul2008MultivariateHHH4, Held2012HHHSeasonality},
+\cite{Held2005HHHIntro, Paul2008MultivariateHHH4, Held2012HHHSeasonality, meyeretal2016SpatioTemporalAnalysisSurveillance},
 a specific variation of a generalized linear model developed for infectious
 disease. Another commonly used and widely studied approach is the seasonal
 autoregressive integrated moving average (SARIMA) model. However, both of these approaches 
@@ -390,6 +390,19 @@ suitable for application to a wide variety of time series, including diseases
 with different latent dynamics.  
 Third, the method can easily be used with either discrete or continuous data 
 by substituting one kernel function specification for another.
+
+One of the few previous methods that shares these characteristics is in Brooks \etal
+\cite{brooks2015empiricalBayes}, who propose an Empirical Bayes method that also gives
+a joint predictive distribution for incidence in each remaining week in the season.
+Their approach contrasts with ours in that it takes a ``top-down'' approach to
+constructing that predictive distribution, saying that the general trend in
+incidence over the course of the season will look like a modified version of the
+season-long trend in incidence from a previous season.  On the other hand, the approach
+we discuss in the present article is a ``bottom-up'' method that first constructs
+predictive distributions for incidence in individual weeks and then ties those
+marginal distributions together to obtain a joint distribution for incidence in all
+weeks of the season.  It seems likely that both of these approaches have something to
+offer in predicting disease incidence; we will return to this point in the conclusions.
 
 The remainder of this article is organized as follows.  First, we describe our
 approach to prediction using KCDE and copulas.  Next, we present the
@@ -528,7 +541,7 @@ remaining covariates, which are measures of disease incidence:
 &K^{\bX, Y}\left\{(\bx_{t^*}, y^h_{t^*}), (\bx_t, y^h_t); \btheta^h \right\} \nonumber \\
 &\quad = K^{\text{per}}(t^*, t; \btheta^h_{\text{per}}) K^{\text{inc}}\{(z_{t^* - l_1}, \ldots, z_{t^* - l_M}, z_{t^* + h}), (z_{t - l_1}, \ldots, z_{t - l_M}, z_{t + h}); \btheta^h_{\text{inc}}\}. \nonumber
 \end{align}
-Here we have set $\btheta^h = (\btheta^h_{\text{per}}, \btheta^h_{\text{inc}})$.
+Here we have set $\btheta^h = (\btheta^h_{\text{per}}, \btheta^h_{\text{inc}})$ where $\btheta^h$ encompasses parameters both about the periodicity and incidence.
 %&\quad = K^{\bX, Y}\left\{(t^*, z_{t^* - l_1}, \ldots, z_{t^* - l_M}, z_{t^* +
 % h}), (t, z_{t - l_1}, \ldots, z_{t - l_M}, z_{t + h}); \btheta^h \right\} \nonumber \\
 
@@ -604,7 +617,12 @@ the kernel density estimation literature, this approach to estimation is referre
 as likelihood cross-validation, and similar criticisms have been made regarding
 its performance in handling outliers and estimating heavy-tailed distributions
 \cite{schuster1981nonconsistencyLCVforKDE,
-scott1981MonteCarloStudyNonparDensityEstimators}.
+scott1981MonteCarloStudyNonparDensityEstimators}.  This is relevant to application
+of the method to infectious disease prediction, as the distribution of disease
+incidence tends to be skewed right with a long upper tail.  It is possible that
+the use of cross-validated log scores in estimation could lead to too-large
+bandwidth estimates, in turn inflating the width of the predictive distribution.
+We will return to this possibility in our conclusions.
 
 \subsection{Combining Marginal Predictive Distributions with Copulas}
 \label{subsec:Methods:Copulas}
@@ -670,12 +688,13 @@ estimation.
 \section{Simulation Study}
 \label{sec:SimStudy}
 
-We conducted a simulation study to examine the
-utility of using a non-diagonal bandwidth matrix specification when
+One component of the KCDE model specification outlined in
+Subsection~\ref{subsec:Methods:KCDE} is the parameterization of the bandwidth matrix.
+We conducted a simulation study to examine the utility of using a
+fully parameterized matrix specification instead of a diagonal bandwidth matrix when
 estimating discrete conditional distributions with KCDE.  The simulation study
 is motivated by the simplest case of predicting
-incidence in a single week using KCDE as outlined in
-Subsection~\ref{subsec:Methods:KCDE}: predicting incidence at time $t + h$ given
+incidence in a single week using KCDE: predicting incidence at time $t + h$ given
 incidence at time $t$.  A central characteristic of the disease
 incidence data we analyze in the next Section is the presence of positive
 correlation between incidence in nearby time points
@@ -752,7 +771,9 @@ directly in our models.
 These data sets were used in two recent
 prediction competitions sponsored by the United States federal government
 \cite{PandemicPredictionandForecastingScienceandTechnologyInteragencyWorkingGroup2015Announcement,
-EpidemicPredictionInitiative2015Index}.  
+EpidemicPredictionInitiative2015Index}.
+
+An important feature of both of these time series is that they exhibit fairly regular seasonal trends: incidence of dengue fever usually reaches a peak during the summer months and a nadir during the winter months, while influenza typically peaks during the winter and reaches a nadir during the summer months.  For the purposes of making predictions of seasonal targets with the dengue data, we have used the definition of a season used by the competition administrators: the season begins in the week starting on April 29th or April 30th (depending on the year); historically, this has been the week of the year with lowest dengue incidence.  For the influenza data, we define the season as beginning in the 30th week of the year; which is the week starting on July 29th or July 30th.  Again, historically the lowest incidence of influenza has tended to occur near that time.
 
 We divided each data set into two subsets.  The first period is used as a training set in
 estimating the model parameters.  The last four years of each data set are
@@ -821,7 +842,7 @@ The second baseline model is the ``HHH4'' model for infectious disease incidence
 available in the {\tt surveillance} \cite{Hohle:R:surveillance} package in R.
 This is a generalized linear model with either a Poisson or Negative Binomial family.
 The mean is a linear combination of autoregressive and sinusoidal components. 
-We followed the model selection and estimation procedures outlined in \citet{Held2012HHHSeasonality}
+We followed the model selection and estimation procedures outlined in \cite{Held2012HHHSeasonality}
 (see Supplement for details).  The prediction target for dengue data is
 discrete case counts and easily implemented in the HHH4 software
 (Figure~\ref{fig:DengueRibbonsPredictions}).  The prediction target for
@@ -899,9 +920,12 @@ dengue_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor[
 dengue_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor[
     dengue_prediction_log_score_diffs_from_sarima_long$model == "HHH4-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
     ] <- "HHH4"
+dengue_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    dengue_prediction_log_score_diffs_from_sarima_long$model == "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+] <- "SARIMA"
 dengue_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor <-
     factor(dengue_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor,
-        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE", "HHH4"))
+        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE", "HHH4", "SARIMA"))
 
 dengue_prediction_log_score_diffs_from_hhh4_wide <- dengue_prediction_results %>%
     select(full_model_descriptor, prediction_time, prediction_horizon, log_score) %>%
@@ -930,11 +954,14 @@ dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor[
     dengue_prediction_log_score_diffs_from_hhh4_long$periodic & dengue_prediction_log_score_diffs_from_hhh4_long$bw_full] <-
     "Periodic, Full Bandwidth KCDE"
 dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor[
+    dengue_prediction_log_score_diffs_from_hhh4_long$model == "HHH4-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+] <- "HHH4"
+dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor[
     dengue_prediction_log_score_diffs_from_hhh4_long$model == "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
 ] <- "SARIMA"
 dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor <-
     factor(dengue_prediction_log_score_diffs_from_hhh4_long$reduced_model_descriptor,
-        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE", "SARIMA"))
+        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE", "HHH4", "SARIMA"))
 @
 
 <<FluDataMergePredictionResults, echo = FALSE>>=
@@ -979,9 +1006,12 @@ ili_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor[
 ili_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor[
     ili_prediction_log_score_diffs_from_sarima_long$periodic & ili_prediction_log_score_diffs_from_sarima_long$bw_full] <-
     "Periodic, Full Bandwidth KCDE"
+ili_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor[
+    ili_prediction_log_score_diffs_from_sarima_long$model == "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+] <- "SARIMA"
 ili_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor <-
     factor(ili_prediction_log_score_diffs_from_sarima_long$reduced_model_descriptor,
-        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE"))
+        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE", "SARIMA"))
 
 
 
@@ -1001,7 +1031,7 @@ dengue_prediction_log_score_diffs_from_hhh4_long_with_pred_time_covars$baseline_
 
 
 We evaluated the performance of all KCDE specifications relative to the baseline 
-model(s) for each dataset using log scores (discussed previously in Section \ref{subsec:Methods:KCDE}).
+model(s) for each dataset using log scores (log scores were defined previously in Section \ref{subsec:Methods:KCDE}).
 Across both data sets, including the periodic kernel component in the KCDE
 specification led to consistent improvements in predictions of incidence in
 individual weeks.
@@ -1227,9 +1257,9 @@ These results for predictions at times of high incidence are visible in
 Figure~\ref{fig:AggregatedFluResultsBoxPlots} as the long upper tails
 of cases when KCDE outperformed the baseline models.
 For the influenza application, the KCDE specifications including the periodic
-kernel component performed about as well as SARIMA throughout the season.
+kernel component performed about as well as SARIMA throughout the season as measured by log scores.
 
-
+We also evaluated the coverage rates of predictive intervals for incidence in individual weeks (Supplemental Figure 5, Supplemental Table 1).  For predictions for dengue fever, coverage rates for all methods we considered were too low.  However, the KCDE models were generally closer to the target coverage rates than the baseline models.  For predictions of influenza, the coverage rates for all KCDE specifications as well as the baseline SARIMA model were too large.  For this application, none of the models had consistently better or worse performance than the others as measured by coverage rates of the predictive intervals.
 
 %% Code to confirm that similar qualitative patterns hold with all KCDE specifications.
 %% See also the plots in the supplement.
@@ -2042,7 +2072,7 @@ grid search suggested by De Gooijer and Gannoun
 our methods.
 
 Another method for improving our ability to use covariates would be to replace
-variable selection with shrinkage.  \citet{hall2004crossvalidationKCDE}
+variable selection with shrinkage.  \cite{hall2004crossvalidationKCDE}
 show that when cross-validation is used to select the bandwidth parameters in
 KCDE using product kernels, the estimated bandwidths corresponding to
 irrelevant covariates tend to infinity asymptotically as the sample
@@ -2052,19 +2082,65 @@ matrix, bandwidths for irrelevant covariates could be driven to infinity
 at lower sample sizes.  This technique should allow us to include more (possibly
 irrelevant) covariates in the model.  
 If successful, this would also enable further
-exploration of using other predictive variables such as weather or 
-incidence measures from neighboring locations in the model.
+exploration of using other predictive variables such as weather, 
+incidence measures from neighboring locations, \newtext{or data from internet searches and social media} in the model.
+
+\newtext{In many disease incidence data sets, we observe multiple incidence
+time series simultaneously.  For example, in addition to the national level
+wILI index used in this article, the influenza-like illness data from the CDC
+contain measures of incidence for 10 smaller regions within the United States,
+and break down incidence within four age groups.  The methods described in
+this article could be applied to make predictions with multiple time series.
+One possible approach to this would be to fit a separate predictive model for
+each time series, using the other time series as covariates that are conditioned on.}
 
 Another aspect of our method that should be explored further is the use of
 log score in estimation.  We used log scores in this work to match the use
 of log scores in evaluating and comparing the performance of different models. 
 The log score has the advantage of defining a proper scoring
-rule, but it has the disadvantage of being sensitive to outlying values.
+rule, but it has the disadvantage of being sensitive to extreme values.
 Previous authors have suggested the use of other loss functions in estimation
 for kernel-based density estimation methods that reduce these effects, such as
 variations on integrated squared error
 \cite{fan2004crossvalidationKCDE} or the continuous ranked probability
-score \cite{jeon2012KCDEWindPower}.
+score \cite{jeon2012KCDEWindPower}.  \newtext{Despite discussion in the literature of the
+potential limitations of using log scores for estimation with kernel-based methods,
+there is not conclusive evidence that use of log scores caused any difficulties
+in our application. For example, while the predictive interval coverage rates
+were too high in the application to influenza, coverage rates were too low in
+the application to dengue fever.  Nevertheless, details of the loss function
+used in estimation could impact the utility of the resulting predictions.}
+
+\newtext{In the present article, we have simplified the disease prediction task by
+assuming that the disease incidence measure is reported accurately and without delay.
+This allowed us to focus on the narrower methodological question of
+examining whether KCDE is able to capture infectious disease dynamics.
+However, in order to apply the methods in a real time setting it will be
+crucial to relax this assumption.  We envision two ways that this could be done.
+First, we could model the relationship between initial reports of incidence
+and the final revised incidence measure.  Using that model, we could use
+initial reports of incidence at any given time to predict the revised incidence at
+that time.  These predictions of final incidence could then be used as inputs
+to the KCDE prediction model outlined in this article.  This approach is similar
+in spirit to the methods used by Brooks \etal \cite{brooks2015empiricalBayes}.
+An alternative approach could use KCDE to directly learn a relationship between
+initial, unrevised, reports of disease incidence and the final incidence measure in future weeks.}
+
+\newtext{The KCDE modeling framework could also be applied to directly model the joint distribution
+of incidence in multiple future weeks without the use of a copula.  If we were to directly
+model incidence in all remaining weeks of the season with KCDE the method would operate
+more similarly to the approach of Brooks \etal \cite{brooks2015empiricalBayes}, who directly model
+the trajectory of incidence over the course of the season.  However, we believe that this
+line would have limited success since fully nonparametric estimation of the joint distribution of
+incidence in 40 future weeks (for example) given only about 15 to 20 years of past data will
+be challenging.  Another possible approach would be
+to use KCDE to obtain a joint predictive density of incidence in smaller groups of weeks
+(for example, 2 - 5 weeks at a time) and then combine
+those predictive densities using a mechanism such as a copula.
+Such an intermediate approach might be able to capture more information about
+medium-term trends in incidence such as holiday effects than the method we have presented in this article
+without suffering from the curse of dimensionality as much as direct application of KCDE to
+an entire season at a time.}
 
 There is also a long history of using other modeling approaches such as
 compartmental models for infectious disease prediction.  KCDE is distinguished
@@ -2382,7 +2458,8 @@ with vertical grey bars.}
 
 \begin{figure}
 <<DengueDataRibbonsPredictionPlot95Intervals, echo = FALSE, fig.height = 8.6, dev = "cairo_ps">>=
-color_palette <- c("#D55E00", "#0072B2")
+color_palette_fill <- c("#D55E00", "#0072B2", "#FFFFFF")
+color_palette_colour <- c("#D55E00", "#0072B2", "#000000")
 
 dengue_ribbons_df <- dengue_prediction_results %>%
     select(prediction_time,
@@ -2395,11 +2472,33 @@ dengue_ribbons_df <- dengue_prediction_results %>%
         bound_type = ifelse(grepl("lb", bound_type), "lower", "upper")) %>%
     spread(bound_type, predictive_value)
 
+dengue_ribbons_df <- rbind.fill(
+  dengue_ribbons_df,
+  dengue_ribbons_df %>%
+    filter(model == "HHH4") %>%
+    mutate(model = "Observed\nIncidence",
+      full_model_descriptor == "Observed\nIncidence")
+)
+
 phs_used <- c(1, 6, 26)
 models_used <- c("SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
-    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full",
+    "Observed\nIncidence")
 pi_type <- "95"
 #pi_type <- "50"
+
+reduced_dengue_sj <-   dengue_sj %>%
+    filter(dengue_sj$season %in% paste0(2009:2012, "/", 2010:2013))
+dengue_prediction_results_for_plot <- rbind.fill(
+  dengue_prediction_results,
+  data.frame(
+      prediction_time = rep(reduced_dengue_sj$time, each = length(phs_used)),
+      pt_pred = rep(reduced_dengue_sj$total_cases, each = length(phs_used)),
+      prediction_horizon = rep(phs_used, times = nrow(reduced_dengue_sj)),
+      full_model_descriptor = "Observed\nIncidence",
+      model = "Observed\nIncidence"
+  )
+)
 
 p_dengue <- ggplot() +
     geom_ribbon(aes(x = prediction_time, ymin = lower, ymax = upper, colour = model, fill = model, alpha = model),
@@ -2407,17 +2506,30 @@ p_dengue <- ggplot() +
         data = dengue_ribbons_df[dengue_ribbons_df$prediction_horizon %in% phs_used &
                 dengue_ribbons_df$full_model_descriptor %in% models_used &
                 dengue_ribbons_df$interval_type == pi_type, ]) +
-    geom_line(aes(x = time, y = total_cases), data = dengue_sj[dengue_sj$season %in% paste0(2009:2012, "/", 2010:2013), ]) +
-    geom_line(aes(x = prediction_time, y = pt_pred, colour = model, linetype = model),
-        size = 1,
-        data = dengue_prediction_results[dengue_prediction_results$prediction_horizon %in% phs_used &
-                dengue_prediction_results$full_model_descriptor %in% models_used, ]) +
+    # geom_line(aes(x = time, y = total_cases), data = dengue_sj[dengue_sj$season %in% paste0(2009:2012, "/", 2010:2013), ]) +
+    geom_line(aes(x = prediction_time, y = pt_pred, colour = model, linetype = model, size = model),
+#        size = 1,
+        data = dengue_prediction_results_for_plot[dengue_prediction_results_for_plot$prediction_horizon %in% phs_used &
+                dengue_prediction_results_for_plot$full_model_descriptor %in% models_used, ]) +
     scale_alpha_discrete("Model",
-        limits = c("KCDE", "SARIMA"),
-        range = c(0.45, 0.2)) +
-    scale_fill_manual("Model", values = color_palette) +
-    scale_colour_manual("Model", values = color_palette) +
-    scale_linetype("Model") +
+        limits = c("KCDE", "SARIMA", "Observed\nIncidence"),
+        range = c(0.45, 0.2, 0)) +
+    scale_fill_manual("Model",
+      limits = c("KCDE", "SARIMA", "Observed\nIncidence"),
+      breaks = c("KCDE", "SARIMA", "Observed\nIncidence"),
+      values = color_palette_fill) +
+    scale_colour_manual("Model",
+      limits = c("KCDE", "SARIMA", "Observed\nIncidence"),
+      breaks = c("KCDE", "SARIMA", "Observed\nIncidence"),
+      values = color_palette_colour) +
+    scale_size_manual("Model",
+      limits = c("KCDE", "SARIMA", "Observed\nIncidence"),
+      breaks = c("KCDE", "SARIMA", "Observed\nIncidence"),
+      values = c(1, 1, 0.25)) +
+    scale_linetype_manual("Model",
+      limits = c("KCDE", "SARIMA", "Observed\nIncidence"),
+      breaks = c("KCDE", "SARIMA", "Observed\nIncidence"),
+      values = c(1, 2, 1)) +
     facet_wrap( ~ prediction_horizon, ncol = 1,
         labeller = as_labeller(function(labels, ...) {
                 return(paste0("Prediction Horizon = ", labels))
@@ -2438,8 +2550,31 @@ ili_ribbons_df <- ili_prediction_results %>%
         bound_type = ifelse(grepl("lb", bound_type), "lower", "upper")) %>%
     spread(bound_type, predictive_value)
 
+ili_ribbons_df <- rbind.fill(
+  ili_ribbons_df,
+  ili_ribbons_df %>%
+    filter(model == "SARIMA") %>%
+    mutate(model = "Observed\nIncidence",
+      full_model_descriptor == "Observed\nIncidence")
+)
+
+reduced_ili_national <-   ili_national %>%
+    filter(ili_national$year %in% 2011:2014)
+ili_prediction_results_for_plot <- rbind.fill(
+  ili_prediction_results,
+  data.frame(
+      prediction_time = rep(reduced_ili_national$time, each = length(phs_used)),
+      pt_pred = rep(reduced_ili_national$weighted_ili, each = length(phs_used)),
+      prediction_horizon = rep(phs_used, times = nrow(reduced_ili_national)),
+      full_model_descriptor = "Observed\nIncidence",
+      model = "Observed\nIncidence"
+  )
+)
+
+
 models_used <- c("SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA",
-    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full")
+    "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full",
+    "Observed\nIncidence")
 
 p_ili <- ggplot() +
     geom_ribbon(aes(x = prediction_time, ymin = lower, ymax = upper, colour = model, fill = model, alpha = model),
@@ -2447,17 +2582,30 @@ p_ili <- ggplot() +
         data = ili_ribbons_df[ili_ribbons_df$prediction_horizon %in% phs_used &
                 ili_ribbons_df$full_model_descriptor %in% models_used &
                 ili_ribbons_df$interval_type == pi_type, ]) +
-    geom_line(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2011:2014, ]) +
-    geom_line(aes(x = prediction_time, y = pt_pred, colour = model, linetype = model),
-        size = 1,
-        data = ili_prediction_results[ili_prediction_results$prediction_horizon %in% phs_used &
-                ili_prediction_results$full_model_descriptor %in% models_used, ]) +
+#    geom_line(aes(x = time, y = weighted_ili), data = ili_national[ili_national$year %in% 2011:2014, ]) +
+    geom_line(aes(x = prediction_time, y = pt_pred, colour = model, linetype = model, size = model),
+#        size = 1,
+        data = ili_prediction_results_for_plot[ili_prediction_results_for_plot$prediction_horizon %in% phs_used &
+                ili_prediction_results_for_plot$full_model_descriptor %in% models_used, ]) +
     scale_alpha_discrete("Model",
-        limits = c("KCDE", "SARIMA"),
-        range = c(0.45, 0.2)) +
-    scale_fill_manual("Model", values = color_palette) +
-    scale_colour_manual("Model", values = color_palette) +
-    scale_linetype("Model") +
+        limits = c("KCDE", "SARIMA", "Observed\nIncidence"),
+        range = c(0.45, 0.2, 0)) +
+    scale_fill_manual("Model",
+      limits = c("KCDE", "SARIMA", "Observed\nIncidence"),
+      breaks = c("KCDE", "SARIMA", "Observed\nIncidence"),
+      values = color_palette_fill) +
+    scale_colour_manual("Model",
+      limits = c("KCDE", "SARIMA", "Observed\nIncidence"),
+      breaks = c("KCDE", "SARIMA", "Observed\nIncidence"),
+      values = color_palette_colour) +
+    scale_size_manual("Model",
+      limits = c("KCDE", "SARIMA", "Observed\nIncidence"),
+      breaks = c("KCDE", "SARIMA", "Observed\nIncidence"),
+      values = c(1, 1, 0.25)) +
+    scale_linetype_manual("Model",
+      limits = c("KCDE", "SARIMA", "Observed\nIncidence"),
+      breaks = c("KCDE", "SARIMA", "Observed\nIncidence"),
+      values = c(1, 2, 1)) +
     facet_wrap( ~ prediction_horizon, ncol = 1,
         labeller = as_labeller(function(labels, ...) {
                 return(paste0("Prediction Horizon = ", labels))
@@ -2475,10 +2623,10 @@ print(p_dengue, vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
 print(p_ili, vp = viewport(layout.pos.row = 2, layout.pos.col = 1))
 @
 \caption{Plots of point and interval predictions from SARIMA and the
-Periodic, Full Bandwidth KCDE model.}
+Periodic, Full Bandwidth KCDE model.  The point prediction is the median of the predictive
+distribution for incidence in the given week.  The interval prediction is a percentile interval; for example, the endpoints of the 95\% prediction interval are the 2.5th percentile and the 97.5th percentile of the predictive distribution.}
 \label{fig:DengueRibbonsPredictions}
 \end{figure}
-
 
 
 \begin{figure}
@@ -2561,6 +2709,7 @@ and prediction time in the test period.
 \end{figure}
 
 
+
 \begin{figure}
 <<DengueLogScoreDiffVsReportedCasesCombined, echo = FALSE, fig.height = 8.4, fig.keep = "last", dev = "cairo_ps">>=
 dengue_prediction_log_score_diffs_from_baseline <- rbind.fill(
@@ -2604,6 +2753,284 @@ prediction horizon.
 }
 \label{fig:DengueLogScoreDiffVsReportedCasesCombined}
 \end{figure}
+
+
+
+\begin{table}[hp]
+\centering
+\begin{tabular}{lllllllll}
+\toprule
+         & Predictive & Baseline &     \multicolumn{6}{c}{Summary of Log Score Differences} \\
+\cline{4-9}
+ Disease & Model      & Model    & Min & Q1 & Median & Q3 & Max & Mean (95\% CI) \\ 
+  \hline
+<<PerformanceSummaryTable, echo = FALSE, results = "asis">>=
+#difference ~ N(mean_difference_model_pair, rho^(target time difference) * phi^(analysis time difference))???
+
+temp <- dengue_prediction_log_score_diffs_from_baseline %>%
+  filter(model %in% models_used) %>%
+  group_by(reduced_model_descriptor, baseline_model) %>%
+  summarize(
+    min = min(log_score_difference),
+    Q1 = quantile(log_score_difference, probs = 0.25),
+    median = quantile(log_score_difference, probs = 0.5),
+    Q3 = quantile(log_score_difference, probs = 0.75),
+    max = max(log_score_difference),
+    mean = mean(log_score_difference),
+    mean_ci_lb = t.test(log_score_difference)$conf.int[1],
+    mean_ci_ub = t.test(log_score_difference)$conf.int[2]
+  ) %>%
+  as.data.frame()
+
+for(row_num in 1:8) {
+  cat(paste0("Dengue & ",
+    as.character(temp[row_num, "reduced_model_descriptor"]), " & ",
+    temp[row_num, "baseline_model"], " & ",
+    round(temp[row_num, "min"], 2), " & ",
+    round(temp[row_num, "Q1"], 2), " & ",
+    round(temp[row_num, "median"], 2), " & ",
+    round(temp[row_num, "Q3"], 2), " & ",
+    round(temp[row_num, "max"], 2), " & ",
+    round(temp[row_num, "mean"], 2), " (",
+    round(temp[row_num, "mean_ci_lb"], 2), ", ",
+    round(temp[row_num, "mean_ci_ub"], 2), ")",
+    "\\\\\n"
+  ))
+}
+cat("\\midrule\n");
+
+temp <- ili_prediction_log_score_diffs_from_sarima_long %>%
+  filter(model %in% models_used) %>%
+  group_by(reduced_model_descriptor) %>%
+  summarize(
+    min = min(log_score_difference),
+    Q1 = quantile(log_score_difference, probs = 0.25),
+    median = quantile(log_score_difference, probs = 0.5),
+    Q3 = quantile(log_score_difference, probs = 0.75),
+    max = max(log_score_difference),
+    mean = mean(log_score_difference),
+    mean_ci_lb = t.test(log_score_difference)$conf.int[1],
+    mean_ci_ub = t.test(log_score_difference)$conf.int[2]
+  ) %>%
+  as.data.frame()
+for(row_num in 1:4) {
+  cat(paste0("Influenza & ",
+    as.character(temp[row_num, "reduced_model_descriptor"]), " & ",
+    "SARIMA", " & ",
+    round(temp[row_num, "min"], 2), " & ",
+    round(temp[row_num, "Q1"], 2), " & ",
+    round(temp[row_num, "median"], 2), " & ",
+    round(temp[row_num, "Q3"], 2), " & ",
+    round(temp[row_num, "max"], 2), " & ",
+    round(temp[row_num, "mean"], 2), " (",
+    round(temp[row_num, "mean_ci_lb"], 2), ", ",
+    round(temp[row_num, "mean_ci_ub"], 2), ")",
+    "\\\\\n"
+  ))
+}
+@
+\bottomrule
+\end{tabular}
+\caption{Summaries of model performance relative to the baseline models for
+predictions of incidence in individual weeks.  Each row summarizes the log
+score differences for predictions of incidence made at all combinations of 
+target week in the test period and prediction horizon. THE CONFIDENCE INTERVALS ARE TOO NARROW/NOT CLEAR IF THEY'RE MEANINGFUL.}
+\end{table}
+
+\begin{table}[hp]
+\centering
+\begin{tabular}{lllllllll}
+\toprule
+         & Predictive & Baseline &     \multicolumn{6}{c}{Summary of Log Score Differences} \\
+\cline{4-9}
+ Disease & Model      & Model    & Min & Q1 & Median & Q3 & Max & Mean (95\% CI) \\ 
+  \hline
+<<PerformanceSummaryTableNadir, echo = FALSE, results = "asis">>=
+#difference ~ N(mean_difference_model_pair, rho^(target time difference) * phi^(analysis time difference))???
+
+lower_cutoff <- max(dengue_prediction_log_score_diffs_from_sarima_long_with_pred_time_covars$total_cases) / 3
+upper_cutoff <- 2 * lower_cutoff
+
+temp <- dengue_prediction_log_score_diffs_from_baseline %>%
+  filter(model %in% models_used & total_cases <= lower_cutoff) %>%
+  group_by(reduced_model_descriptor, baseline_model) %>%
+  summarize(
+    min = min(log_score_difference),
+    Q1 = quantile(log_score_difference, probs = 0.25),
+    median = quantile(log_score_difference, probs = 0.5),
+    Q3 = quantile(log_score_difference, probs = 0.75),
+    max = max(log_score_difference),
+    mean = mean(log_score_difference),
+    mean_ci_lb = t.test(log_score_difference)$conf.int[1],
+    mean_ci_ub = t.test(log_score_difference)$conf.int[2]
+  ) %>%
+  as.data.frame()
+
+for(row_num in 1:8) {
+  cat(paste0("Dengue & ",
+    as.character(temp[row_num, "reduced_model_descriptor"]), " & ",
+    temp[row_num, "baseline_model"], " & ",
+    round(temp[row_num, "min"], 2), " & ",
+    round(temp[row_num, "Q1"], 2), " & ",
+    round(temp[row_num, "median"], 2), " & ",
+    round(temp[row_num, "Q3"], 2), " & ",
+    round(temp[row_num, "max"], 2), " & ",
+    round(temp[row_num, "mean"], 2), " (",
+    round(temp[row_num, "mean_ci_lb"], 2), ", ",
+    round(temp[row_num, "mean_ci_ub"], 2), ")",
+    "\\\\\n"
+  ))
+}
+cat("\\midrule\n");
+
+temp <- ili_national[, c("time", "weighted_ili", "season")]
+colnames(temp) <- c("prediction_time", "weighted_ili", "season")
+
+ili_prediction_log_score_diffs_from_sarima_with_pred_time_covars <-
+  ili_prediction_log_score_diffs_from_sarima_long %>%
+  left_join(temp, by = "prediction_time", copy = TRUE)
+
+lower_cutoff <- max(ili_prediction_log_score_diffs_from_sarima_with_pred_time_covars$weighted_ili) / 3
+upper_cutoff <- 2 * lower_cutoff
+
+
+temp <- ili_prediction_log_score_diffs_from_sarima_with_pred_time_covars %>%
+  filter(model %in% models_used & weighted_ili <= lower_cutoff) %>%
+  group_by(reduced_model_descriptor) %>%
+  summarize(
+    min = min(log_score_difference),
+    Q1 = quantile(log_score_difference, probs = 0.25),
+    median = quantile(log_score_difference, probs = 0.5),
+    Q3 = quantile(log_score_difference, probs = 0.75),
+    max = max(log_score_difference),
+    mean = mean(log_score_difference),
+    mean_ci_lb = t.test(log_score_difference)$conf.int[1],
+    mean_ci_ub = t.test(log_score_difference)$conf.int[2]
+  ) %>%
+  as.data.frame()
+for(row_num in 1:4) {
+  cat(paste0("Influenza & ",
+    as.character(temp[row_num, "reduced_model_descriptor"]), " & ",
+    "SARIMA", " & ",
+    round(temp[row_num, "min"], 2), " & ",
+    round(temp[row_num, "Q1"], 2), " & ",
+    round(temp[row_num, "median"], 2), " & ",
+    round(temp[row_num, "Q3"], 2), " & ",
+    round(temp[row_num, "max"], 2), " & ",
+    round(temp[row_num, "mean"], 2), " (",
+    round(temp[row_num, "mean_ci_lb"], 2), ", ",
+    round(temp[row_num, "mean_ci_ub"], 2), ")",
+    "\\\\\n"
+  ))
+}
+@
+\bottomrule
+\end{tabular}
+\caption{Summaries of model performance relative to the baseline models for
+predictions of incidence in individual weeks where observed incidence in the target week was less than one third of the maximum weekly incidence in the test period.  Each row summarizes the log
+score differences for predictions of incidence made at all combinations of 
+target week in the test period and prediction horizon. THE CONFIDENCE INTERVALS ARE TOO NARROW/NOT CLEAR IF THEY'RE MEANINGFUL.}
+\end{table}
+
+
+
+\begin{table}[hp]
+\centering
+\begin{tabular}{lllllllll}
+\toprule
+         & Predictive & Baseline &     \multicolumn{6}{c}{Summary of Log Score Differences} \\
+\cline{4-9}
+ Disease & Model      & Model    & Min & Q1 & Median & Q3 & Max & Mean (95\% CI) \\ 
+  \hline
+<<PerformanceSummaryTablePeak, echo = FALSE, results = "asis">>=
+#difference ~ N(mean_difference_model_pair, rho^(target time difference) * phi^(analysis time difference))???
+
+lower_cutoff <- max(dengue_prediction_log_score_diffs_from_sarima_long_with_pred_time_covars$total_cases) / 3
+upper_cutoff <- 2 * lower_cutoff
+
+temp <- dengue_prediction_log_score_diffs_from_baseline %>%
+  filter(model %in% models_used & total_cases >= upper_cutoff) %>%
+  group_by(reduced_model_descriptor, baseline_model) %>%
+  summarize(
+    min = min(log_score_difference),
+    Q1 = quantile(log_score_difference, probs = 0.25),
+    median = quantile(log_score_difference, probs = 0.5),
+    Q3 = quantile(log_score_difference, probs = 0.75),
+    max = max(log_score_difference),
+    mean = mean(log_score_difference),
+    mean_ci_lb = t.test(log_score_difference)$conf.int[1],
+    mean_ci_ub = t.test(log_score_difference)$conf.int[2]
+  ) %>%
+  as.data.frame()
+
+for(row_num in 1:8) {
+  cat(paste0("Dengue & ",
+    as.character(temp[row_num, "reduced_model_descriptor"]), " & ",
+    temp[row_num, "baseline_model"], " & ",
+    round(temp[row_num, "min"], 2), " & ",
+    round(temp[row_num, "Q1"], 2), " & ",
+    round(temp[row_num, "median"], 2), " & ",
+    round(temp[row_num, "Q3"], 2), " & ",
+    round(temp[row_num, "max"], 2), " & ",
+    round(temp[row_num, "mean"], 2), " (",
+    round(temp[row_num, "mean_ci_lb"], 2), ", ",
+    round(temp[row_num, "mean_ci_ub"], 2), ")",
+    "\\\\\n"
+  ))
+}
+cat("\\midrule\n");
+
+temp <- ili_national[, c("time", "weighted_ili", "season")]
+colnames(temp) <- c("prediction_time", "weighted_ili", "season")
+
+ili_prediction_log_score_diffs_from_sarima_with_pred_time_covars <-
+  ili_prediction_log_score_diffs_from_sarima_long %>%
+  left_join(temp, by = "prediction_time", copy = TRUE)
+
+lower_cutoff <- max(ili_prediction_log_score_diffs_from_sarima_with_pred_time_covars$weighted_ili) / 3
+upper_cutoff <- 2 * lower_cutoff
+
+
+temp <- ili_prediction_log_score_diffs_from_sarima_with_pred_time_covars %>%
+  filter(model %in% models_used & weighted_ili >= upper_cutoff) %>%
+  group_by(reduced_model_descriptor) %>%
+  summarize(
+    min = min(log_score_difference),
+    Q1 = quantile(log_score_difference, probs = 0.25),
+    median = quantile(log_score_difference, probs = 0.5),
+    Q3 = quantile(log_score_difference, probs = 0.75),
+    max = max(log_score_difference),
+    mean = mean(log_score_difference),
+    mean_ci_lb = t.test(log_score_difference)$conf.int[1],
+    mean_ci_ub = t.test(log_score_difference)$conf.int[2]
+  ) %>%
+  as.data.frame()
+for(row_num in 1:4) {
+  cat(paste0("Influenza & ",
+    as.character(temp[row_num, "reduced_model_descriptor"]), " & ",
+    "SARIMA", " & ",
+    round(temp[row_num, "min"], 2), " & ",
+    round(temp[row_num, "Q1"], 2), " & ",
+    round(temp[row_num, "median"], 2), " & ",
+    round(temp[row_num, "Q3"], 2), " & ",
+    round(temp[row_num, "max"], 2), " & ",
+    round(temp[row_num, "mean"], 2), " (",
+    round(temp[row_num, "mean_ci_lb"], 2), ", ",
+    round(temp[row_num, "mean_ci_ub"], 2), ")",
+    "\\\\\n"
+  ))
+}
+@
+\bottomrule
+\end{tabular}
+\caption{Summaries of model performance relative to the baseline models for
+predictions of incidence in individual weeks where observed incidence in the target week was at least two thirds of the maximum weekly incidence in the test period.  Each row summarizes the log
+score differences for predictions of incidence made at all combinations of 
+target week in the test period and prediction horizon. THE CONFIDENCE INTERVALS ARE TOO NARROW/NOT CLEAR IF THEY'RE MEANINGFUL.}
+\end{table}
+
+
+
 
 
 \begin{figure}
