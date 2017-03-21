@@ -5,6 +5,8 @@
 
 \usepackage[colorlinks=true, urlcolor=citecolor, linkcolor=citecolor, citecolor=citecolor]{hyperref}
 
+\usepackage{booktabs}
+
 % Add history information for the article if required
 %\history{Received August 1, 2010;
 %revised October 1, 2010;
@@ -50,6 +52,7 @@ Diseases,}}\\
 }
 
 \renewcommand{\figurename}{Supplemental Figure}
+\renewcommand{\tablename}{Supplemental Table}
 
 %% Author addresses
 %$^1$\textit{Department of Biostatistics and Epidemiology,
@@ -151,6 +154,8 @@ library(kcde)
 suppressMessages(suppressWarnings(library(pdtmvn)))
 
 suppressMessages(library(forecast))
+
+library(xtable)
 
 opts_chunk$set(cache = TRUE)
 #opts_chunk$set(cache = TRUE, autodep = TRUE)
@@ -412,12 +417,8 @@ E[Z_t] &= \lambda_t Z_{t - l} + \nu_t \text{, where} \\
 
 In these equations, $l$ is a lag to use in the autoregressive term and
 $S^{(\lambda)}$ and $S^{(\nu)}$ specify the number of sinusoidal terms used to
-capture seasonality.  Held and Paul \cite{Held2012HHHSeasonality} advocate
-using performance of one-step-ahead predictions (as measured by the log score, ranked probability
-score, or squared error score) to select the model specification.
-In practice, they fix $l = 1$, vary $S^{(\lambda)} \in \{0, 1\}$, and either vary
-$S^{(\nu)} \in \{0, 1\}$ or fix $S^{(\nu)} = 3$ depending on the
-application.  In this work, we considered all possible model specifications that
+capture seasonality.  We used Aikake's Information Criterion (CITE) to perform model selection.
+We considered all possible model specifications that
 could be obtained by varying the following four factors:
 \begin{enumerate}
 \item Parametric family: $\{\text{Poisson}, \text{Negative Binomial}\}$
@@ -425,15 +426,13 @@ could be obtained by varying the following four factors:
 \item $S^{(\lambda)} \in \{0, 1, 2, 3\}$
 \item $S^{(\nu)} \in \{0, 1, 2, 3\}$
 \end{enumerate}
-
-Following the examples in Held and Paul \cite{Held2012HHHSeasonality}, we
-selected the model with the best mean log score for predictions for the final two years of the
-training data.  The selected model had a Poisson family, $l = 1$,
-$S^{(\lambda)} = 0$, and $S^{(\nu)} = 3$.
+This is similar to the approach taken by Held and Paul \cite{Held2012HHHSeasonality}.
+The selected model (with lowest AIC among the candidate specifications considered) had a Negative Binomial family, $l = 1$,
+$S^{(\lambda)} = 2$, and $S^{(\nu)} = 1$.
 
 The surveillance package provides functionality to compute
 one-step-ahead predictive distributions and to iteratively sample trajectories
-over multiple time steps, but it does not provide functionality to compute the
+over multiple time steps \cite{meyeretal2016SpatioTemporalAnalysisSurveillance}, but it does not provide functionality to compute the
 predictive distributions at horizons more than one step ahead.  For this
 article, we used an importance sampling estimate of the predictive density at
 horizons $h \geq 2$:
@@ -1627,7 +1626,7 @@ ili_coverage <- left_join(ili_ribbons_df %>% mutate(time = prediction_time),
   mutate(in_interval = (weighted_ili <= upper & weighted_ili >= lower)) %>%
   group_by(full_model_descriptor, interval_type) %>%
   summarize(coverage = mean(in_interval) * 100) %>%
-  mutate(disease = "influenza")
+  mutate(disease = "Influenza")
 
  
 dengue_coverage <- left_join(dengue_ribbons_df %>% mutate(time = prediction_time),
@@ -1636,7 +1635,7 @@ dengue_coverage <- left_join(dengue_ribbons_df %>% mutate(time = prediction_time
   mutate(in_interval = (total_cases <= upper & total_cases >= lower)) %>%
   group_by(full_model_descriptor, interval_type) %>%
   summarize(coverage = mean(in_interval) * 100) %>%
-  mutate(disease = "dengue")
+  mutate(disease = "Dengue")
 
 combined_coverage <- rbind.fill(ili_coverage, dengue_coverage) %>%
     mutate(
@@ -1672,7 +1671,7 @@ combined_coverage$reduced_model_descriptor <-
 target_coverage <- data.frame(
   interval_type = as.character(c(50, 50, 95, 95)),
   coverage = c(0.50, 0.50, 0.95, 0.95) * 100,
-  disease = c("dengue", "influenza", "dengue", "influenza")
+  disease = c("Dengue", "Influenza", "Dengue", "Influenza")
 )
 
 ggplot(combined_coverage) +
@@ -1687,9 +1686,63 @@ ggplot(combined_coverage) +
   facet_wrap( ~ disease, ncol = 1) +
   xlab("Target Interval Coverage Rate") +
   ylab("Interval Coverage Rate in Test Seasons") +
+  ggtitle("Predictive Interval Coverage Rates by\nDisease, Model Specification, and Target Coverage Rate") +
   theme_bw()
 @
+\caption{Coverage rates for predictions of disease incidence in individual weeks during the test time frame.  For each model specification, we have obtained the overall proportion of predictive intervals that contained the realized outcome, combining across all prediction horizons and all times in the test period at which the prediction was made.}
+\label{fig:PredictiveIntervalCoverageRates} %fig.height = 4.3
 \end{figure}
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{llll}
+\toprule
+         &       & Target & Actual   \\
+ Disease & Model & Coverage & Coverage \\ 
+  \hline
+<<CoverageTable, echo = FALSE, results = "asis">>=
+coverage_for_table <- combined_coverage[, c("disease", "interval_type", "reduced_model_descriptor", "coverage")] %>%
+  transmute(Disease = disease,
+    Model = reduced_model_descriptor,
+    `Expected\nCoverage` = interval_type,
+    `Actual\nCoverage` = coverage) %>%
+  arrange(Disease, `Expected\nCoverage`, Model)
+
+row_num_groups_list <- list(1:6, 7:12, 13:17, 18:22)
+for(row_num_group_ind in seq_along(row_num_groups_list)) {
+  row_num_group <- row_num_groups_list[[row_num_group_ind]]
+  best_in_group <- row_num_group[
+    which.min(
+      abs(coverage_for_table[row_num_group, 4] -
+          as.numeric(coverage_for_table[row_num_group, 3]))
+    )
+  ]
+  for(row_num in row_num_group) {
+    cat(paste0(coverage_for_table[row_num, 1], " & ",
+      coverage_for_table[row_num, 2], " & ",
+      coverage_for_table[row_num, 3], " & ",
+      ifelse(best_in_group == row_num,
+        "\\textbf{",
+        ""),
+      round(coverage_for_table[row_num, 4], 2),
+      ifelse(best_in_group == row_num,
+        "}",
+        ""),
+      "\\\\\n"
+    ))
+  }
+  if(row_num_group_ind %in% c(1, 3)) {
+    cat("\\cline{2-4}\n")
+  } else if(row_num_group_ind == 2) {
+    cat("\\cline{1-4}\n")
+  }
+}
+@
+\bottomrule
+\end{tabular}
+\caption{Coverage rates for predictions of disease incidence in individual weeks during the test time frame.  For each model specification, we have obtained the overall proportion of predictive intervals that contained the realized outcome, combining across all prediction horizons and all times in the test period at which the prediction was made.  For each combination of disease and target coverage rate, the result for the model with actual coverage rate closest to the target coverate rate is highlighted.}
+\end{table}
+
 
 \begin{figure}
 <<FluDataResultsAggregatedBoxplots, echo = FALSE, dev = "cairo_ps">>=
@@ -3820,7 +3873,7 @@ grid.newpage()
 pushViewport(viewport(layout = grid.layout(nrow = 9, ncol = 3,
             heights = unit(c(1, rep(1, 7), 0.75), c("lines", rep("null", 8))),
             widths = unit(c(1, 1, 0.25), c("null", "lines", "null")))))
-grid.text("Summary of Results for Peak Week Incidence",
+grid.text("Summary of Results for Peak Week Timing",
     gp = gpar(fontsize = 14),
     vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
 #grid.text("Observed\nIncidence",
