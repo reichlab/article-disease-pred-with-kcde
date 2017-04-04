@@ -2757,12 +2757,11 @@ prediction horizon.
 
 
 \begin{table}[hp]
-\centering
-\begin{tabular}{lllllllll}
+\begin{tabular}{llllllllll}
 \toprule
-         & Predictive & Baseline &     \multicolumn{6}{c}{Summary of Log Score Differences} \\
-\cline{4-9}
- Disease & Model      & Model    & Min & Q1 & Median & Q3 & Max & Mean (95\% CI) \\ 
+         &                    &          &              &    \multicolumn{6}{c}{Summary of Log Score Differences} \\
+\cline{5-10}
+ Disease & KCDE Specification & Baseline & Subset & Min & Q1 & Q2 & Mean & Q3 & Max \\ 
   \hline
 <<PerformanceSummaryTable, echo = FALSE, results = "asis">>=
 #difference ~ N(mean_difference_model_pair, rho^(target time difference) * phi^(analysis time difference))???
@@ -2776,82 +2775,17 @@ temp <- dengue_prediction_log_score_diffs_from_baseline %>%
     median = quantile(log_score_difference, probs = 0.5),
     Q3 = quantile(log_score_difference, probs = 0.75),
     max = max(log_score_difference),
-    mean = mean(log_score_difference),
-    mean_ci_lb = t.test(log_score_difference)$conf.int[1],
-    mean_ci_ub = t.test(log_score_difference)$conf.int[2]
+    mean = mean(log_score_difference)
   ) %>%
+  ungroup() %>%
+  mutate(reduced_model_descriptor = as.character(reduced_model_descriptor)) %>%
+  mutate(reduced_model_descriptor = substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5)) %>%
   as.data.frame()
-
-for(row_num in 1:8) {
-  cat(paste0("Dengue & ",
-    as.character(temp[row_num, "reduced_model_descriptor"]), " & ",
-    temp[row_num, "baseline_model"], " & ",
-    round(temp[row_num, "min"], 2), " & ",
-    round(temp[row_num, "Q1"], 2), " & ",
-    round(temp[row_num, "median"], 2), " & ",
-    round(temp[row_num, "Q3"], 2), " & ",
-    round(temp[row_num, "max"], 2), " & ",
-    round(temp[row_num, "mean"], 2), " (",
-    round(temp[row_num, "mean_ci_lb"], 2), ", ",
-    round(temp[row_num, "mean_ci_ub"], 2), ")",
-    "\\\\\n"
-  ))
-}
-cat("\\midrule\n");
-
-temp <- ili_prediction_log_score_diffs_from_sarima_long %>%
-  filter(model %in% models_used) %>%
-  group_by(reduced_model_descriptor) %>%
-  summarize(
-    min = min(log_score_difference),
-    Q1 = quantile(log_score_difference, probs = 0.25),
-    median = quantile(log_score_difference, probs = 0.5),
-    Q3 = quantile(log_score_difference, probs = 0.75),
-    max = max(log_score_difference),
-    mean = mean(log_score_difference),
-    mean_ci_lb = t.test(log_score_difference)$conf.int[1],
-    mean_ci_ub = t.test(log_score_difference)$conf.int[2]
-  ) %>%
-  as.data.frame()
-for(row_num in 1:4) {
-  cat(paste0("Influenza & ",
-    as.character(temp[row_num, "reduced_model_descriptor"]), " & ",
-    "SARIMA", " & ",
-    round(temp[row_num, "min"], 2), " & ",
-    round(temp[row_num, "Q1"], 2), " & ",
-    round(temp[row_num, "median"], 2), " & ",
-    round(temp[row_num, "Q3"], 2), " & ",
-    round(temp[row_num, "max"], 2), " & ",
-    round(temp[row_num, "mean"], 2), " (",
-    round(temp[row_num, "mean_ci_lb"], 2), ", ",
-    round(temp[row_num, "mean_ci_ub"], 2), ")",
-    "\\\\\n"
-  ))
-}
-@
-\bottomrule
-\end{tabular}
-\caption{Summaries of model performance relative to the baseline models for
-predictions of incidence in individual weeks.  Each row summarizes the log
-score differences for predictions of incidence made at all combinations of 
-target week in the test period and prediction horizon. THE CONFIDENCE INTERVALS ARE TOO NARROW/NOT CLEAR IF THEY'RE MEANINGFUL.}
-\end{table}
-
-\begin{table}[hp]
-\centering
-\begin{tabular}{lllllllll}
-\toprule
-         & Predictive & Baseline &     \multicolumn{6}{c}{Summary of Log Score Differences} \\
-\cline{4-9}
- Disease & Model      & Model    & Min & Q1 & Median & Q3 & Max & Mean (95\% CI) \\ 
-  \hline
-<<PerformanceSummaryTableNadir, echo = FALSE, results = "asis">>=
-#difference ~ N(mean_difference_model_pair, rho^(target time difference) * phi^(analysis time difference))???
 
 lower_cutoff <- max(dengue_prediction_log_score_diffs_from_sarima_long_with_pred_time_covars$total_cases) / 3
 upper_cutoff <- 2 * lower_cutoff
 
-temp <- dengue_prediction_log_score_diffs_from_baseline %>%
+temp_nadir <- dengue_prediction_log_score_diffs_from_baseline %>%
   filter(model %in% models_used & total_cases <= lower_cutoff) %>%
   group_by(reduced_model_descriptor, baseline_model) %>%
   summarize(
@@ -2860,95 +2794,18 @@ temp <- dengue_prediction_log_score_diffs_from_baseline %>%
     median = quantile(log_score_difference, probs = 0.5),
     Q3 = quantile(log_score_difference, probs = 0.75),
     max = max(log_score_difference),
-    mean = mean(log_score_difference),
-    mean_ci_lb = t.test(log_score_difference)$conf.int[1],
-    mean_ci_ub = t.test(log_score_difference)$conf.int[2]
+    mean = mean(log_score_difference)
   ) %>%
+  ungroup() %>%
+  mutate(reduced_model_descriptor = as.character(reduced_model_descriptor)) %>%
+  mutate(week_type = "Low Incidence",
+    reduced_model_descriptor = substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5)) %>%
   as.data.frame()
-
-for(row_num in 1:8) {
-  cat(paste0("Dengue & ",
-    as.character(temp[row_num, "reduced_model_descriptor"]), " & ",
-    temp[row_num, "baseline_model"], " & ",
-    round(temp[row_num, "min"], 2), " & ",
-    round(temp[row_num, "Q1"], 2), " & ",
-    round(temp[row_num, "median"], 2), " & ",
-    round(temp[row_num, "Q3"], 2), " & ",
-    round(temp[row_num, "max"], 2), " & ",
-    round(temp[row_num, "mean"], 2), " (",
-    round(temp[row_num, "mean_ci_lb"], 2), ", ",
-    round(temp[row_num, "mean_ci_ub"], 2), ")",
-    "\\\\\n"
-  ))
-}
-cat("\\midrule\n");
-
-temp <- ili_national[, c("time", "weighted_ili", "season")]
-colnames(temp) <- c("prediction_time", "weighted_ili", "season")
-
-ili_prediction_log_score_diffs_from_sarima_with_pred_time_covars <-
-  ili_prediction_log_score_diffs_from_sarima_long %>%
-  left_join(temp, by = "prediction_time", copy = TRUE)
-
-lower_cutoff <- max(ili_prediction_log_score_diffs_from_sarima_with_pred_time_covars$weighted_ili) / 3
-upper_cutoff <- 2 * lower_cutoff
-
-
-temp <- ili_prediction_log_score_diffs_from_sarima_with_pred_time_covars %>%
-  filter(model %in% models_used & weighted_ili <= lower_cutoff) %>%
-  group_by(reduced_model_descriptor) %>%
-  summarize(
-    min = min(log_score_difference),
-    Q1 = quantile(log_score_difference, probs = 0.25),
-    median = quantile(log_score_difference, probs = 0.5),
-    Q3 = quantile(log_score_difference, probs = 0.75),
-    max = max(log_score_difference),
-    mean = mean(log_score_difference),
-    mean_ci_lb = t.test(log_score_difference)$conf.int[1],
-    mean_ci_ub = t.test(log_score_difference)$conf.int[2]
-  ) %>%
-  as.data.frame()
-for(row_num in 1:4) {
-  cat(paste0("Influenza & ",
-    as.character(temp[row_num, "reduced_model_descriptor"]), " & ",
-    "SARIMA", " & ",
-    round(temp[row_num, "min"], 2), " & ",
-    round(temp[row_num, "Q1"], 2), " & ",
-    round(temp[row_num, "median"], 2), " & ",
-    round(temp[row_num, "Q3"], 2), " & ",
-    round(temp[row_num, "max"], 2), " & ",
-    round(temp[row_num, "mean"], 2), " (",
-    round(temp[row_num, "mean_ci_lb"], 2), ", ",
-    round(temp[row_num, "mean_ci_ub"], 2), ")",
-    "\\\\\n"
-  ))
-}
-@
-\bottomrule
-\end{tabular}
-\caption{Summaries of model performance relative to the baseline models for
-predictions of incidence in individual weeks where observed incidence in the target week was less than one third of the maximum weekly incidence in the test period.  Each row summarizes the log
-score differences for predictions of incidence made at all combinations of 
-target week in the test period and prediction horizon. THE CONFIDENCE INTERVALS ARE TOO NARROW/NOT CLEAR IF THEY'RE MEANINGFUL.}
-\end{table}
-
-
-
-\begin{table}[hp]
-\centering
-\begin{tabular}{lllllllll}
-\toprule
-         & Predictive & Baseline &     \multicolumn{6}{c}{Summary of Log Score Differences} \\
-\cline{4-9}
- Disease & Model      & Model    & Min & Q1 & Median & Q3 & Max & Mean (95\% CI) \\ 
-  \hline
-<<PerformanceSummaryTablePeak, echo = FALSE, results = "asis">>=
-#difference ~ N(mean_difference_model_pair, rho^(target time difference) * phi^(analysis time difference))???
 
 lower_cutoff <- max(dengue_prediction_log_score_diffs_from_sarima_long_with_pred_time_covars$total_cases) / 3
 upper_cutoff <- 2 * lower_cutoff
 
-temp <- dengue_prediction_log_score_diffs_from_baseline %>%
+temp_peak <- dengue_prediction_log_score_diffs_from_baseline %>%
   filter(model %in% models_used & total_cases >= upper_cutoff) %>%
   group_by(reduced_model_descriptor, baseline_model) %>%
   summarize(
@@ -2961,22 +2818,52 @@ temp <- dengue_prediction_log_score_diffs_from_baseline %>%
     mean_ci_lb = t.test(log_score_difference)$conf.int[1],
     mean_ci_ub = t.test(log_score_difference)$conf.int[2]
   ) %>%
+  ungroup() %>%
+  mutate(reduced_model_descriptor = as.character(reduced_model_descriptor)) %>%
+  mutate(week_type = "High Incidence",
+    reduced_model_descriptor = substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5)) %>%
   as.data.frame()
 
 for(row_num in 1:8) {
   cat(paste0("Dengue & ",
     as.character(temp[row_num, "reduced_model_descriptor"]), " & ",
     temp[row_num, "baseline_model"], " & ",
-    round(temp[row_num, "min"], 2), " & ",
-    round(temp[row_num, "Q1"], 2), " & ",
-    round(temp[row_num, "median"], 2), " & ",
-    round(temp[row_num, "Q3"], 2), " & ",
-    round(temp[row_num, "max"], 2), " & ",
-    round(temp[row_num, "mean"], 2), " (",
-    round(temp[row_num, "mean_ci_lb"], 2), ", ",
-    round(temp[row_num, "mean_ci_ub"], 2), ")",
+    "All Weeks & ",
+    format(round(temp[row_num, "min"], 2), nsmall = 2), " & ",
+    format(round(temp[row_num, "Q1"], 2), nsmall = 2), " & ",
+    format(round(temp[row_num, "median"], 2), nsmall = 2), " & ",
+    format(round(temp[row_num, "mean"], 2), nsmall = 2), " & ",
+    format(round(temp[row_num, "Q3"], 2), nsmall = 2), " & ",
+    format(round(temp[row_num, "max"], 2), nsmall = 2),
     "\\\\\n"
   ))
+  cat(paste0(" & ",
+    " & ",
+    " & ",
+    "Low Incidence & ",
+    format(round(temp_nadir[row_num, "min"], 2), nsmall = 2), " & ",
+    format(round(temp_nadir[row_num, "Q1"], 2), nsmall = 2), " & ",
+    format(round(temp_nadir[row_num, "median"], 2), nsmall = 2), " & ",
+    format(round(temp_nadir[row_num, "mean"], 2), nsmall = 2), " & ",
+    format(round(temp_nadir[row_num, "Q3"], 2), nsmall = 2), " & ",
+    format(round(temp_nadir[row_num, "max"], 2), nsmall = 2),
+    "\\\\\n"
+  ))
+  cat(paste0(" & ",
+    " & ",
+    " & ",
+    "High Incidence & ",
+    format(round(temp_peak[row_num, "min"], 2), nsmall = 2), " & ",
+    format(round(temp_peak[row_num, "Q1"], 2), nsmall = 2), " & ",
+    format(round(temp_peak[row_num, "median"], 2), nsmall = 2), " & ",
+    format(round(temp_peak[row_num, "mean"], 2), nsmall = 2), " & ",
+    format(round(temp_peak[row_num, "Q3"], 2), nsmall = 2), " & ",
+    format(round(temp_peak[row_num, "max"], 2), nsmall = 2),
+    "\\\\\n"
+  ))
+  if(row_num < 8) {
+    cat("\\cline{2-10}\n")
+  }
 }
 cat("\\midrule\n");
 
@@ -2987,11 +2874,44 @@ ili_prediction_log_score_diffs_from_sarima_with_pred_time_covars <-
   ili_prediction_log_score_diffs_from_sarima_long %>%
   left_join(temp, by = "prediction_time", copy = TRUE)
 
+temp <- ili_prediction_log_score_diffs_from_sarima_long %>%
+  filter(model %in% models_used) %>%
+  group_by(reduced_model_descriptor) %>%
+  summarize(
+    min = min(log_score_difference),
+    Q1 = quantile(log_score_difference, probs = 0.25),
+    median = quantile(log_score_difference, probs = 0.5),
+    mean = mean(log_score_difference),
+    Q3 = quantile(log_score_difference, probs = 0.75),
+    max = max(log_score_difference)
+  ) %>%
+  ungroup() %>%
+  mutate(reduced_model_descriptor = as.character(reduced_model_descriptor)) %>%
+  mutate(reduced_model_descriptor = substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5)) %>%
+  as.data.frame()
+
 lower_cutoff <- max(ili_prediction_log_score_diffs_from_sarima_with_pred_time_covars$weighted_ili) / 3
 upper_cutoff <- 2 * lower_cutoff
 
+temp_nadir <- ili_prediction_log_score_diffs_from_sarima_with_pred_time_covars %>%
+  filter(model %in% models_used & weighted_ili <= lower_cutoff) %>%
+  group_by(reduced_model_descriptor) %>%
+  summarize(
+    min = min(log_score_difference),
+    Q1 = quantile(log_score_difference, probs = 0.25),
+    median = quantile(log_score_difference, probs = 0.5),
+    Q3 = quantile(log_score_difference, probs = 0.75),
+    max = max(log_score_difference),
+    mean = mean(log_score_difference),
+    mean_ci_lb = t.test(log_score_difference)$conf.int[1],
+    mean_ci_ub = t.test(log_score_difference)$conf.int[2]
+  ) %>%
+  ungroup() %>%
+  mutate(reduced_model_descriptor = as.character(reduced_model_descriptor)) %>%
+  mutate(reduced_model_descriptor = substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5)) %>%
+  as.data.frame()
 
-temp <- ili_prediction_log_score_diffs_from_sarima_with_pred_time_covars %>%
+temp_peak <- ili_prediction_log_score_diffs_from_sarima_with_pred_time_covars %>%
   filter(model %in% models_used & weighted_ili >= upper_cutoff) %>%
   group_by(reduced_model_descriptor) %>%
   summarize(
@@ -3004,33 +2924,64 @@ temp <- ili_prediction_log_score_diffs_from_sarima_with_pred_time_covars %>%
     mean_ci_lb = t.test(log_score_difference)$conf.int[1],
     mean_ci_ub = t.test(log_score_difference)$conf.int[2]
   ) %>%
+  ungroup() %>%
+  mutate(reduced_model_descriptor = as.character(reduced_model_descriptor)) %>%
+  mutate(reduced_model_descriptor = substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5)) %>%
   as.data.frame()
+
 for(row_num in 1:4) {
   cat(paste0("Influenza & ",
     as.character(temp[row_num, "reduced_model_descriptor"]), " & ",
     "SARIMA", " & ",
-    round(temp[row_num, "min"], 2), " & ",
-    round(temp[row_num, "Q1"], 2), " & ",
-    round(temp[row_num, "median"], 2), " & ",
-    round(temp[row_num, "Q3"], 2), " & ",
-    round(temp[row_num, "max"], 2), " & ",
-    round(temp[row_num, "mean"], 2), " (",
-    round(temp[row_num, "mean_ci_lb"], 2), ", ",
-    round(temp[row_num, "mean_ci_ub"], 2), ")",
+    "All Weeks & ",
+    format(round(temp[row_num, "min"], 2), nsmall = 2), " & ",
+    format(round(temp[row_num, "Q1"], 2), nsmall = 2), " & ",
+    format(round(temp[row_num, "median"], 2), nsmall = 2), " & ",
+    format(round(temp[row_num, "mean"], 2), nsmall = 2), " & ",
+    format(round(temp[row_num, "Q3"], 2), nsmall = 2), " & ",
+    format(round(temp[row_num, "max"], 2), nsmall = 2),
     "\\\\\n"
   ))
+  cat(paste0(" & ",
+    " & ",
+    " & ",
+    "Low Incidence & ",
+    format(round(temp_nadir[row_num, "min"], 2), nsmall = 2), " & ",
+    format(round(temp_nadir[row_num, "Q1"], 2), nsmall = 2), " & ",
+    format(round(temp_nadir[row_num, "median"], 2), nsmall = 2), " & ",
+    format(round(temp_nadir[row_num, "mean"], 2), nsmall = 2), " & ",
+    format(round(temp_nadir[row_num, "Q3"], 2), nsmall = 2), " & ",
+    format(round(temp_nadir[row_num, "max"], 2), nsmall = 2),
+    "\\\\\n"
+  ))
+  cat(paste0(" & ",
+    " & ",
+    " & ",
+    "High Incidence & ",
+    format(round(temp_peak[row_num, "min"], 2), nsmall = 2), " & ",
+    format(round(temp_peak[row_num, "Q1"], 2), nsmall = 2), " & ",
+    format(round(temp_peak[row_num, "median"], 2), nsmall = 2), " & ",
+    format(round(temp_peak[row_num, "mean"], 2), nsmall = 2), " & ",
+    format(round(temp_peak[row_num, "Q3"], 2), nsmall = 2), " & ",
+    format(round(temp_peak[row_num, "max"], 2), nsmall = 2),
+    "\\\\\n"
+  ))
+  if(row_num < 4) {
+    cat("\\cline{2-10}\n")
+  }
 }
 @
 \bottomrule
 \end{tabular}
+\flushleft
 \caption{Summaries of model performance relative to the baseline models for
-predictions of incidence in individual weeks where observed incidence in the target week was at least two thirds of the maximum weekly incidence in the test period.  Each row summarizes the log
-score differences for predictions of incidence made at all combinations of 
-target week in the test period and prediction horizon. THE CONFIDENCE INTERVALS ARE TOO NARROW/NOT CLEAR IF THEY'RE MEANINGFUL.}
+predictions of incidence in individual weeks.  Each row summarizes the log
+score differences for predictions of incidence made by one of the KCDE specifications
+and one of the baseline models.  The first row for each model pair summarizes
+results for all combinations of 
+target week in the test period and prediction horizon; the ``Low Incidence" rows summarize results
+for predictions in weeks where the observed incidence in the target week was less than one third of the maximum weekly incidence in the test period; the ``High Incidence" rows summarize results for weeks where the observed incidence was at least two thirds of the maximum weekly incidence in the test period.}
 \end{table}
-
-
-
 
 
 \begin{figure}
