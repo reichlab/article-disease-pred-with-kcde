@@ -582,7 +582,7 @@ K^{\text{inc}}_{\text{cont}}(\tilde{\bz}_{t^*}, \tilde{\bz}_{t}; \bB) = \frac{\e
 
 In this expression, $\b1$ is a column vector of ones.
 The matrix $\bB$ is a bandwidth matrix that
-controls the orientation and scale of the kernel function.  This bandwidth
+controls the orientation and scale of the kernel function.  Subtracting $\bB \b1$ in the numerator has the effect of placing the mode of the kernel function at $z_{t + h}$.  This bandwidth
 matrix is parameterized by $\btheta^h_{\text{inc}}$.  In this work we have considered
 two parameterizations: a diagonal bandwidth matrix, and a fully parameterized
 bandwidth based on the Cholesky decomposition.  To obtain the
@@ -593,7 +593,7 @@ points in the range of the discrete random variable (see supplement for details)
 We estimate the bandwidth parameters $\btheta^h$ by numerically maximizing the
 cross-validated log score of the predictive distributions for the observations
 in the training data.  For a random variable $Y$ with observed value $y$ the
-log score of the predictive distribution $f_Y$ is $log\{f_Y(y)\}$.  A larger log
+log score of the predictive distribution $f_Y$ is $\log\{f_Y(y)\}$.  A larger log
 score indicates better model performance.  In obtaining the cross-validated log score for the
 predictive distribution at time $t^*$, we leave the year
 of training data before and after the time $t^*$ out of the set $\btau$ in
@@ -706,7 +706,8 @@ bandwidth.
 There are many factors that determine the relative performance of KCDE
 estimators with different bandwidth parameterizations.  In this simulation
 study, we vary just one of these factors:
-the sample size ($N = 100$ or $N = 1000$).
+the sample size ($N = 100$ or $N = 1000$).  These sample sizes are roughly similar to
+the number of observations in the training data sets used in the applications in Section~\ref{sec:Applications} (where we have training sets of size 692 in the application to influenza and 988 in the application to dengue fever).
 
 %We simulate data from a discretized bivariate normal
 %distribution.  To define this
@@ -775,10 +776,13 @@ EpidemicPredictionInitiative2015Index}.
 
 An important feature of both of these time series is that they exhibit fairly regular seasonal trends: incidence of dengue fever usually reaches a peak during the summer months and a nadir during the winter months, while influenza typically peaks during the winter and reaches a nadir during the summer months.  For the purposes of making predictions of seasonal targets with the dengue data, we have used the definition of a season used by the competition administrators: the season begins in the week starting on April 29th or April 30th (depending on the year); historically, this has been the week of the year with lowest dengue incidence.  For the influenza data, we define the season as beginning in the 30th week of the year; which is the week starting on July 29th or July 30th.  Again, historically the lowest incidence of influenza has tended to occur near that time.
 
-We divided each data set into two subsets.  The first period is used as a training set in
-estimating the model parameters.  The last four years of each data set are
-reserved as a test set for evaluating model performance, as was chosen by
-the competition administrators.  All predictions are made as though in real time, assuming that
+We divided each data set into two subsets.  The last four years of each data set are
+reserved as a test set for evaluating model performance.  The size of the test set was determined by
+the dengue prediction competition administrators.  In the influenza data set, the last four years of data included
+only observations for three full seasons.  The first period is used as a training set in
+estimating the model parameters.  For the influenza data, we had 14 years of training data (1997 through 2010);
+for the dengue data, we had 19 seasons of training data (1990/1991 through 2008/2009).
+All predictions are made as though in real time, assuming that
 once cases are reported they are never revised and that there are no delays in
 reporting.  Specifically, we use only data up through a given week to
 make predictions for incidence after that week.
@@ -1171,16 +1175,8 @@ kcde_hhh4_max <- max(
 
 For predictions of incidence in individual weeks in the application to dengue,
 the KCDE specifications performed similarly to the baseline models near the season nadir but 
-%outperformed the baseline models during periods of high incidence near the season peaks.
-%We chose the Periodic, Full Bandwidth KCDE specification as the best-performing KCDE specification for further comparison.
-%The Periodic, Full Bandwidth KCDE model particularly
-% Figure~\ref{fig:DengueLogScoreDiffVsReportedCasesCombined} offers a more
-% quantitative view of the results for the Periodic, Full Bandwidth KCDE model
-% in the application to dengue fever in terms of differences in log scores from
-% the baseline models.
-% The figure shows that 
 outperformed the baseline models in predictions for times of high incidence near
-the season peaks (Figure~\ref{fig:DengueLogScoreDiffVsReportedCasesCombined}
+the season peaks (Table~\ref{tbl:IndWeeksIncidenceResults}, Figure~\ref{fig:DengueLogScoreDiffVsReportedCasesCombined}
 and Supplemental Figures 6 through 8).
 For example, in weeks with fewer than 93 reported cases (roughly one third of
 the maximum weekly case count in the testing period), the median log score
@@ -1765,6 +1761,118 @@ combined_peak_incidence_diffs_from_equal <- rbind.fill(
 #)
 @
 
+
+
+<<PeakTimingLogScoreDifferencesFromEqual, echo = FALSE>>=
+dengue_peak_timing_log_score_diffs_from_equal_wide <- dengue_peak_week_results %>%
+    select(full_model_descriptor, analysis_time_season, analysis_time_season_week, peak_week_log_score) %>%
+    spread(full_model_descriptor, peak_week_log_score)
+
+dengue_peak_timing_log_score_diffs_from_equal_wide[, unique(dengue_peak_week_results$full_model_descriptor)] <-
+    dengue_peak_timing_log_score_diffs_from_equal_wide[, unique(dengue_peak_week_results$full_model_descriptor)] -
+    dengue_peak_timing_log_score_diffs_from_equal_wide[, "Equal Bin Probabilities"]
+
+dengue_peak_timing_log_score_diffs_from_equal_long <- dengue_peak_timing_log_score_diffs_from_equal_wide %>%
+    gather_("model", "log_score_difference", unique(dengue_prediction_results$full_model_descriptor)) %>%
+    mutate(
+        seasonal_lag = grepl("seasonal_lag_1", model),
+        differencing = grepl("differencing_TRUE", model),
+        periodic = grepl("periodic_TRUE", model),
+        bw_full = grepl("bw_full", model)
+    )
+dengue_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor <- "Null KCDE"
+dengue_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    dengue_peak_timing_log_score_diffs_from_equal_long$periodic & !dengue_peak_timing_log_score_diffs_from_equal_long$bw_full] <-
+    "Periodic KCDE"
+dengue_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    !dengue_peak_timing_log_score_diffs_from_equal_long$periodic & dengue_peak_timing_log_score_diffs_from_equal_long$bw_full] <-
+    "Full Bandwidth KCDE"
+dengue_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    dengue_peak_timing_log_score_diffs_from_equal_long$periodic & dengue_peak_timing_log_score_diffs_from_equal_long$bw_full] <-
+    "Periodic, Full Bandwidth KCDE"
+dengue_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    dengue_peak_timing_log_score_diffs_from_equal_long$model == "HHH4-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+] <- "HHH4"
+dengue_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    dengue_peak_timing_log_score_diffs_from_equal_long$model == "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+] <- "SARIMA"
+dengue_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor <-
+    factor(dengue_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor,
+        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE", "HHH4", "SARIMA"))
+
+dengue_peak_timing_log_score_diffs_from_equal_long$before_peak_week <- FALSE
+for(season in unique(dengue_peak_timing_log_score_diffs_from_equal_long$analysis_time_season)) {
+    dengue_peak_timing_log_score_diffs_from_equal_long$before_peak_week[
+        dengue_peak_timing_log_score_diffs_from_equal_long$analysis_time_season == season &
+            dengue_peak_timing_log_score_diffs_from_equal_long$analysis_time_season_week <
+            dengue_peak_week_times$peak_week[dengue_peak_week_times$analysis_time_season == season]
+    ] <- TRUE
+}
+
+
+
+ili_peak_timing_log_score_diffs_from_equal_wide <- ili_peak_week_results %>%
+    select(full_model_descriptor, analysis_time_season, analysis_time_season_week, peak_week_log_score) %>%
+    spread(full_model_descriptor, peak_week_log_score)
+
+ili_peak_timing_log_score_diffs_from_equal_wide[, unique(ili_peak_week_results$full_model_descriptor)] <-
+    ili_peak_timing_log_score_diffs_from_equal_wide[, unique(ili_peak_week_results$full_model_descriptor)] -
+    ili_peak_timing_log_score_diffs_from_equal_wide[, "Equal Bin Probabilities"]
+
+ili_peak_timing_log_score_diffs_from_equal_long <- ili_peak_timing_log_score_diffs_from_equal_wide %>%
+    gather_("model", "log_score_difference", unique(ili_prediction_results$full_model_descriptor)) %>%
+    mutate(
+        seasonal_lag = grepl("seasonal_lag_1", model),
+        differencing = grepl("differencing_TRUE", model),
+        periodic = grepl("periodic_TRUE", model),
+        bw_full = grepl("bw_full", model)
+    )
+ili_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor <- "Null KCDE"
+ili_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    ili_peak_timing_log_score_diffs_from_equal_long$periodic & !ili_peak_timing_log_score_diffs_from_equal_long$bw_full] <-
+    "Periodic KCDE"
+ili_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    !ili_peak_timing_log_score_diffs_from_equal_long$periodic & ili_peak_timing_log_score_diffs_from_equal_long$bw_full] <-
+    "Full Bandwidth KCDE"
+ili_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    ili_peak_timing_log_score_diffs_from_equal_long$periodic & ili_peak_timing_log_score_diffs_from_equal_long$bw_full] <-
+    "Periodic, Full Bandwidth KCDE"
+ili_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    ili_peak_timing_log_score_diffs_from_equal_long$model == "HHH4-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+] <- "HHH4"
+ili_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor[
+    ili_peak_timing_log_score_diffs_from_equal_long$model == "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+] <- "SARIMA"
+ili_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor <-
+    factor(ili_peak_timing_log_score_diffs_from_equal_long$reduced_model_descriptor,
+        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE", "HHH4", "SARIMA"))
+
+ili_peak_timing_log_score_diffs_from_equal_long$before_peak_week <- FALSE
+for(season in unique(ili_peak_timing_log_score_diffs_from_equal_long$analysis_time_season)) {
+    ili_peak_timing_log_score_diffs_from_equal_long$before_peak_week[
+        ili_peak_timing_log_score_diffs_from_equal_long$analysis_time_season == season &
+            ili_peak_timing_log_score_diffs_from_equal_long$analysis_time_season_week <
+            ili_peak_week_times$peak_week[ili_peak_week_times$analysis_time_season == season]
+    ] <- TRUE
+}
+
+
+
+combined_peak_timing_diffs_from_equal <- rbind.fill(
+        ili_peak_timing_log_score_diffs_from_equal_long[ili_peak_timing_log_score_diffs_from_equal_long$before_peak_week, ],
+        dengue_peak_timing_log_score_diffs_from_equal_long[dengue_peak_timing_log_score_diffs_from_equal_long$before_peak_week, ]
+    )
+#peak_timing_log_score_diffs_from_equal_means <- tapply(
+#    combined_peak_timing_diffs_from_equal$log_score_difference,
+#    combined_peak_timing_diffs_from_equal[, c("reduced_model_descriptor", "data_set_and_season")],
+#    mean
+#)
+#peak_timing_log_score_diffs_from_equal_sds <- tapply(
+#    combined_peak_timing_diffs_from_equal$log_score_difference,
+#    combined_peak_timing_diffs_from_equal[, c("reduced_model_descriptor", "data_set_and_season")],
+#    sd
+#)
+@
 
 KCDE offered more consistent performance than the baseline methods for
 predictions of the timing of the peak week and incidence in the peak week
@@ -2628,9 +2736,7 @@ distribution for incidence in the given week.  The interval prediction is a perc
 \end{figure}
 
 
-\begin{figure}
-<<FluDataResultsAggregatedBoxplots, echo = FALSE, fig.height = 8.4, dev = "postscript">>=
-
+<<CalcLogScoreDiffs, echo = FALSE, fig.height = 8.4, dev = "postscript">>=
 models_used <- c(
     unique(ili_prediction_results$full_model_descriptor[
     !ili_prediction_results$differencing & !(ili_prediction_results$max_seasonal_lag == 1)])
@@ -2650,63 +2756,7 @@ color_palette <- c("#D55E00", "#56B4E9")
 sarima_mean_differences_df <- combined_prediction_log_score_diffs_from_sarima_long[combined_prediction_log_score_diffs_from_sarima_long$model %in% models_used, ] %>%
     group_by(reduced_model_descriptor, data_set) %>%
     summarize(mean_log_score_difference = mean(log_score_difference))
-
-boxplot_sarima_contrasts <- ggplot() +
-    geom_hline(yintercept = 0) +
-    geom_boxplot(aes(y = log_score_difference, x = reduced_model_descriptor, colour = data_set),
-        data = combined_prediction_log_score_diffs_from_sarima_long[combined_prediction_log_score_diffs_from_sarima_long$model %in% models_used, ]) +
-    geom_point(aes(y = mean_log_score_difference,
-      x = reduced_model_descriptor,
-      colour = data_set),
-      size = 4, shape = 3, position = position_dodge(width = 0.75),
-      data = sarima_mean_differences_df) +
-    ylim(c(-3, 7.5)) +
-    scale_colour_manual("Data Set", values = color_palette) +
-    scale_x_discrete(labels = c("Periodic, Full Bandwidth KCDE" = "Periodic, Full Bandwidth\nKCDE")) +
-    ggtitle("(a) Comparison of KCDE with SARIMA") +
-    xlab("") +
-    ylab("Log Score Difference") +
-    theme_bw(base_size = 11)# +
-
-hhh4_mean_differences_df <- dengue_prediction_log_score_diffs_from_hhh4_long[dengue_prediction_log_score_diffs_from_hhh4_long$model %in% models_used, ] %>%
-    group_by(reduced_model_descriptor, data_set) %>%
-    summarize(mean_log_score_difference = mean(log_score_difference))
-
-boxplot_hhh4_contrasts <- ggplot() +
-    geom_hline(yintercept = 0) +
-    geom_boxplot(aes(y = log_score_difference, x = reduced_model_descriptor, colour = data_set),
-        data = dengue_prediction_log_score_diffs_from_hhh4_long[dengue_prediction_log_score_diffs_from_hhh4_long$model %in% models_used, ]) +
-    geom_point(aes(y = mean_log_score_difference,
-      x = reduced_model_descriptor,
-      colour = data_set),
-      size = 4, shape = 3, position = position_dodge(width = 0.75),
-      data = hhh4_mean_differences_df) +
-    ylim(c(-3, 7.5)) +
-    scale_colour_manual("Data Set", values = color_palette) +
-    scale_x_discrete(labels = c("Periodic, Full Bandwidth KCDE" = "Periodic, Full Bandwidth\nKCDE")) +
-    ggtitle("(b) Comparison of KCDE with HHH4") +
-    xlab("") +
-    ylab("Log Score Difference") +
-    theme_bw(base_size = 11)# +
-
-
-grid.newpage()
-pushViewport(viewport(layout = grid.layout(nrow = 2, ncol = 1,
-            heights = unit(c(1, 1), c("null", "null")),
-            widths = unit(c(1), c("null")))))
-suppressWarnings(print(boxplot_sarima_contrasts, vp = viewport(layout.pos.row = 1, layout.pos.col = 1)))
-suppressWarnings(print(boxplot_hhh4_contrasts, vp = viewport(layout.pos.row = 2, layout.pos.col = 1)))
 @
-\caption{Differences in log scores for the weekly predictive distributions
-obtained from KCDE specifications and the baseline models.  For reference, a log score
-difference of 2.3 (4.6) indicates that the predictive density from KCDE was about 10 (100)
-times as large as the predictive density from the baseline model at the realized outcome. 
-The boxplots summarize the results across all combinations of prediction horizon
-and prediction time in the test period.
-}
-\label{fig:AggregatedFluResultsBoxPlots}
-\end{figure}
-
 
 
 \begin{figure}
@@ -2738,9 +2788,37 @@ scatterplot_dengue_diff_from_baseline_by_obs_cases <- ggplot() +
     xlab("Reported Dengue Cases in Prediction Target Week") +
     ylab("Log Score Difference") +
     ggtitle("Comparison of Periodic, Full Bandwidth KCDE Model and Baseline Models\nvs. Reported Dengue Cases in Prediction Target Week") +
-    theme_bw(base_size = 11)
+    theme_bw(base_size = 11) +
+    theme(plot.margin = unit(c(6, 2, 6, 2), "mm"))
 
-print(scatterplot_dengue_diff_from_baseline_by_obs_cases)
+legend_grob <- get_legend_grob(scatterplot_dengue_diff_from_baseline_by_obs_cases)
+scatterplot_dengue_diff_from_baseline_by_obs_cases <-
+    scatterplot_dengue_diff_from_baseline_by_obs_cases +
+    theme(legend.position = "none")
+
+densityplot_dengue_cases <- ggplot() +
+    geom_density(aes(x = total_cases, colour = season, shape = season),
+        data = dengue_prediction_log_score_diffs_from_baseline[
+          dengue_prediction_log_score_diffs_from_baseline$model == "KCDE-seasonal_lag_0-differencing_FALSE-periodic_TRUE-bw_full" & 
+          dengue_prediction_log_score_diffs_from_baseline$prediction_horizon == 1L, ]) +
+    scale_colour_manual("Season", values = color_palette) +
+    xlab("Reported Dengue Cases in Prediction Target Week") +
+    ylab("Density") +
+    theme_bw() +
+    theme(legend.position = "none")
+
+
+grid.newpage()
+pushViewport(viewport(layout = grid.layout(nrow = 2, ncol = 2,
+            heights = unit(c(3, 1), c("null", "null")),
+            widths = unit(c(4, 1), c("null", "null")))))
+print(scatterplot_dengue_diff_from_baseline_by_obs_cases,
+  vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
+print(densityplot_dengue_cases, vp = viewport(layout.pos.row = 2, layout.pos.col = 1))
+
+pushViewport(viewport(layout.pos.row = 1:2, layout.pos.col = 2))
+grid.draw(legend_grob)
+upViewport()
 @
 \caption{Differences in log scores for the weekly predictive distributions
 obtained from the Periodic, Full Bandwidth KCDE model and the baseline
@@ -2756,144 +2834,674 @@ prediction horizon.
 
 
 \begin{table}[hp]
-\begin{tabular}{llllllllll}
+\begin{tabular}{lllllllll}
 \toprule
-         &                    &          &              &    \multicolumn{6}{c}{Summary of Log Score Differences} \\
-\cline{5-10}
- Disease & KCDE Specification & Baseline & Subset & Min & Q1 & Q2 & Mean & Q3 & Max \\ 
+         &          &              &    \multicolumn{6}{c}{Summary of Log Score Differences} \\
+\cline{4-9}
+ Disease & Subset & Model & Min & Q1 & Q2 & Mean & Q3 & Max \\ 
   \hline
-<<PerformanceSummaryTable, echo = FALSE, results = "asis">>=
-#difference ~ N(mean_difference_model_pair, rho^(target time difference) * phi^(analysis time difference))???
+<<PerformanceSummaryTableIndividualWeeksAbsolute, echo = FALSE, results = "asis">>=
+ili_prediction_results <- ili_prediction_results %>%
+    mutate(
+        periodic = grepl("periodic_TRUE", full_model_descriptor),
+        bw_full = grepl("bw_full", full_model_descriptor)
+    )
+ili_prediction_results$reduced_model_descriptor <- "Null KCDE"
+ili_prediction_results$reduced_model_descriptor[
+    ili_prediction_results$periodic & !ili_prediction_results$bw_full] <-
+    "Periodic KCDE"
+ili_prediction_results$reduced_model_descriptor[
+    !ili_prediction_results$periodic & ili_prediction_results$bw_full] <-
+    "Full Bandwidth KCDE"
+ili_prediction_results$reduced_model_descriptor[
+    ili_prediction_results$periodic & ili_prediction_results$bw_full] <-
+    "Periodic, Full Bandwidth KCDE"
+ili_prediction_results$reduced_model_descriptor[
+    ili_prediction_results$full_model_descriptor == "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+] <- "SARIMA"
+ili_prediction_results$reduced_model_descriptor <-
+    factor(ili_prediction_results$reduced_model_descriptor,
+        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE", "SARIMA"))
 
-temp <- dengue_prediction_log_score_diffs_from_baseline %>%
-  filter(model %in% models_used) %>%
-  group_by(reduced_model_descriptor, baseline_model) %>%
+temp <- ili_national[, c("time", "weighted_ili")]
+colnames(temp) <- c("prediction_time", "weighted_ili")
+
+ili_prediction_results <-
+  ili_prediction_results %>%
+  left_join(temp, by = "prediction_time", copy = TRUE)
+
+dengue_prediction_results <- dengue_prediction_results %>%
+    mutate(
+        periodic = grepl("periodic_TRUE", full_model_descriptor),
+        bw_full = grepl("bw_full", full_model_descriptor)
+    )
+dengue_prediction_results$reduced_model_descriptor <- "Null KCDE"
+dengue_prediction_results$reduced_model_descriptor[
+    dengue_prediction_results$periodic & !dengue_prediction_results$bw_full] <-
+    "Periodic KCDE"
+dengue_prediction_results$reduced_model_descriptor[
+    !dengue_prediction_results$periodic & dengue_prediction_results$bw_full] <-
+    "Full Bandwidth KCDE"
+dengue_prediction_results$reduced_model_descriptor[
+    dengue_prediction_results$periodic & dengue_prediction_results$bw_full] <-
+    "Periodic, Full Bandwidth KCDE"
+dengue_prediction_results$reduced_model_descriptor[
+    dengue_prediction_results$full_model_descriptor == "SARIMA-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+] <- "SARIMA"
+dengue_prediction_results$reduced_model_descriptor[
+    dengue_prediction_results$full_model_descriptor == "HHH4-seasonal_lag_NA-differencing_NA-periodic_NA-bw_NA"
+] <- "HHH4"
+dengue_prediction_results$reduced_model_descriptor <-
+    factor(dengue_prediction_results$reduced_model_descriptor,
+        levels = c("Null KCDE", "Full Bandwidth KCDE", "Periodic KCDE", "Periodic, Full Bandwidth KCDE", "HHH4", "SARIMA"))
+
+temp <- dengue_sj[, c("time", "total_cases")]
+colnames(temp) <- c("prediction_time", "total_cases")
+
+dengue_prediction_results <-
+    dengue_prediction_results %>%
+    left_join(temp, by = "prediction_time", copy = TRUE)
+
+temp <- dengue_prediction_results %>%
+  group_by(reduced_model_descriptor) %>%
   summarize(
-    min = min(log_score_difference),
-    Q1 = quantile(log_score_difference, probs = 0.25),
-    median = quantile(log_score_difference, probs = 0.5),
-    Q3 = quantile(log_score_difference, probs = 0.75),
-    max = max(log_score_difference),
-    mean = mean(log_score_difference)
+    min = min(log_score),
+    Q1 = quantile(log_score, probs = 0.25),
+    median = quantile(log_score, probs = 0.5),
+    Q3 = quantile(log_score, probs = 0.75),
+    max = max(log_score),
+    mean = mean(log_score)
   ) %>%
   ungroup() %>%
   mutate(reduced_model_descriptor = as.character(reduced_model_descriptor)) %>%
-  mutate(reduced_model_descriptor = substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5)) %>%
+  # mutate(reduced_model_descriptor = 
+  #   ifelse(reduced_model_descriptor %in% c("HHH4", "SARIMA"),
+  #     reduced_model_descriptor,
+  #     substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5))) %>%
   as.data.frame()
 
-lower_cutoff <- max(dengue_prediction_log_score_diffs_from_sarima_long_with_pred_time_covars$total_cases) / 3
+lower_cutoff <- max(dengue_prediction_results$total_cases) / 3
 upper_cutoff <- 2 * lower_cutoff
 
-temp_nadir <- dengue_prediction_log_score_diffs_from_baseline %>%
-  filter(model %in% models_used & total_cases <= lower_cutoff) %>%
-  group_by(reduced_model_descriptor, baseline_model) %>%
+temp_nadir <- dengue_prediction_results %>%
+  filter(total_cases <= lower_cutoff) %>%
+  group_by(reduced_model_descriptor) %>%
   summarize(
-    min = min(log_score_difference),
-    Q1 = quantile(log_score_difference, probs = 0.25),
-    median = quantile(log_score_difference, probs = 0.5),
-    Q3 = quantile(log_score_difference, probs = 0.75),
-    max = max(log_score_difference),
-    mean = mean(log_score_difference)
+    min = min(log_score),
+    Q1 = quantile(log_score, probs = 0.25),
+    median = quantile(log_score, probs = 0.5),
+    Q3 = quantile(log_score, probs = 0.75),
+    max = max(log_score),
+    mean = mean(log_score)
   ) %>%
   ungroup() %>%
   mutate(reduced_model_descriptor = as.character(reduced_model_descriptor)) %>%
-  mutate(week_type = "Low Incidence",
-    reduced_model_descriptor = substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5)) %>%
+  # mutate(week_type = "Low Incidence",
+  #   reduced_model_descriptor = substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5)) %>%
   as.data.frame()
 
-lower_cutoff <- max(dengue_prediction_log_score_diffs_from_sarima_long_with_pred_time_covars$total_cases) / 3
-upper_cutoff <- 2 * lower_cutoff
-
-temp_peak <- dengue_prediction_log_score_diffs_from_baseline %>%
-  filter(model %in% models_used & total_cases >= upper_cutoff) %>%
-  group_by(reduced_model_descriptor, baseline_model) %>%
+temp_peak <- dengue_prediction_results %>%
+  filter(total_cases >= upper_cutoff) %>%
+  group_by(reduced_model_descriptor) %>%
   summarize(
-    min = min(log_score_difference),
-    Q1 = quantile(log_score_difference, probs = 0.25),
-    median = quantile(log_score_difference, probs = 0.5),
-    Q3 = quantile(log_score_difference, probs = 0.75),
-    max = max(log_score_difference),
-    mean = mean(log_score_difference),
-    mean_ci_lb = t.test(log_score_difference)$conf.int[1],
-    mean_ci_ub = t.test(log_score_difference)$conf.int[2]
+    min = min(log_score),
+    Q1 = quantile(log_score, probs = 0.25),
+    median = quantile(log_score, probs = 0.5),
+    Q3 = quantile(log_score, probs = 0.75),
+    max = max(log_score),
+    mean = mean(log_score)
   ) %>%
   ungroup() %>%
   mutate(reduced_model_descriptor = as.character(reduced_model_descriptor)) %>%
-  mutate(week_type = "High Incidence",
-    reduced_model_descriptor = substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5)) %>%
+  # mutate(week_type = "Low Incidence",
+  #   reduced_model_descriptor = substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5)) %>%
   as.data.frame()
 
-for(row_num in 1:8) {
-  cat(paste0("Dengue & ",
-    as.character(temp[row_num, "reduced_model_descriptor"]), " & ",
-    temp[row_num, "baseline_model"], " & ",
-    "All Weeks & ",
-    format(round(temp[row_num, "min"], 2), nsmall = 2), " & ",
-    format(round(temp[row_num, "Q1"], 2), nsmall = 2), " & ",
-    format(round(temp[row_num, "median"], 2), nsmall = 2), " & ",
-    format(round(temp[row_num, "mean"], 2), nsmall = 2), " & ",
-    format(round(temp[row_num, "Q3"], 2), nsmall = 2), " & ",
+max_row <- which.max(temp$mean)
+min_row <- which.min(temp$min)
+
+for(row_num in 1:6) {
+  if(identical(row_num, 1L)) {
+    cat("Dengue & All Weeks & ")
+  } else {
+    cat(" &  & ")
+  }
+  if(identical(row_num, max_row)) {
+    row_open_string <- max_open_string <- "\\textbf{"
+    row_close_string <- max_close_string <- "}"
+  } else {
+    row_open_string <- max_open_string <- ""
+    row_close_string <- max_close_string <- ""
+  }
+  if(identical(row_num, min_row)) {
+    min_open_string <- "\\underline{\\emph{"
+    min_close_string <- "}}"
+    row_open_string <- paste0(row_open_string, "\\underline{\\emph{")
+    row_close_string <- paste0(row_close_string, "}}")
+  } else {
+    min_open_string <- ""
+    min_close_string <- ""
+    row_open_string <- row_open_string
+    row_close_string <- row_close_string
+  }
+  cat(paste0(
+    row_open_string,
+    as.character(temp[row_num, "reduced_model_descriptor"]),
+    row_close_string,
+    " & ",
+    min_open_string,
+    format(round(temp[row_num, "min"], 2), nsmall = 2),
+    min_close_string,
+    " & ",
+    format(round(temp[row_num, "Q1"], 2), nsmall = 2),
+    " & ",
+    format(round(temp[row_num, "median"], 2), nsmall = 2),
+    " & ",
+    max_open_string,
+    format(round(temp[row_num, "mean"], 2), nsmall = 2),
+    max_close_string,
+    " & ",
+    format(round(temp[row_num, "Q3"], 2), nsmall = 2),
+    " & ",
     format(round(temp[row_num, "max"], 2), nsmall = 2),
     "\\\\\n"
   ))
-  cat(paste0(" & ",
+}
+
+cat("\\cline{2-9}\n")
+
+max_row <- which.max(temp_nadir$mean)
+min_row <- which.min(temp_nadir$min)
+
+for(row_num in 1:6) {
+  if(identical(row_num, 1L)) {
+    cat(" & Low Incidence & ")
+  } else {
+    cat(" &  & ")
+  }
+  if(identical(row_num, max_row)) {
+    row_open_string <- max_open_string <- "\\textbf{"
+    row_close_string <- max_close_string <- "}"
+  } else {
+    row_open_string <- max_open_string <- ""
+    row_close_string <- max_close_string <- ""
+  }
+  if(identical(row_num, min_row)) {
+    min_open_string <- "\\underline{\\emph{"
+    min_close_string <- "}}"
+    row_open_string <- paste0(row_open_string, "\\underline{\\emph{")
+    row_close_string <- paste0(row_close_string, "}}")
+  } else {
+    min_open_string <- ""
+    min_close_string <- ""
+    row_open_string <- row_open_string
+    row_close_string <- row_close_string
+  }
+  cat(paste0(
+    row_open_string,
+    as.character(temp_nadir[row_num, "reduced_model_descriptor"]),
+    row_close_string,
     " & ",
+    min_open_string,
+    format(round(temp_nadir[row_num, "min"], 2), nsmall = 2),
+    min_close_string,
     " & ",
-    "Low Incidence & ",
-    format(round(temp_nadir[row_num, "min"], 2), nsmall = 2), " & ",
-    format(round(temp_nadir[row_num, "Q1"], 2), nsmall = 2), " & ",
-    format(round(temp_nadir[row_num, "median"], 2), nsmall = 2), " & ",
-    format(round(temp_nadir[row_num, "mean"], 2), nsmall = 2), " & ",
-    format(round(temp_nadir[row_num, "Q3"], 2), nsmall = 2), " & ",
+    format(round(temp_nadir[row_num, "Q1"], 2), nsmall = 2),
+    " & ",
+    format(round(temp_nadir[row_num, "median"], 2), nsmall = 2),
+    " & ",
+    max_open_string,
+    format(round(temp_nadir[row_num, "mean"], 2), nsmall = 2),
+    max_close_string,
+    " & ",
+    format(round(temp_nadir[row_num, "Q3"], 2), nsmall = 2),
+    " & ",
     format(round(temp_nadir[row_num, "max"], 2), nsmall = 2),
     "\\\\\n"
   ))
-  cat(paste0(" & ",
+}
+
+cat("\\cline{2-9}\n")
+
+max_row <- which.max(temp_peak$mean)
+min_row <- which.min(temp_peak$min)
+
+for(row_num in 1:6) {
+  if(identical(row_num, 1L)) {
+    cat(" & High Incidence & ")
+  } else {
+    cat(" &  & ")
+  }
+  if(identical(row_num, max_row)) {
+    row_open_string <- max_open_string <- "\\textbf{"
+    row_close_string <- max_close_string <- "}"
+  } else {
+    row_open_string <- max_open_string <- ""
+    row_close_string <- max_close_string <- ""
+  }
+  if(identical(row_num, min_row)) {
+    min_open_string <- "\\underline{\\emph{"
+    min_close_string <- "}}"
+    row_open_string <- paste0(row_open_string, "\\underline{\\emph{")
+    row_close_string <- paste0(row_close_string, "}}")
+  } else {
+    min_open_string <- ""
+    min_close_string <- ""
+    row_open_string <- row_open_string
+    row_close_string <- row_close_string
+  }
+  
+  cat(paste0(
+    row_open_string,
+    as.character(temp_peak[row_num, "reduced_model_descriptor"]),
+    row_close_string,
     " & ",
+    min_open_string,
+    format(round(temp_peak[row_num, "min"], 2), nsmall = 2),
+    min_close_string,
     " & ",
-    "High Incidence & ",
-    format(round(temp_peak[row_num, "min"], 2), nsmall = 2), " & ",
-    format(round(temp_peak[row_num, "Q1"], 2), nsmall = 2), " & ",
-    format(round(temp_peak[row_num, "median"], 2), nsmall = 2), " & ",
-    format(round(temp_peak[row_num, "mean"], 2), nsmall = 2), " & ",
-    format(round(temp_peak[row_num, "Q3"], 2), nsmall = 2), " & ",
+    format(round(temp_peak[row_num, "Q1"], 2), nsmall = 2),
+    " & ",
+    format(round(temp_peak[row_num, "median"], 2), nsmall = 2),
+    " & ",
+    max_open_string,
+    format(round(temp_peak[row_num, "mean"], 2), nsmall = 2),
+    max_close_string,
+    " & ",
+    format(round(temp_peak[row_num, "Q3"], 2), nsmall = 2),
+    " & ",
     format(round(temp_peak[row_num, "max"], 2), nsmall = 2),
     "\\\\\n"
   ))
-  if(row_num < 8) {
-    cat("\\cline{2-10}\n")
+}
+
+cat("\\midrule\n");
+
+
+temp <- ili_prediction_results %>%
+  group_by(reduced_model_descriptor) %>%
+  summarize(
+    min = min(log_score),
+    Q1 = quantile(log_score, probs = 0.25),
+    median = quantile(log_score, probs = 0.5),
+    mean = mean(log_score),
+    Q3 = quantile(log_score, probs = 0.75),
+    max = max(log_score)
+  ) %>%
+  ungroup() %>%
+  mutate(reduced_model_descriptor = as.character(reduced_model_descriptor)) %>%
+  # mutate(reduced_model_descriptor = substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5)) %>%
+  as.data.frame()
+
+lower_cutoff <- max(ili_prediction_results$weighted_ili) / 3
+upper_cutoff <- 2 * lower_cutoff
+
+temp_nadir <- ili_prediction_results %>%
+  filter(weighted_ili <= lower_cutoff) %>%
+  group_by(reduced_model_descriptor) %>%
+  summarize(
+    min = min(log_score),
+    Q1 = quantile(log_score, probs = 0.25),
+    median = quantile(log_score, probs = 0.5),
+    Q3 = quantile(log_score, probs = 0.75),
+    max = max(log_score),
+    mean = mean(log_score)
+  ) %>%
+  ungroup() %>%
+  mutate(reduced_model_descriptor = as.character(reduced_model_descriptor)) %>%
+  # mutate(reduced_model_descriptor = substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5)) %>%
+  as.data.frame()
+
+temp_peak <- ili_prediction_results %>%
+  filter(weighted_ili >= upper_cutoff) %>%
+  group_by(reduced_model_descriptor) %>%
+  summarize(
+    min = min(log_score),
+    Q1 = quantile(log_score, probs = 0.25),
+    median = quantile(log_score, probs = 0.5),
+    Q3 = quantile(log_score, probs = 0.75),
+    max = max(log_score),
+    mean = mean(log_score)
+  ) %>%
+  ungroup() %>%
+  mutate(reduced_model_descriptor = as.character(reduced_model_descriptor)) %>%
+  # mutate(reduced_model_descriptor = substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5)) %>%
+  as.data.frame()
+
+max_row <- which.max(temp$mean)
+min_row <- which.min(temp$min)
+
+for(row_num in 1:5) {
+  if(identical(row_num, 1L)) {
+    cat("Influenza & All Weeks & ")
+  } else {
+    cat(" &  & ")
   }
+  if(identical(row_num, max_row)) {
+    row_open_string <- max_open_string <- "\\textbf{"
+    row_close_string <- max_close_string <- "}"
+  } else {
+    row_open_string <- max_open_string <- ""
+    row_close_string <- max_close_string <- ""
+  }
+  if(identical(row_num, min_row)) {
+    min_open_string <- "\\underline{\\emph{"
+    min_close_string <- "}}"
+    row_open_string <- paste0(row_open_string, "\\underline{\\emph{")
+    row_close_string <- paste0(row_close_string, "}}")
+  } else {
+    min_open_string <- ""
+    min_close_string <- ""
+    row_open_string <- row_open_string
+    row_close_string <- row_close_string
+  }
+  cat(paste0(
+    row_open_string,
+    as.character(temp[row_num, "reduced_model_descriptor"]),
+    row_close_string,
+    " & ",
+    min_open_string,
+    format(round(temp[row_num, "min"], 2), nsmall = 2),
+    min_close_string,
+    " & ",
+    format(round(temp[row_num, "Q1"], 2), nsmall = 2),
+    " & ",
+    format(round(temp[row_num, "median"], 2), nsmall = 2),
+    " & ",
+    max_open_string,
+    format(round(temp[row_num, "mean"], 2), nsmall = 2),
+    max_close_string,
+    " & ",
+    format(round(temp[row_num, "Q3"], 2), nsmall = 2),
+    " & ",
+    format(round(temp[row_num, "max"], 2), nsmall = 2),
+    "\\\\\n"
+  ))
+}
+
+cat("\\cline{2-9}\n")
+
+max_row <- which.max(temp_nadir$mean)
+min_row <- which.min(temp_nadir$min)
+
+for(row_num in 1:5) {
+  if(identical(row_num, 1L)) {
+    cat(" & Low Incidence & ")
+  } else {
+    cat(" &  & ")
+  }
+  if(identical(row_num, max_row)) {
+    row_open_string <- max_open_string <- "\\textbf{"
+    row_close_string <- max_close_string <- "}"
+  } else {
+    row_open_string <- max_open_string <- ""
+    row_close_string <- max_close_string <- ""
+  }
+  if(identical(row_num, min_row)) {
+    min_open_string <- "\\underline{\\emph{"
+    min_close_string <- "}}"
+    row_open_string <- paste0(row_open_string, "\\underline{\\emph{")
+    row_close_string <- paste0(row_close_string, "}}")
+  } else {
+    min_open_string <- ""
+    min_close_string <- ""
+    row_open_string <- row_open_string
+    row_close_string <- row_close_string
+  }
+  cat(paste0(
+    row_open_string,
+    as.character(temp_nadir[row_num, "reduced_model_descriptor"]),
+    row_close_string,
+    " & ",
+    min_open_string,
+    format(round(temp_nadir[row_num, "min"], 2), nsmall = 2),
+    min_close_string,
+    " & ",
+    format(round(temp_nadir[row_num, "Q1"], 2), nsmall = 2),
+    " & ",
+    format(round(temp_nadir[row_num, "median"], 2), nsmall = 2),
+    " & ",
+    max_open_string,
+    format(round(temp_nadir[row_num, "mean"], 2), nsmall = 2),
+    max_close_string,
+    " & ",
+    format(round(temp_nadir[row_num, "Q3"], 2), nsmall = 2),
+    " & ",
+    format(round(temp_nadir[row_num, "max"], 2), nsmall = 2),
+    "\\\\\n"
+  ))
+}
+
+cat("\\cline{2-9}\n")
+
+max_row <- which.max(temp_peak$mean)
+min_row <- which.min(temp_peak$min)
+
+for(row_num in 1:5) {
+  if(identical(row_num, 1L)) {
+    cat(" & High Incidence & ")
+  } else {
+    cat(" &  & ")
+  }
+  if(identical(row_num, max_row)) {
+    row_open_string <- max_open_string <- "\\textbf{"
+    row_close_string <- max_close_string <- "}"
+  } else {
+    row_open_string <- max_open_string <- ""
+    row_close_string <- max_close_string <- ""
+  }
+  if(identical(row_num, min_row)) {
+    min_open_string <- "\\underline{\\emph{"
+    min_close_string <- "}}"
+    row_open_string <- paste0(row_open_string, "\\underline{\\emph{")
+    row_close_string <- paste0(row_close_string, "}}")
+  } else {
+    min_open_string <- ""
+    min_close_string <- ""
+    row_open_string <- row_open_string
+    row_close_string <- row_close_string
+  }
+  
+  cat(paste0(
+    row_open_string,
+    as.character(temp_peak[row_num, "reduced_model_descriptor"]),
+    row_close_string,
+    " & ",
+    min_open_string,
+    format(round(temp_peak[row_num, "min"], 2), nsmall = 2),
+    min_close_string,
+    " & ",
+    format(round(temp_peak[row_num, "Q1"], 2), nsmall = 2),
+    " & ",
+    format(round(temp_peak[row_num, "median"], 2), nsmall = 2),
+    " & ",
+    max_open_string,
+    format(round(temp_peak[row_num, "mean"], 2), nsmall = 2),
+    max_close_string,
+    " & ",
+    format(round(temp_peak[row_num, "Q3"], 2), nsmall = 2),
+    " & ",
+    format(round(temp_peak[row_num, "max"], 2), nsmall = 2),
+    "\\\\\n"
+  ))
+}
+
+@
+\bottomrule
+\end{tabular}
+\flushleft
+\label{tbl:IndWeeksIncidenceResults}
+\caption{Summaries of model performance for predictions of incidence in individual weeks.
+The ``All Weeks'' group summarizes log scores for all combinations of prediction horizon and target week in the test period;
+the ``Low Incidence" group summarizes log scores for predictions of incidence in weeks where the
+observed incidence was less than one third of the maximum weekly incidence in the test period;
+the ``High Incidence" group summarizes log scores for predictions of indience in weeks where the
+observed incidence was at least two thirds of the maximum weekly incidence in the test period.
+The model in \textbf{bold} font
+had the highest mean log score within each combination of disease and weeks subset.  The model in \underline{\emph{italicized and underlined}} font had the lowest minimum log score within each combination of disease and weeks subset.  In some cases, the same model had both the highest average log score and the lowest worst-case log score.
+}
+\end{table}
+
+
+
+
+\begin{table}[hp]
+\centering
+\begin{tabular}{lllllllll}
+\toprule
+         &                    &          &              \multicolumn{6}{c}{Summary of Log Score Differences from} \\
+         &                    &          &              \multicolumn{6}{c}{Equal Bin Probabilities} \\
+\cline{4-9}
+ Disease & Subset & Model & Min & Q1 & Q2 & Mean & Q3 & Max \\ 
+  \hline
+<<PerformanceSummaryTablePeakIncidence, echo = FALSE, results = "asis">>=
+#difference ~ N(mean_difference_model_pair, rho^(target time difference) * phi^(analysis time difference))???
+
+temp <- dengue_peak_incidence_log_score_diffs_from_equal_long %>%
+  group_by(reduced_model_descriptor) %>%
+  summarize(
+    min = min(log_score_difference),
+    Q1 = quantile(log_score_difference, probs = 0.25),
+    median = quantile(log_score_difference, probs = 0.5),
+    Q3 = quantile(log_score_difference, probs = 0.75),
+    max = max(log_score_difference),
+    mean = mean(log_score_difference)
+  ) %>%
+  ungroup() %>%
+  mutate(reduced_model_descriptor = as.character(reduced_model_descriptor),
+    week_type = "All Weeks") %>%
+  mutate(reduced_model_descriptor = 
+      ifelse(reduced_model_descriptor %in% c("SARIMA", "HHH4"),
+        reduced_model_descriptor,
+        substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5))) %>%
+  as.data.frame()
+
+temp_before_peak <- dengue_peak_incidence_log_score_diffs_from_equal_long %>%
+  filter(before_peak_week) %>%
+  group_by(reduced_model_descriptor) %>%
+  summarize(
+    min = min(log_score_difference),
+    Q1 = quantile(log_score_difference, probs = 0.25),
+    median = quantile(log_score_difference, probs = 0.5),
+    Q3 = quantile(log_score_difference, probs = 0.75),
+    max = max(log_score_difference),
+    mean = mean(log_score_difference)
+  ) %>%
+  ungroup() %>%
+  mutate(reduced_model_descriptor = as.character(reduced_model_descriptor),
+    week_type = "Before Peak") %>%
+  mutate(reduced_model_descriptor = 
+      ifelse(reduced_model_descriptor %in% c("SARIMA", "HHH4"),
+        reduced_model_descriptor,
+        substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5))) %>%
+  as.data.frame()
+
+max_row <- which.max(temp$mean)
+min_row <- which.min(temp$min)
+
+for(row_num in 1:6) {
+  if(identical(row_num, 1L)) {
+    cat("Dengue & All Weeks & ")
+  } else {
+    cat(" &  & ")
+  }
+  if(identical(row_num, max_row)) {
+    row_open_string <- max_open_string <- "\\textbf{"
+    row_close_string <- max_close_string <- "}"
+  } else {
+    row_open_string <- max_open_string <- ""
+    row_close_string <- max_close_string <- ""
+  }
+  if(identical(row_num, min_row)) {
+    min_open_string <- "\\underline{\\emph{"
+    min_close_string <- "}}"
+    row_open_string <- paste0(row_open_string, "\\underline{\\emph{")
+    row_close_string <- paste0(row_close_string, "}}")
+  } else {
+    min_open_string <- ""
+    min_close_string <- ""
+    row_open_string <- row_open_string
+    row_close_string <- row_close_string
+  }
+  cat(paste0(
+    row_open_string,
+    as.character(temp[row_num, "reduced_model_descriptor"]),
+    row_close_string,
+    " & ",
+    min_open_string,
+    format(round(temp[row_num, "min"], 2), nsmall = 2),
+    min_close_string,
+    " & ",
+    format(round(temp[row_num, "Q1"], 2), nsmall = 2),
+    " & ",
+    format(round(temp[row_num, "median"], 2), nsmall = 2),
+    " & ",
+    max_open_string,
+    format(round(temp[row_num, "mean"], 2), nsmall = 2),
+    max_close_string,
+    " & ",
+    format(round(temp[row_num, "Q3"], 2), nsmall = 2),
+    " & ",
+    format(round(temp[row_num, "max"], 2), nsmall = 2),
+    "\\\\\n"
+  ))
+}
+cat("\\cline{2-9}\n")
+
+max_row <- which.max(temp_before_peak$mean)
+min_row <- which.min(temp_before_peak$min)
+
+for(row_num in 1:6) {
+  if(identical(row_num, 1L)) {
+    cat(" & Before Peak & ")
+  } else {
+    cat(" &  & ")
+  }
+  if(identical(row_num, max_row)) {
+    row_open_string <- max_open_string <- "\\textbf{"
+    row_close_string <- max_close_string <- "}"
+  } else {
+    row_open_string <- max_open_string <- ""
+    row_close_string <- max_close_string <- ""
+  }
+  if(identical(row_num, min_row)) {
+    min_open_string <- "\\underline{\\emph{"
+    min_close_string <- "}}"
+    row_open_string <- paste0(row_open_string, "\\underline{\\emph{")
+    row_close_string <- paste0(row_close_string, "}}")
+  } else {
+    min_open_string <- ""
+    min_close_string <- ""
+    row_open_string <- row_open_string
+    row_close_string <- row_close_string
+  }
+  cat(paste0(
+    row_open_string,
+    as.character(temp_before_peak[row_num, "reduced_model_descriptor"]),
+    row_close_string,
+    " & ",
+    min_open_string,
+    format(round(temp_before_peak[row_num, "min"], 2), nsmall = 2),
+    min_close_string,
+    " & ",
+    format(round(temp_before_peak[row_num, "Q1"], 2), nsmall = 2),
+    " & ",
+    format(round(temp_before_peak[row_num, "median"], 2), nsmall = 2),
+    " & ",
+    max_open_string,
+    format(round(temp_before_peak[row_num, "mean"], 2), nsmall = 2),
+    max_close_string,
+    " & ",
+    format(round(temp_before_peak[row_num, "Q3"], 2), nsmall = 2),
+    " & ",
+    format(round(temp_before_peak[row_num, "max"], 2), nsmall = 2),
+    "\\\\\n"
+  ))
 }
 cat("\\midrule\n");
 
-temp <- ili_national[, c("time", "weighted_ili", "season")]
-colnames(temp) <- c("prediction_time", "weighted_ili", "season")
 
-ili_prediction_log_score_diffs_from_sarima_with_pred_time_covars <-
-  ili_prediction_log_score_diffs_from_sarima_long %>%
-  left_join(temp, by = "prediction_time", copy = TRUE)
-
-temp <- ili_prediction_log_score_diffs_from_sarima_long %>%
-  filter(model %in% models_used) %>%
-  group_by(reduced_model_descriptor) %>%
-  summarize(
-    min = min(log_score_difference),
-    Q1 = quantile(log_score_difference, probs = 0.25),
-    median = quantile(log_score_difference, probs = 0.5),
-    mean = mean(log_score_difference),
-    Q3 = quantile(log_score_difference, probs = 0.75),
-    max = max(log_score_difference)
-  ) %>%
-  ungroup() %>%
-  mutate(reduced_model_descriptor = as.character(reduced_model_descriptor)) %>%
-  mutate(reduced_model_descriptor = substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5)) %>%
-  as.data.frame()
-
-lower_cutoff <- max(ili_prediction_log_score_diffs_from_sarima_with_pred_time_covars$weighted_ili) / 3
-upper_cutoff <- 2 * lower_cutoff
-
-temp_nadir <- ili_prediction_log_score_diffs_from_sarima_with_pred_time_covars %>%
-  filter(model %in% models_used & weighted_ili <= lower_cutoff) %>%
+temp <- ili_peak_incidence_log_score_diffs_from_equal_long %>%
   group_by(reduced_model_descriptor) %>%
   summarize(
     min = min(log_score_difference),
@@ -2901,17 +3509,19 @@ temp_nadir <- ili_prediction_log_score_diffs_from_sarima_with_pred_time_covars %
     median = quantile(log_score_difference, probs = 0.5),
     Q3 = quantile(log_score_difference, probs = 0.75),
     max = max(log_score_difference),
-    mean = mean(log_score_difference),
-    mean_ci_lb = t.test(log_score_difference)$conf.int[1],
-    mean_ci_ub = t.test(log_score_difference)$conf.int[2]
+    mean = mean(log_score_difference)
   ) %>%
   ungroup() %>%
-  mutate(reduced_model_descriptor = as.character(reduced_model_descriptor)) %>%
-  mutate(reduced_model_descriptor = substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5)) %>%
+  mutate(reduced_model_descriptor = as.character(reduced_model_descriptor),
+    week_type = "All Weeks") %>%
+  mutate(reduced_model_descriptor = 
+      ifelse(reduced_model_descriptor == "SARIMA",
+        "SARIMA",
+        substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5))) %>%
   as.data.frame()
 
-temp_peak <- ili_prediction_log_score_diffs_from_sarima_with_pred_time_covars %>%
-  filter(model %in% models_used & weighted_ili >= upper_cutoff) %>%
+temp_before_peak <- ili_peak_incidence_log_score_diffs_from_equal_long %>%
+  filter(before_peak_week) %>%
   group_by(reduced_model_descriptor) %>%
   summarize(
     min = min(log_score_difference),
@@ -2919,68 +3529,448 @@ temp_peak <- ili_prediction_log_score_diffs_from_sarima_with_pred_time_covars %>
     median = quantile(log_score_difference, probs = 0.5),
     Q3 = quantile(log_score_difference, probs = 0.75),
     max = max(log_score_difference),
-    mean = mean(log_score_difference),
-    mean_ci_lb = t.test(log_score_difference)$conf.int[1],
-    mean_ci_ub = t.test(log_score_difference)$conf.int[2]
+    mean = mean(log_score_difference)
   ) %>%
   ungroup() %>%
-  mutate(reduced_model_descriptor = as.character(reduced_model_descriptor)) %>%
-  mutate(reduced_model_descriptor = substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5)) %>%
+  mutate(reduced_model_descriptor = as.character(reduced_model_descriptor),
+    week_type = "Before Peak") %>%
+  mutate(reduced_model_descriptor = 
+      ifelse(reduced_model_descriptor == "SARIMA",
+        "SARIMA",
+        substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5))) %>%
   as.data.frame()
 
-for(row_num in 1:4) {
-  cat(paste0("Influenza & ",
-    as.character(temp[row_num, "reduced_model_descriptor"]), " & ",
-    "SARIMA", " & ",
-    "All Weeks & ",
-    format(round(temp[row_num, "min"], 2), nsmall = 2), " & ",
-    format(round(temp[row_num, "Q1"], 2), nsmall = 2), " & ",
-    format(round(temp[row_num, "median"], 2), nsmall = 2), " & ",
-    format(round(temp[row_num, "mean"], 2), nsmall = 2), " & ",
-    format(round(temp[row_num, "Q3"], 2), nsmall = 2), " & ",
+max_row <- which.max(temp$mean)
+min_row <- which.min(temp$min)
+
+for(row_num in 1:5) {
+  if(identical(row_num, 1L)) {
+    cat("Influenza & All Weeks & ")
+  } else {
+    cat(" &  & ")
+  }
+  if(identical(row_num, max_row)) {
+    row_open_string <- max_open_string <- "\\textbf{"
+    row_close_string <- max_close_string <- "}"
+  } else {
+    row_open_string <- max_open_string <- ""
+    row_close_string <- max_close_string <- ""
+  }
+  if(identical(row_num, min_row)) {
+    min_open_string <- "\\underline{\\emph{"
+    min_close_string <- "}}"
+    row_open_string <- paste0(row_open_string, "\\underline{\\emph{")
+    row_close_string <- paste0(row_close_string, "}}")
+  } else {
+    min_open_string <- ""
+    min_close_string <- ""
+    row_open_string <- row_open_string
+    row_close_string <- row_close_string
+  }
+  cat(paste0(
+    row_open_string,
+    as.character(temp[row_num, "reduced_model_descriptor"]),
+    row_close_string,
+    " & ",
+    min_open_string,
+    format(round(temp[row_num, "min"], 2), nsmall = 2),
+    min_close_string,
+    " & ",
+    format(round(temp[row_num, "Q1"], 2), nsmall = 2),
+    " & ",
+    format(round(temp[row_num, "median"], 2), nsmall = 2),
+    " & ",
+    max_open_string,
+    format(round(temp[row_num, "mean"], 2), nsmall = 2),
+    max_close_string,
+    " & ",
+    format(round(temp[row_num, "Q3"], 2), nsmall = 2),
+    " & ",
     format(round(temp[row_num, "max"], 2), nsmall = 2),
     "\\\\\n"
   ))
-  cat(paste0(" & ",
-    " & ",
-    " & ",
-    "Low Incidence & ",
-    format(round(temp_nadir[row_num, "min"], 2), nsmall = 2), " & ",
-    format(round(temp_nadir[row_num, "Q1"], 2), nsmall = 2), " & ",
-    format(round(temp_nadir[row_num, "median"], 2), nsmall = 2), " & ",
-    format(round(temp_nadir[row_num, "mean"], 2), nsmall = 2), " & ",
-    format(round(temp_nadir[row_num, "Q3"], 2), nsmall = 2), " & ",
-    format(round(temp_nadir[row_num, "max"], 2), nsmall = 2),
-    "\\\\\n"
-  ))
-  cat(paste0(" & ",
-    " & ",
-    " & ",
-    "High Incidence & ",
-    format(round(temp_peak[row_num, "min"], 2), nsmall = 2), " & ",
-    format(round(temp_peak[row_num, "Q1"], 2), nsmall = 2), " & ",
-    format(round(temp_peak[row_num, "median"], 2), nsmall = 2), " & ",
-    format(round(temp_peak[row_num, "mean"], 2), nsmall = 2), " & ",
-    format(round(temp_peak[row_num, "Q3"], 2), nsmall = 2), " & ",
-    format(round(temp_peak[row_num, "max"], 2), nsmall = 2),
-    "\\\\\n"
-  ))
-  if(row_num < 4) {
-    cat("\\cline{2-10}\n")
+}
+
+cat("\\cline{2-9}\n")
+
+max_row <- which.max(temp_before_peak$mean)
+min_row <- which.min(temp_before_peak$min)
+
+for(row_num in 1:5) {
+  if(identical(row_num, 1L)) {
+    cat(" & Before Peak & ")
+  } else {
+    cat(" &  & ")
   }
+  if(identical(row_num, max_row)) {
+    row_open_string <- max_open_string <- "\\textbf{"
+    row_close_string <- max_close_string <- "}"
+  } else {
+    row_open_string <- max_open_string <- ""
+    row_close_string <- max_close_string <- ""
+  }
+  if(identical(row_num, min_row)) {
+    min_open_string <- "\\underline{\\emph{"
+    min_close_string <- "}}"
+    row_open_string <- paste0(row_open_string, "\\underline{\\emph{")
+    row_close_string <- paste0(row_close_string, "}}")
+  } else {
+    min_open_string <- ""
+    min_close_string <- ""
+    row_open_string <- row_open_string
+    row_close_string <- row_close_string
+  }
+  cat(paste0(
+    row_open_string,
+    as.character(temp_before_peak[row_num, "reduced_model_descriptor"]),
+    row_close_string,
+    " & ",
+    min_open_string,
+    format(round(temp_before_peak[row_num, "min"], 2), nsmall = 2),
+    min_close_string,
+    " & ",
+    format(round(temp_before_peak[row_num, "Q1"], 2), nsmall = 2),
+    " & ",
+    format(round(temp_before_peak[row_num, "median"], 2), nsmall = 2),
+    " & ",
+    max_open_string,
+    format(round(temp_before_peak[row_num, "mean"], 2), nsmall = 2),
+    max_close_string,
+    " & ",
+    format(round(temp_before_peak[row_num, "Q3"], 2), nsmall = 2),
+    " & ",
+    format(round(temp_before_peak[row_num, "max"], 2), nsmall = 2),
+    "\\\\\n"
+  ))
 }
 @
 \bottomrule
 \end{tabular}
 \flushleft
-\caption{Summaries of model performance relative to the baseline models for
-predictions of incidence in individual weeks.  Each row summarizes the log
-score differences for predictions of incidence made by one of the KCDE specifications
-and one of the baseline models.  The first row for each model pair summarizes
-results for all combinations of 
-target week in the test period and prediction horizon; the ``Low Incidence" rows summarize results
-for predictions in weeks where the observed incidence in the target week was less than one third of the maximum weekly incidence in the test period; the ``High Incidence" rows summarize results for weeks where the observed incidence was at least two thirds of the maximum weekly incidence in the test period.}
+\label{tbl:IndWeeksIncidenceResults}
+\caption{Summaries of model performance relative to a naive approach assigning equal probability to all bins for
+predictions of incidence in the peak week.  Each row summarizes the differences in log
+score for the given model and the log score that would be achieved by using equal bin probabilities; positive values indicate that the model performed better than using equal bin probabilities.  The ``All Weeks'' group summarizes results for all combinations of 
+target week in the test period and prediction horizon; the ``Before Peak" group summarizes results
+for predictions in weeks before the actual peak for the given season.  The model in \textbf{bold} font
+had the highest mean log score within each combination of disease and weeks subset.  The model in \underline{\emph{italicized and underlined}} font had the lowest minimum log score within each combination of disease and weeks subset.  In some cases, the same model had both the highest average log score and the lowest worst-case log score.}
 \end{table}
+
+
+
+
+
+\begin{table}[hp]
+\centering
+\begin{tabular}{lllllllll}
+\toprule
+         &                    &          &              \multicolumn{6}{c}{Summary of Log Score Differences from} \\
+         &                    &          &              \multicolumn{6}{c}{Equal Bin Probabilities} \\
+\cline{4-9}
+ Disease & Subset & Model & Min & Q1 & Q2 & Mean & Q3 & Max \\ 
+  \hline
+<<PerformanceSummaryTablePeakTiming, echo = FALSE, results = "asis">>=
+#difference ~ N(mean_difference_model_pair, rho^(target time difference) * phi^(analysis time difference))???
+
+temp <- dengue_peak_timing_log_score_diffs_from_equal_long %>%
+  group_by(reduced_model_descriptor) %>%
+  summarize(
+    min = min(log_score_difference, na.rm = TRUE),
+    Q1 = quantile(log_score_difference, probs = 0.25, na.rm = TRUE),
+    median = quantile(log_score_difference, probs = 0.5, na.rm = TRUE),
+    Q3 = quantile(log_score_difference, probs = 0.75, na.rm = TRUE),
+    max = max(log_score_difference, na.rm = TRUE),
+    mean = mean(log_score_difference, na.rm = TRUE)
+  ) %>%
+  ungroup() %>%
+  mutate(reduced_model_descriptor = as.character(reduced_model_descriptor),
+    week_type = "All Weeks") %>%
+  mutate(reduced_model_descriptor = 
+      ifelse(reduced_model_descriptor %in% c("SARIMA", "HHH4"),
+        reduced_model_descriptor,
+        substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5))) %>%
+  as.data.frame()
+
+temp_before_peak <- dengue_peak_timing_log_score_diffs_from_equal_long %>%
+  filter(before_peak_week) %>%
+  group_by(reduced_model_descriptor) %>%
+  summarize(
+    min = min(log_score_difference, na.rm = TRUE),
+    Q1 = quantile(log_score_difference, probs = 0.25, na.rm = TRUE),
+    median = quantile(log_score_difference, probs = 0.5, na.rm = TRUE),
+    Q3 = quantile(log_score_difference, probs = 0.75, na.rm = TRUE),
+    max = max(log_score_difference, na.rm = TRUE),
+    mean = mean(log_score_difference, na.rm = TRUE)
+  ) %>%
+  ungroup() %>%
+  mutate(reduced_model_descriptor = as.character(reduced_model_descriptor),
+    week_type = "Before Peak") %>%
+  mutate(reduced_model_descriptor = 
+      ifelse(reduced_model_descriptor %in% c("SARIMA", "HHH4"),
+        reduced_model_descriptor,
+        substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5))) %>%
+  as.data.frame()
+
+max_row <- which.max(temp$mean)
+min_row <- which.min(temp$min)
+
+for(row_num in 1:6) {
+  if(identical(row_num, 1L)) {
+    cat("Dengue & All Weeks & ")
+  } else {
+    cat(" &  & ")
+  }
+  if(identical(row_num, max_row)) {
+    row_open_string <- max_open_string <- "\\textbf{"
+    row_close_string <- max_close_string <- "}"
+  } else {
+    row_open_string <- max_open_string <- ""
+    row_close_string <- max_close_string <- ""
+  }
+  if(identical(row_num, min_row)) {
+    min_open_string <- "\\underline{\\emph{"
+    min_close_string <- "}}"
+    row_open_string <- paste0(row_open_string, "\\underline{\\emph{")
+    row_close_string <- paste0(row_close_string, "}}")
+  } else {
+    min_open_string <- ""
+    min_close_string <- ""
+    row_open_string <- row_open_string
+    row_close_string <- row_close_string
+  }
+  cat(paste0(
+    row_open_string,
+    as.character(temp[row_num, "reduced_model_descriptor"]),
+    row_close_string,
+    " & ",
+    min_open_string,
+    format(round(temp[row_num, "min"], 2), nsmall = 2),
+    min_close_string,
+    " & ",
+    format(round(temp[row_num, "Q1"], 2), nsmall = 2),
+    " & ",
+    format(round(temp[row_num, "median"], 2), nsmall = 2),
+    " & ",
+    max_open_string,
+    format(round(temp[row_num, "mean"], 2), nsmall = 2),
+    max_close_string,
+    " & ",
+    format(round(temp[row_num, "Q3"], 2), nsmall = 2),
+    " & ",
+    format(round(temp[row_num, "max"], 2), nsmall = 2),
+    "\\\\\n"
+  ))
+}
+cat("\\cline{2-9}\n")
+
+max_row <- which.max(temp_before_peak$mean)
+min_row <- which.min(temp_before_peak$min)
+
+for(row_num in 1:6) {
+  if(identical(row_num, 1L)) {
+    cat(" & Before Peak & ")
+  } else {
+    cat(" &  & ")
+  }
+  if(identical(row_num, max_row)) {
+    row_open_string <- max_open_string <- "\\textbf{"
+    row_close_string <- max_close_string <- "}"
+  } else {
+    row_open_string <- max_open_string <- ""
+    row_close_string <- max_close_string <- ""
+  }
+  if(identical(row_num, min_row)) {
+    min_open_string <- "\\underline{\\emph{"
+    min_close_string <- "}}"
+    row_open_string <- paste0(row_open_string, "\\underline{\\emph{")
+    row_close_string <- paste0(row_close_string, "}}")
+  } else {
+    min_open_string <- ""
+    min_close_string <- ""
+    row_open_string <- row_open_string
+    row_close_string <- row_close_string
+  }
+  cat(paste0(
+    row_open_string,
+    as.character(temp_before_peak[row_num, "reduced_model_descriptor"]),
+    row_close_string,
+    " & ",
+    min_open_string,
+    format(round(temp_before_peak[row_num, "min"], 2), nsmall = 2),
+    min_close_string,
+    " & ",
+    format(round(temp_before_peak[row_num, "Q1"], 2), nsmall = 2),
+    " & ",
+    format(round(temp_before_peak[row_num, "median"], 2), nsmall = 2),
+    " & ",
+    max_open_string,
+    format(round(temp_before_peak[row_num, "mean"], 2), nsmall = 2),
+    max_close_string,
+    " & ",
+    format(round(temp_before_peak[row_num, "Q3"], 2), nsmall = 2),
+    " & ",
+    format(round(temp_before_peak[row_num, "max"], 2), nsmall = 2),
+    "\\\\\n"
+  ))
+}
+cat("\\midrule\n");
+
+
+temp <- ili_peak_timing_log_score_diffs_from_equal_long %>%
+  group_by(reduced_model_descriptor) %>%
+  summarize(
+    min = min(log_score_difference),
+    Q1 = quantile(log_score_difference, probs = 0.25),
+    median = quantile(log_score_difference, probs = 0.5),
+    Q3 = quantile(log_score_difference, probs = 0.75),
+    max = max(log_score_difference),
+    mean = mean(log_score_difference)
+  ) %>%
+  ungroup() %>%
+  mutate(reduced_model_descriptor = as.character(reduced_model_descriptor),
+    week_type = "All Weeks") %>%
+  mutate(reduced_model_descriptor = 
+      ifelse(reduced_model_descriptor == "SARIMA",
+        "SARIMA",
+        substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5))) %>%
+  as.data.frame()
+
+temp_before_peak <- ili_peak_timing_log_score_diffs_from_equal_long %>%
+  filter(before_peak_week) %>%
+  group_by(reduced_model_descriptor) %>%
+  summarize(
+    min = min(log_score_difference),
+    Q1 = quantile(log_score_difference, probs = 0.25),
+    median = quantile(log_score_difference, probs = 0.5),
+    Q3 = quantile(log_score_difference, probs = 0.75),
+    max = max(log_score_difference),
+    mean = mean(log_score_difference)
+  ) %>%
+  ungroup() %>%
+  mutate(reduced_model_descriptor = as.character(reduced_model_descriptor),
+    week_type = "Before Peak") %>%
+  mutate(reduced_model_descriptor = 
+      ifelse(reduced_model_descriptor == "SARIMA",
+        "SARIMA",
+        substr(reduced_model_descriptor, 1, nchar(reduced_model_descriptor) - 5))) %>%
+  as.data.frame()
+
+max_row <- which.max(temp$mean)
+min_row <- which.min(temp$min)
+
+for(row_num in 1:5) {
+  if(identical(row_num, 1L)) {
+    cat("Influenza & All Weeks & ")
+  } else {
+    cat(" &  & ")
+  }
+  if(identical(row_num, max_row)) {
+    row_open_string <- max_open_string <- "\\textbf{"
+    row_close_string <- max_close_string <- "}"
+  } else {
+    row_open_string <- max_open_string <- ""
+    row_close_string <- max_close_string <- ""
+  }
+  if(identical(row_num, min_row)) {
+    min_open_string <- "\\underline{\\emph{"
+    min_close_string <- "}}"
+    row_open_string <- paste0(row_open_string, "\\underline{\\emph{")
+    row_close_string <- paste0(row_close_string, "}}")
+  } else {
+    min_open_string <- ""
+    min_close_string <- ""
+    row_open_string <- row_open_string
+    row_close_string <- row_close_string
+  }
+  cat(paste0(
+    row_open_string,
+    as.character(temp[row_num, "reduced_model_descriptor"]),
+    row_close_string,
+    " & ",
+    min_open_string,
+    format(round(temp[row_num, "min"], 2), nsmall = 2),
+    min_close_string,
+    " & ",
+    format(round(temp[row_num, "Q1"], 2), nsmall = 2),
+    " & ",
+    format(round(temp[row_num, "median"], 2), nsmall = 2),
+    " & ",
+    max_open_string,
+    format(round(temp[row_num, "mean"], 2), nsmall = 2),
+    max_close_string,
+    " & ",
+    format(round(temp[row_num, "Q3"], 2), nsmall = 2),
+    " & ",
+    format(round(temp[row_num, "max"], 2), nsmall = 2),
+    "\\\\\n"
+  ))
+}
+
+cat("\\cline{2-9}\n")
+
+max_row <- which.max(temp_before_peak$mean)
+min_row <- which.min(temp_before_peak$min)
+
+for(row_num in 1:5) {
+  if(identical(row_num, 1L)) {
+    cat(" & Before Peak & ")
+  } else {
+    cat(" &  & ")
+  }
+  if(identical(row_num, max_row)) {
+    row_open_string <- max_open_string <- "\\textbf{"
+    row_close_string <- max_close_string <- "}"
+  } else {
+    row_open_string <- max_open_string <- ""
+    row_close_string <- max_close_string <- ""
+  }
+  if(identical(row_num, min_row)) {
+    min_open_string <- "\\underline{\\emph{"
+    min_close_string <- "}}"
+    row_open_string <- paste0(row_open_string, "\\underline{\\emph{")
+    row_close_string <- paste0(row_close_string, "}}")
+  } else {
+    min_open_string <- ""
+    min_close_string <- ""
+    row_open_string <- row_open_string
+    row_close_string <- row_close_string
+  }
+  cat(paste0(
+    row_open_string,
+    as.character(temp_before_peak[row_num, "reduced_model_descriptor"]),
+    row_close_string,
+    " & ",
+    min_open_string,
+    format(round(temp_before_peak[row_num, "min"], 2), nsmall = 2),
+    min_close_string,
+    " & ",
+    format(round(temp_before_peak[row_num, "Q1"], 2), nsmall = 2),
+    " & ",
+    format(round(temp_before_peak[row_num, "median"], 2), nsmall = 2),
+    " & ",
+    max_open_string,
+    format(round(temp_before_peak[row_num, "mean"], 2), nsmall = 2),
+    max_close_string,
+    " & ",
+    format(round(temp_before_peak[row_num, "Q3"], 2), nsmall = 2),
+    " & ",
+    format(round(temp_before_peak[row_num, "max"], 2), nsmall = 2),
+    "\\\\\n"
+  ))
+}
+@
+\bottomrule
+\end{tabular}
+\flushleft
+\label{tbl:PeakTimingResults}
+\caption{Summaries of model performance relative to a naive approach assigning equal probability to all bins for
+predictions of the peak week timing.  Each row summarizes the differences in log
+score for the given model and the log score that would be achieved by using equal bin probabilities; positive values indicate that the model performed better than using equal bin probabilities.  The ``All Weeks'' group summarizes results for all combinations of 
+target week in the test period and prediction horizon; the ``Before Peak" group summarizes results
+for predictions in weeks before the actual peak for the given season.  The model in \textbf{bold} font
+had the highest mean log score within each combination of disease and weeks subset.  The model in \underline{\emph{italicized and underlined}} font had the lowest minimum log score within each combination of disease and weeks subset.  In some cases, the same model had both the highest average log score and the lowest worst-case log score.}
+\end{table}
+
 
 
 
@@ -3275,7 +4265,7 @@ grid.newpage()
 pushViewport(viewport(layout = grid.layout(nrow = 10, ncol = 3,
             heights = unit(c(1, 0.37, rep(1, 7), 1.57), c("lines", rep("null", 9))),
             widths = unit(c(1, 1, 0.25), c("null", "lines", "null")))))
-grid.text("Summary of Results for Peak Week Timing",
+grid.text("Summary of Results for Peak Week Incidence and Timing",
     gp = gpar(fontsize = 14),
     vp = viewport(layout.pos.row = 1, layout.pos.col = 1))
 #grid.text("Observed\nIncidence",
