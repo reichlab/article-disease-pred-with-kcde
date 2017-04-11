@@ -1846,9 +1846,8 @@ this based on KCDE and copulas and found that it is a viable method that
 can yield improved predictions relative to commonly employed methods in this
 field.  In predicting incidence of dengue fever in individual weeks,
 our approach offered consistent and substantial performance gains relative to a
-SARIMA model and the HHH4 model.  These improvements were particularly
-concentrated in the times that are of most interest to public health decision 
-makers: periods of high incidence near the season peak.   In the application to influenza,
+SARIMA model and the HHH4 model, particularly in periods of high incidence near the season peak that are of most interest to public health decision 
+makers.   In the application to influenza,
 our method did about as well as SARIMA when predicting incidence in individual
 weeks.
 
@@ -1868,19 +1867,11 @@ variation is substantial, continued evaluation of these methods on datasets with
 longer prospective testing phases could provide better information about
 long-run performance of all of these methods.
 
-Our implementation of KCDE offers two main methodological contributions.  Most
-importantly in the context of modeling infectious disease, we have introduced the use of a periodic kernel
-component that captures seasonality.  In both of our applications, including
-this periodic kernel component in the KCDE specification led to substantial 
-improvements in the predictive distributions for incidence in individual weeks.
-We also introduced a method for obtaining kernel functions that are appropriate
-for use with discrete data while allowing for a fully parameterized bandwidth
-matrix.  In our applications, using a fully parameterized bandwidth matrix did
-not lead to consistent improvements in predictions.  However, we have
-demonstrated through a simulation study that the fully parameterized bandwidth
-can be helpful in some conditional density estimation tasks.  This general
-method for obtaining discrete kernel functions may be beneficial in other
-applications of KCDE.
+We have introduced the use of a periodic kernel component that led to substantial improvements in the predictive distributions for incidence in individual weeks. Periodic kernels have not otherwise been used in the KCDE literature despite their importance for prediction in seasonal systems. This advance improves the applicability of KCDE to infectious disease prediction in general and we demonstrate how it leads to improved performance for CDC's chosen prediction targets.
+
+We also introduced application of KCDE with a fully parameterized bandwidth matrix to discrete data. Much infectious disease case data is discrete and small discrete counts can be indicative of transmission dynamics driven by stochasticity[ cite a stochastic SIR (?) ]. Handling this important case directly makes our method widely applicable to infectious disease data, particularly when combined with the periodic kernel.
+
+While taking advantage of a fully parameterized bandwidth matrix did not lead to consistent improvements in our test data, we have demonstrated through a simulation study that the fully parameterized bandwidth can be helpful in some conditional density estimation tasks. This general method for obtaining discrete kernel functions may be beneficial in other applications of KCDE.
 
 %dengue_max_by_season <- tapply(dengue_sj$total_cases, dengue_sj$season, max)
 %max(dengue_max_by_season) / min(dengue_max_by_season)
@@ -1935,11 +1926,11 @@ There is room for extensions and improvements to the methods we
 have outlined in this article.  One limitation of our work lies in the
 selection of covariates for the predictive model.  We have simply
 used incidence at the two most recent time points, and possibly the observation
-time, as covariates.  We considered using a stepwise
+time, as covariates.  In theory, the method could accommodate the use of additional covariates; however, in practice we are limited by the computationally demanding estimation procedure.  We considered using a stepwise
 variable selection approach to select the model specification,
 but we found this to be too computationally expensive to be practical; the full
 grid search suggested by De Gooijer and Gannoun
-\cite{de2000nonparametricConditionalPredictiveRegions} in similar settings with only one bandwidth parameter would be far too slow for our methods.
+\cite{de2000nonparametricConditionalPredictiveRegions} in similar settings with only one bandwidth parameter would be far too slow for our methods.  In future work, we plan to consider methods for combining predictive distributions from multiple small KCDE models that each use a small subset of the possible covariates; this strategy should reduce the overall computational complexity of estimation with multiple covariates.  If successful, this would also enable further exploration of using other predictive variables such as weather or incidence measures from neighboring locations in the model.
 
 Another method for improving our ability to use covariates would be to replace
 variable selection with shrinkage.  \cite{hall2004crossvalidationKCDE}
@@ -1950,19 +1941,16 @@ size increases.  We conjecture
 that by introducing an appropriate penalty on the elements bandwidth
 matrix, bandwidths for irrelevant covariates could be driven to infinity
 at lower sample sizes.  This technique should allow us to include more (possibly
-irrelevant) covariates in the model.  
-If successful, this would also enable further
-exploration of using other predictive variables such as weather, 
-incidence measures from neighboring locations, or data from internet searches and social media in the model.
+irrelevant) covariates in the model.
 
 In many disease incidence data sets, we observe multiple incidence
 time series simultaneously.  For example, in addition to the national level
 wILI index used in this article, the influenza-like illness data from the CDC
 contain measures of incidence for 10 smaller regions within the United States,
 and break down incidence within four age groups.  The methods described in
-this article could be applied to make predictions with multiple time series.
-One possible approach to this would be to fit a separate predictive model for
-each time series, using the other time series as covariates that are conditioned on.
+this article could be applied to make predictions with multiple time series, although we have not pursued that line in this work.
+For example, one possible approach to this would be to fit a separate predictive model for
+each time series, using the other time series as covariates that are conditioned on.  If a joint distribution of these time series were required, we could use the copula to estimate joint dependence structure across all of the time series.  Another option would be to use KCDE to directly estimate the joint distribution of a random vector of incidence in future time points.
 
 Another aspect of our method that should be explored further is the use of
 log score in estimation.  We used log scores in this work to match the use
