@@ -1682,7 +1682,7 @@ combined_peak_timing_diffs_from_equal <- rbind.fill(
 #)
 @
 
-\subsubsection{In most cases, including a periodic kernel component in the KCDE specification led to improved predictions}.  KCDE specifications including a periodic kernel component had better average performance than the corresponding KCDE specification without a periodic kernel component for predicting incidence in individual weeks in all combinations of the data sets and the subset of weeks considered.  The periodic kernel also led to better predictions of peak incidence in every case except for early season predictions in the application to influenza when the bandwidth matrix for the incidence kernel component was fully parameterized.  For predictions of peak timing, including the periodic kernel component was helpful in the application to influenza, but led to worse performance for early-season predictions of the peak timing for dengue incidence.
+\subsubsection{In most cases, including a periodic kernel component in the KCDE specification led to improved predictions.}  KCDE specifications including a periodic kernel component had better average performance than the corresponding KCDE specification without a periodic kernel component for predicting incidence in individual weeks in all combinations of the data sets and the subset of weeks considered.  The periodic kernel also led to better predictions of peak incidence in every case except for early season predictions in the application to influenza when the bandwidth matrix for the incidence kernel component was fully parameterized.  For predictions of peak timing, including the periodic kernel component was helpful in the application to influenza, but led to worse performance for early-season predictions of the peak timing for dengue incidence.
 
 \subsubsection{We have seen that the KCDE model outperformed the baseline models in the application to dengue, but the SARIMA model generally had higher mean performance than the KCDE models in the application to influenza (although SARIMA had less consistent performance for predictions of incidence in individual weeks or at the peak week in both applications).}
 We believe that the difference in relative performance of KCDE and the baseline
@@ -2283,7 +2283,7 @@ dengue_plot <- ggplot() +
     scale_x_date() +
     scale_y_continuous(limits = c(0, 500), expand = c(0, 0)) +
     xlab("Time") +
-    ylab("Reported Cases") +
+    ylab("Reported Cases\n") +
     ggtitle("Dengue Fever Data - San Juan, Puerto Rico") +
     theme_bw(base_size = 11)
 
@@ -2297,7 +2297,7 @@ ili_plot <- ggplot() +
         colour = "red", linetype = 2) +
     scale_x_date() +
     xlab("Time") +
-    ylab("Weighted Influenza-like Illness\n") +
+    ylab("Weighted Proportion of Doctor Visits\nwith Influenza-like Illness (wILI)\n") +
     ggtitle("Influenza Data - National United States") +
     theme_bw(base_size = 11)
 
