@@ -437,7 +437,7 @@ article, we used an importance sampling estimate of the predictive density at
 horizons $h \geq 2$:
 \begin{align*}
 P(Z_{t + h} = z_{t + h} \mid z_t) &= \iint P(Z_{t + h} = z_{t + h}, \ldots, Z_{t + 1} = z_{t + 1} \mid z_t) \, \mathrm{d} z_{t + 1} \cdots \mathrm{d} z_{t + h - 1} \\
-&\approx \sum_{j = 1}^J P(Z_{t + h} = z_{t + h} \mid z^{(j)}_{t + h - 1}, \ldots, z^{(j)}_{t + 1}, z_t) \text{, where}
+&\approx \frac{1}{J} \sum_{j = 1}^J P(Z_{t + h} = z_{t + h} \mid z^{(j)}_{t + h - 1}, \ldots, z^{(j)}_{t + 1}, z_t) \text{, where}
 \end{align*}
 $(z^{(j)}_{t + h - 1}, \ldots, z^{(j)}_{t + 1}),\, j = 1, \ldots, J$ are sampled
 from the joint distribution of $(Z_{t + h - 1}, \ldots, Z_{t + 1}) \mid z_t$.
