@@ -221,7 +221,7 @@ chosen by the CDC as relevant to public health:
 \begin{enumerate}
   \item Incidence $h$ time steps in the future (at ``prediction horizon'' $h$).  
   \item Timing of the peak week of the current season, $w^* \in \{1, \ldots, W\}$, where $W$ is the total number of weeks in the season.
-  \item Binned incidence in the peak week of the current season.
+  \item Incidence in the peak week of the current season.
 \end{enumerate}
 
 These quantities have emerged as being targets of particular utility in making planning decisions 
@@ -483,6 +483,8 @@ for the trajectory of incidence over all remaining weeks in the season:
     &\quad = \int_{\{(\bz_{({t^*} + 1):({t^*} + H_{t^*})}): a \leq \max_{w} z_{S_{t^*} + w} < b\}} f(\bz_{({t^*} + 1):({t^*} + H_{t^*})} \mid {t^*}, \bz_{1:{t^*}}) \, \mathrm{d} \bz_{({t^*} + 1):({t^*} + H_{t^*})}. \label{eqn:PeakPredIncidenceIntegral}
     \end{align}
 \end{enumerate}
+In predicting binned incidence in the peak week, we are following the precedent set in the
+competitions run by the CDC.
 In practice, we use Monte Carlo integration to evaluate
 the integrals in Equations \eqref{eqn:PeakPredTimingIntegral} and
 \eqref{eqn:PeakPredIncidenceIntegral} by sampling incidence trajectories from
@@ -784,8 +786,7 @@ An important feature of both of these time series is that they exhibit fairly re
 
 We use the three prediction targets described in Section~\ref{sec:Methods}
 (Supplemental Figure 3).
-Following the precedent set in the
-competitions, we make predictions for \textit{binned} incidence in the peak
+As discussed there, we make predictions for \textit{binned} incidence in the peak
 week.  For the dengue data set, the bins are $[0, 50), [50, 100), \ldots, [500, \infty)$.
 For the influenza data set, the bins are $[0, 0.5), [0.5, 1), \ldots, [13, \infty)$.
 Our predictions for incidence in individual weeks are for the raw, unbinned,
@@ -1846,7 +1847,8 @@ this based on KCDE and copulas and found that it is a viable method that
 can yield improved predictions relative to commonly employed methods in this
 field.  In predicting incidence of dengue fever in individual weeks,
 our approach offered consistent and substantial performance gains relative to a
-SARIMA model and the HHH4 model, particularly in periods of high incidence near the season peak that are of most interest to public health decision 
+SARIMA model and the HHH4 model, particularly in periods of high incidence near
+the season peak that are of most interest to public health decision 
 makers.   In the application to influenza,
 our method did about as well as SARIMA when predicting incidence in individual
 weeks.
@@ -1860,9 +1862,15 @@ worse than this naive model.  For pre-peak predictions of peak week timing,
 there were multiple seasons where the SARIMA model consistently underperformed
 relative to the naive approach of assigning equal probability to each week of
 the year; KCDE and HHH4 were more consistently at or above the level of this
-naive approach.  These improvements in the reliability of early-season
+naive approach.
+
+Across all three prediction targets, an important benefit of the proposed method is that
+it consistently places non-negligible probability on the eventually observed outcome.
+This is in contrast to the baseline models we considered, which occasionally missed quite badly.
+These improvements in the reliability of
 predictions are valuable to public health officials planning interventions several weeks or
-months before the peak of the disease season.  However, since year-to-year
+months before the peak of the disease season.
+However, since year-to-year
 variation is substantial, continued evaluation of these methods on datasets with
 longer prospective testing phases could provide better information about
 long-run performance of all of these methods.
@@ -2403,6 +2411,8 @@ upViewport()
 \caption{Differences in log scores for the weekly predictive distributions
 obtained from the Periodic, Full Bandwidth KCDE model and the baseline
 models, plotted against the observed incidence in the week being predicted.
+The lower panel displays a density estimate of incidence levels in each week
+of the season separately for each season in the test phase.
 For reference, a log score difference of 2.3 (4.6) indicates that the predictive density from KCDE was about 10 (100)
 times as large as the predictive density from the baseline model at the realized outcome.  Each
 point corresponds to a unique combination of prediction target week and

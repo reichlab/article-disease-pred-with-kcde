@@ -308,8 +308,11 @@ In the simulation study, we simulate data from a discretized multivariate normal
 distribution.  The method for discretizing the underlying multivariate normal
 is the same as we described above for descritizing the kernel function.  The
 normal distribution has mean $\b0$ and covariance
-matrix with $1$ on the diagonal and $0.9$ off of the diagonal.  This
-multivariate normal distribution was used in one of the simulation studies
+matrix with $1$ on the diagonal and $0.9$ off of the diagonal.
+Alternatively, this distribution can be characterized as the sum of the column vectors
+$(U, U)'$ and $\bV = (V_1, V_2)'$, where $U \sim N(0, 0.9)$ is a random offset generated independently
+from $\bV \sim N(\b0, 0.1 \mathbb{I})$ (where $\mathbb{I}$ denotes the $2 \times 2$ identity matrix).
+This multivariate normal distribution was used in one of the simulation studies
 conducted by Duong and
 Hazelton \cite{duong2005crossvalidationBandwidthMultivariateKDE} demonstrating
 that a fully parameterized bandwidth matrix could yield improved density estimates for joint density estimation with continuous distributions.
