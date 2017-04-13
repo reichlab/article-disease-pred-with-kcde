@@ -419,7 +419,14 @@ States.  We conclude with a discussion of these results.
 Suppose we observe a measure $z_t$ of disease incidence at evenly spaced times
 indexed by $t = 1, \ldots, T$.  Our goal is to obtain predictions relating to
 incidence after time $T$ using time series of incidence up to time $T$
-as well as time series of covariates up to time $T$.  
+as well as time series of covariates up to time $T$.
+Broadly, our model works in two stages.
+In the first stage, KCDE is used to obtain separate predictive distributions for
+incidence in each remaining week of the season; this will be described in detail in Subsection~\ref{subsec:Methods:KCDE}.
+Second, we use copulas to model the dependence in incidence across different weeks; this will be described in detail in Subsection~\ref{subsec:Methods:Copulas}.
+These two model components together yield a joint predictive distribution for the trajectory disease incidence over the rest of the season, and predictive distributions for the targets of interest can be obtained from this joint distribution for disease incidence.
+We introduce notation and give a more detailed statement of the overall structure of the model here,
+and describe its components and parameter estimation in more detail in the following Subsections.
 
 We allow the incidence measure to be either
 continuous or discrete and use the term density to refer to either the probability density function or probability mass function as appropriate.  We will use a colon notation to
@@ -430,9 +437,6 @@ to predict incidence after $t^*$.  When we apply the method to
 perform prediction for incidence after time $T$, $t^*$ is equal to $T$; however, $t^*$
 takes other values in the estimation procedure we describe below.
 
-We introduce the overall structure of our model here and describe its
-components and parameter estimation in more detail in the
-following Subsections.
 At time $t^*$, our model approximates $f(\bz_{(t^* + 1):(t^* + H_{t^*})} \mid t^*, \bz_{1:t^*})$
 by conditioning only on the time at which we are making the predictions and
 observed incidence at a few recent time points with lags given by the non-negative integers $l_1, \ldots, l_M$:
@@ -586,10 +590,11 @@ The matrix $\bB$ is a bandwidth matrix that
 controls the orientation and scale of the kernel function.  Subtracting $\bB \b1$ in the numerator has the effect of placing the mode of the kernel function at $z_{t + h}$.  This bandwidth
 matrix is parameterized by $\btheta^h_{\text{inc}}$.  In this work we have considered
 two parameterizations: a diagonal bandwidth matrix, and a fully parameterized
-bandwidth based on the Cholesky decomposition.  To obtain the
+bandwidth based on the Cholesky decomposition \cite{trefethen1997numericalLA}.  To obtain the
 discrete kernel (Figure~\ref{fig:PeriodicKernelPlot}), we integrate an
 underlying continuous kernel function over hyper-rectangles containing the
 points in the range of the discrete random variable (see supplement for details).
+According to Equations~\eqref{eqn:KCDEDefinition} through \eqref{eqn:KCDEWeightsDef}, $K^{\text{inc}}_{\text{cont}}$ makes a contribution to calculation of the observation weights by measuring the similarity of the lagged observations of incidence included in $\tilde{z}_{t^*}$ and $\tilde{z}_{t}$, and contributes mass to the predictive density for future incidence $z_{t^* + h}$ near the observed incidence $z_{t + h}$.
 
 We estimate the bandwidth parameters $\btheta^h$ by numerically maximizing the
 cross-validated log score of the predictive distributions for the observations
@@ -633,8 +638,8 @@ predictive distributions for individual prediction horizons obtained from KCDE t
 distribution for the trajectory of incidence over multiple time points. 
 The copula is a parametric function that captures the dependence relations among
 a collection of random variables and allows us to compute the joint distribution
-from the marginal distributions.  Figure 16 in the
-supplement shows that the copula induces positive correlation
+from the marginal distributions.  Supplemental Figure 7
+shows that the copula induces positive correlation
 in the predictive distributions for incidence in nearby weeks, so that high
 incidence in one week is more likely to be followed by high incidence in
 weeks soon after.
@@ -652,15 +657,15 @@ Our model specifies the joint CDF for $(Y_{t^*}^1, \ldots, Y_{t^*}^{H_{t^*}})$
 as follows:
 \begin{align}
 &F^{H_{t^*}}(y_{t^*}^1, \ldots, y_{t^*}^{H_{t^*}} \mid \bx_{t^*}; \btheta^1, \ldots, \btheta^{H_{t^*}}, \bxi^{H_{t^*}}) = \nonumber \\
-&\quad C\{F^{1}(y_{t^*}^1 \mid \bx_{t^*}; \btheta^1), \ldots, F^{H_{t^*}}(y_{t^*}^{H_{t^*}} \mid \bx_{t^*}; \btheta^{H_{t^*}}); \bxi^{H_{t^*}}\}
+&\quad C^{H_{t^*}}\{F^{1}(y_{t^*}^1 \mid \bx_{t^*}; \btheta^1), \ldots, F^{H_{t^*}}(y_{t^*}^{H_{t^*}} \mid \bx_{t^*}; \btheta^{H_{t^*}}); \bxi^{H_{t^*}}\}
 \end{align}
 
-The copula function $C$ maps the marginal CDF values to the joint
+The copula function $C^{H_{t^*}}$ maps the marginal CDF values to the joint
 CDF value.  We use the isotropic normal
 copula implemented in the {\tt R} \cite{RCoreLanguage} package {\tt copula}
 \cite{HofertRCopulaPackage}.  The copula function is given by
 \begin{equation}
-C(u_1, \ldots, u_H ; \bxi^H) = \Phi_{\Sigma^H}(\Phi^{-1}(u_1), \ldots, \Phi^{-1}(u_H)),
+C^H(u_1, \ldots, u_H ; \bxi^H) = \Phi_{\Sigma^H}(\Phi^{-1}(u_1), \ldots, \Phi^{-1}(u_H)),
 \end{equation}
 where $\Phi^{-1}$ is the inverse CDF of a univariate normal
 distribution with mean $0$ and variance $1$ and $\Phi_{\Sigma^H}$ is the CDF
@@ -674,7 +679,7 @@ levels at future times that are $d$ weeks apart.
 
 We obtain a separate copula fit for each value of $H$ from 2 to $W$ (note that a
 copula is not required for ``trajectories'' of length $H = 1$).
-Broadly, estimation for the model parameters proceeds in two stages:
+Estimation for the model parameters proceeds in two stages:
 first we estimate the parameters for KCDE separately for each prediction
 horizon $h = 1, \ldots, H$ as described in the previous Section, and second
 we estimate the copula parameters while holding the KCDE parameters fixed.
@@ -1132,7 +1137,7 @@ cat(paste0(
     ")"
 ))
 @
-where values greater than zero show KCDE making more accurate predictions than SARIMA (Supplemental Table [[TODO: table number here]]).
+where values greater than zero show KCDE making more accurate predictions than SARIMA (Supplemental Table 1).
 The median log score difference relative to HHH4 for these weeks was about
 <<KCDEHHH4LogScoreDiffsUpperTertile, echo = FALSE, results = "asis">>=
 cat(paste0(
@@ -1849,11 +1854,12 @@ field.  In predicting incidence of dengue fever in individual weeks,
 our approach offered consistent and substantial performance gains relative to a
 SARIMA model and the HHH4 model, particularly in periods of high incidence near
 the season peak that are of most interest to public health decision 
-makers.   In the application to influenza,
-our method did about as well as SARIMA when predicting incidence in individual
-weeks.
+makers.   In the application to influenza
+our method did about as well as SARIMA on average for this prediction target,
+but there were some cases where the SARIMA model assigned a very low probability
+density to the eventually observed outcome; the KCDE model was more consistent in this regard.
 
-Overall, across both data sets our method offered more consistency than the
+Across both data sets, our method also offered more consistency than the
 baseline models in predictions for incidence in the peak week.  Both baseline
 models suffered in one or more seasons with high incidence where they made
 substantially worse predictions than a naive model
@@ -1864,18 +1870,18 @@ relative to the naive approach of assigning equal probability to each week of
 the year; KCDE and HHH4 were more consistently at or above the level of this
 naive approach.
 
-Across all three prediction targets, an important benefit of the proposed method is that
-it consistently places non-negligible probability on the eventually observed outcome.
-This is in contrast to the baseline models we considered, which occasionally missed quite badly.
-These improvements in the reliability of
-predictions are valuable to public health officials planning interventions several weeks or
+Across all three prediction targets, our method consistently delivers
+non-neglegible predictive probabilities for the eventually observed events.
+This improved reliability of predictions from KCDE relative to the baseline models is an important
+benefit of the proposed method is that
+is particularly valuable to public health officials planning interventions several weeks or
 months before the peak of the disease season.
 However, since year-to-year
 variation is substantial, continued evaluation of these methods on datasets with
 longer prospective testing phases could provide better information about
 long-run performance of all of these methods.
 
-We have introduced the use of a periodic kernel component that led to substantial improvements in the predictive distributions for incidence in individual weeks. Periodic kernels have not otherwise been used in the KCDE literature despite their importance for prediction in seasonal systems. This advance improves the applicability of KCDE to infectious disease prediction in general and we demonstrate how it leads to improved performance for CDC's chosen prediction targets.
+We have introduced the use of a periodic kernel component that led to substantial improvements in the predictive distributions for incidence in individual weeks, and more moderate improvements to predictions for peak incidence in both applications and predictions of peak timing in the application to influenza.  Periodic kernels have not otherwise been used in the KCDE literature despite their importance for prediction in seasonal systems. This advance improves the applicability of KCDE to infectious disease prediction in general and we demonstrate how it leads to improved performance for CDC's chosen prediction targets.  An exception to this was for predictions of peak timing in the application to dengue fever, where KCDE specifications without the periodic kernel component outperformed KCDE specifications with the periodic kernel component (and both of the baseline models, which also included seasonal terms) for predictions made before the peak occurred.  This may be due to the fact that there was quite a bit of variability in the timing of the season peak in the test phase seasons for dengue.  In future work, we plan to consider methods for adapting the strength of the seasonal weighting according to how well incidence so far in the current season matches the predominant historical seasonal trends.
 
 We also introduced application of KCDE with a fully parameterized bandwidth matrix to discrete data. Much infectious disease case data is discrete and small discrete counts can be indicative of transmission dynamics driven by stochasticity[ cite a stochastic SIR (?) ]. Handling this important case directly makes our method widely applicable to infectious disease data, particularly when combined with the periodic kernel.
 
@@ -1956,9 +1962,10 @@ time series simultaneously.  For example, in addition to the national level
 wILI index used in this article, the influenza-like illness data from the CDC
 contain measures of incidence for 10 smaller regions within the United States,
 and break down incidence within four age groups.  The methods described in
-this article could be applied to make predictions with multiple time series, although we have not pursued that line in this work.
+this article could be applied to make predictions with multiple time series.
 For example, one possible approach to this would be to fit a separate predictive model for
-each time series, using the other time series as covariates that are conditioned on.  If a joint distribution of these time series were required, we could use the copula to estimate joint dependence structure across all of the time series.  Another option would be to use KCDE to directly estimate the joint distribution of a random vector of incidence in future time points.
+each time series, using the other time series as covariates that are conditioned on.  If a joint distribution of these time series were required, we could use the copula to estimate joint dependence structure across all of the time series.  Another option would be to use KCDE to directly estimate the joint distribution of a random vector of the values of all time series in future time points.
+Although this is beyond the scope of the current article, we have begun exploratory work in this area, and some preliminary results from separate KCDE models for influenza fit to each region in the United States are available from \cite{ReichLabFluSight}.
 
 Another aspect of our method that should be explored further is the use of
 log score in estimation.  We used log scores in this work to match the use
@@ -2411,12 +2418,12 @@ upViewport()
 \caption{Differences in log scores for the weekly predictive distributions
 obtained from the Periodic, Full Bandwidth KCDE model and the baseline
 models, plotted against the observed incidence in the week being predicted.
-The lower panel displays a density estimate of incidence levels in each week
-of the season separately for each season in the test phase.
 For reference, a log score difference of 2.3 (4.6) indicates that the predictive density from KCDE was about 10 (100)
 times as large as the predictive density from the baseline model at the realized outcome.  Each
 point corresponds to a unique combination of prediction target week and
 prediction horizon.
+The lower panel displays a density estimate of incidence levels in each week
+of the season separately for each season in the test phase.
 }
 \label{fig:DengueLogScoreDiffVsReportedCasesCombined}
 \end{figure}
