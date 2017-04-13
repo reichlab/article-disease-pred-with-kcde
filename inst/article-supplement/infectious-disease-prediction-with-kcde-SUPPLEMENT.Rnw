@@ -271,6 +271,11 @@ kernel, we add $0.5$ to the observed case counts; the
 corresponding integration bounds are the non-negative integers as illustrated in
 Supplemental Figure~\ref{fig:IncidenceKernelPlots}.
 
+\subsection{Alternative Copula Specifications}
+\label{subsec:SeparateCopulas}
+
+In Section 2.2 of the main manuscript, we introduced the use of copulas to model dependence in incidence values across different weeks in the season. In our model, we have used a separate copula function for each trajectory length (where the length of the trajectory is equal to the number of weeks remaining in the season). This specification allows the amount of dependence among future incidence values to vary with the time in the season at which we are making the predictions. Alternative formulations are also possible: for instance, we could fit a single copula function for the longest trajectory required, and use the relevant subset of those dependence parameters to make predictions at shorter trajectory lengths. We have not tried this alternative formulation, but we have observed that in our formulation the estimated dependence parameters vary strongly with the trajectory length. For instance, in the application to influenza using the KCDE specification with a fully parameterized bandwidth and a periodic kernel component the estimate of $\xi_1^H$ is $0.909$ for a trajectory of length $H = 17$, but it is $0.769$ for a trajectory of length $H = 31$. Thus, the amount of dependence between incidence values $d = 1$ week apart is much lower for $H = 31$ than it is for $H = 17$. This level of variation is fairly consistent across all values of H and d, and the standard errors of these estimates are in the range of about 0.02 to 0.06, suggesting that these differences are statistically significant (though we have not conducted a formal hypothesis test of this). This indicates that a simpler model with the same dependence parameters used at all points in the season would not adequately capture variation in dependence levels over the course of the season.
+
 \subsection{Parameter Estimation}
 \label{subsec:ParamEst}
 
