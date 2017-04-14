@@ -216,17 +216,17 @@ In this work, we use a semi-parametric approach that combines a non-parametric
 method for conditional density estimation referred to as kernel conditional
 density estimation (KCDE) with a parametric method for modeling joint dependence
 structures known as copulas.  We apply this method to make predictions for three targets
-chosen by the CDC as relevant to public health:
+chosen by the United States Centers for Disease Control (CDC) as relevant to public health:
 
 \begin{enumerate}
   \item Incidence $h$ time steps in the future (at ``prediction horizon'' $h$).  
   \item Timing of the peak week of the current season, $w^* \in \{1, \ldots, W\}$, where $W$ is the total number of weeks in the season.
   \item Incidence in the peak week of the current season.
 \end{enumerate}
-
 These quantities have emerged as being targets of particular utility in making planning decisions 
 \cite{PandemicPredictionandForecastingScienceandTechnologyInteragencyWorkingGroup2015Announcement,
-EpidemicPredictionInitiative2015Index}.
+EpidemicPredictionInitiative2015Index}, and variations on these targets have been set as the
+quantities of interest in recent prediction contests \cite{biggerstaff2016resultsCDC20132014InfluenzaChallenge}.
 
 We model the first of these prediction targets directly; predictions for the second and third prediction targets are derived from a joint predictive distribution of incidence in each remaining week of the season.  Using data available up through time $t^*$, we employ KCDE
 to obtain separate predictive distributions for disease incidence in each subsequent week of the season.  
@@ -286,13 +286,14 @@ The covariates we condition on could include historical observations from the ti
 series we are predicting as well as other variables such as weather or
 the time of the season.
 
-Applications range from
-similar infectious disease settings where nearest neighbors regression has been used to make point predictions for incidence of
+Applications range from similar infectious disease settings where nearest neighbors
+regression has been used to make point predictions for incidence of
 measles \cite{sugihara1990nonlinearForecasting} and
 influenza \cite{viboud2003predictionInfluenzaMoA} to sports analytics
 where a version of nearest neighbors regression predicts the career trajectories
 of current NBA players \cite{SilverCARMELOPrediction}.
-We note that KCDE can be seen as a distribution-based counterpart of nearest neighbors regression. For example, the point prediction
+We note that KCDE can be seen as a distribution-based counterpart of nearest neighbors regression.
+For example, the point prediction
 obtained from nearest neighbors regression is equal to the expected value of the predictive distribution
 obtained from KCDE if a particular kernel function is used in the formulation of
 KCDE ({e.g.}, Hastie \etal \cite{HastieTibshiraniESL} discuss the connection
@@ -309,12 +310,19 @@ can also be formulated in the Bayesian framework.  For example, Zhou \etal
 arrival of a disease in amphibian populations using Dirichlet processes and copulas.
 
 There is also a long history of using other modeling approaches for infectious
-disease prediction, including agent-based models, compartmental models and
-more generic regression-based time series models such as seasonal autoregressive
-integrated moving average (SARIMA) models among others.  Brown \etal [in preparation] and
-Unkel \etal \cite{unkel2012statisticalInfectiousDiseasePredictionReview} are
-recent reviews of work on forecasting infectious disease, and describe these alternative
-approaches in more detail.
+disease prediction, including agent-based models, compartmental models
+\cite{shaman2015improvedInfluenzaEnsembleConsecutivePredictions, yang2014comparisonFilteringInfluenza},
+and more generic regression-based time series models such as seasonal autoregressive
+integrated moving average (SARIMA) models \cite{martinez2011sarima, martinez2011predicting, luz2008timeSARIMABrazilDengue} and generalized linear models with autoregressive terms \cite{wang2015dynamicARInfluenza, Held2005HHHIntro}, among others.  Previous work has also explored a variety of covariates that can be used for infectious disease prediction,
+including measures of access frequency for Wikipedia articles \cite{hickmann2015forecastingInfluenzaWikipedia},
+data derived from Twitter \cite{paul2014twitterInfluenzaForecasting, santillana2015combiningSearchTwitterInfluenza},
+and climatological variables \cite{lowe2014dengueBrazilClimate}.  These models need not be used in isolation;
+some work has been done on ensemble methods combining predictions from multiple model specifications
+\cite{shaman2015improvedInfluenzaEnsembleConsecutivePredictions, chakraborty2014forecastingILIEnsemble}.
+Unkel \etal \cite{unkel2012statisticalInfectiousDiseasePredictionReview} is a
+recent reviews of work on forecasting infectious disease, and describes these alternative
+approaches in more detail.  Additionally, Chretien \etal \cite{chretien2014influenza} and
+Nsoesie \etal \cite{nsoesie2014systematic} are reviews focusing on prediction methods for influenza.
 
 Little research has been done comparing the predictive performance of more detailed and 
 disease-mechanistic modeling approaches (agent-based or compartmental
@@ -390,8 +398,9 @@ with different latent dynamics.
 Third, the method can easily be used with either discrete or continuous data 
 by substituting one kernel function specification for another.
 
-One of the few previous methods that shares these characteristics is in Brooks \etal
-\cite{brooks2015empiricalBayes}, who propose an Empirical Bayes method that also gives
+One of the few previous methods that shares these characteristics is an
+Empirical Bayes method employed by Brooks \etal \cite{brooks2015empiricalBayes}
+and van Panhuis \etal \cite{vanPanhuis2014riskDengueBrazil} that also gives
 a joint predictive distribution for incidence in each remaining week in the season.
 Their approach contrasts with ours in that it takes a ``top-down'' approach to
 constructing that predictive distribution, saying that the general trend in
@@ -487,8 +496,8 @@ for the trajectory of incidence over all remaining weeks in the season:
     &\quad = \int_{\{(\bz_{({t^*} + 1):({t^*} + H_{t^*})}): a \leq \max_{w} z_{S_{t^*} + w} < b\}} f(\bz_{({t^*} + 1):({t^*} + H_{t^*})} \mid {t^*}, \bz_{1:{t^*}}) \, \mathrm{d} \bz_{({t^*} + 1):({t^*} + H_{t^*})}. \label{eqn:PeakPredIncidenceIntegral}
     \end{align}
 \end{enumerate}
-In predicting binned incidence in the peak week, we are following the precedent set in the
-competitions run by the CDC.
+In predicting binned incidence in the peak week, we are following the precedent set in prediction
+competitions run by the CDC (see \cite{}).
 In practice, we use Monte Carlo integration to evaluate
 the integrals in Equations \eqref{eqn:PeakPredTimingIntegral} and
 \eqref{eqn:PeakPredIncidenceIntegral} by sampling incidence trajectories from
@@ -772,7 +781,7 @@ compare and the evaluation procedures before discussing the results.
 We apply our methods to two infectious disease data sets (Figure~\ref{fig:IntialDataPlots}).
 The first data set consists of a weekly count of reported cases of dengue fever in San
 Juan, Puerto Rico. The second data set consists of a composite indicator
-of flu activity generated by the Centers for Disease Control (CDC) and
+of flu activity generated by the CDC and
 referred to as the weighted influenza-like illness (wILI) index.  The
 wILI is calculated as the of a proportion of doctor visits with influenza-like
 illness to clinics participating in the U.S. Outpatient Influenza-like
@@ -1870,20 +1879,23 @@ relative to the naive approach of assigning equal probability to each week of
 the year; KCDE and HHH4 were more consistently at or above the level of this
 naive approach.
 
+The goal of making predictions of infectious disease is to provide information to
+public health officials planning interventions several weeks or
+months before the disease season begins or peaks.
+Predictions that assign very low probability to the eventually observed outcome
+may lead public health agencies to misdirect limited resources, potentially resulting
+in increased disease incidence \cite{biggerstaff2016resultsCDC20132014InfluenzaChallenge}.
 Across all three prediction targets, our method consistently delivers
-non-neglegible predictive probabilities for the eventually observed events.
+non-negligible predictive probabilities for the eventually observed events.
 This improved reliability of predictions from KCDE relative to the baseline models is an important
-benefit of the proposed method is that
-is particularly valuable to public health officials planning interventions several weeks or
-months before the peak of the disease season.
-However, since year-to-year
+benefit of the proposed method.  However, since year-to-year
 variation is substantial, continued evaluation of these methods on datasets with
 longer prospective testing phases could provide better information about
 long-run performance of all of these methods.
 
 We have introduced the use of a periodic kernel component that led to substantial improvements in the predictive distributions for incidence in individual weeks, and more moderate improvements to predictions for peak incidence in both applications and predictions of peak timing in the application to influenza.  Periodic kernels have not otherwise been used in the KCDE literature despite their importance for prediction in seasonal systems. This advance improves the applicability of KCDE to infectious disease prediction in general and we demonstrate how it leads to improved performance for CDC's chosen prediction targets.  An exception to this was for predictions of peak timing in the application to dengue fever, where KCDE specifications without the periodic kernel component outperformed KCDE specifications with the periodic kernel component (and both of the baseline models, which also included seasonal terms) for predictions made before the peak occurred.  This may be due to the fact that there was quite a bit of variability in the timing of the season peak in the test phase seasons for dengue.  In future work, we plan to consider methods for adapting the strength of the seasonal weighting according to how well incidence so far in the current season matches the predominant historical seasonal trends.
 
-We also introduced application of KCDE with a fully parameterized bandwidth matrix to discrete data. Much infectious disease case data is discrete and small discrete counts can be indicative of transmission dynamics driven by stochasticity[ cite a stochastic SIR (?) ]. Handling this important case directly makes our method widely applicable to infectious disease data, particularly when combined with the periodic kernel.
+We also introduced application of KCDE with a fully parameterized bandwidth matrix to discrete data. Much infectious disease case data is discrete and small discrete counts can be indicative of transmission dynamics driven by stochasticity. Handling this important case directly makes our method widely applicable to infectious disease data, particularly when combined with the periodic kernel.
 
 While taking advantage of a fully parameterized bandwidth matrix did not lead to consistent improvements in our test data, we have demonstrated through a simulation study that the fully parameterized bandwidth can be helpful in some conditional density estimation tasks. This general method for obtaining discrete kernel functions may be beneficial in other applications of KCDE.
 
@@ -1907,7 +1919,7 @@ While taking advantage of a fully parameterized bandwidth matrix did not lead to
 %note that even without these extensions, KCDE offered similar performance to
 %SARIMA overall in the influenza application.
 
-A major advantage of the approach we have outlined is its flexibility in terms
+An advantage of the approach we have outlined is its flexibility in terms
 of cleanly handling both discrete and continuous data and a variety of
 underlying disease mechanisms.
 Our method consistently yielded reasonable predictions for all three prediction
@@ -1917,11 +1929,12 @@ applied to the influenza data where the disease measure was continuous.  Even in
 the data set where it could be used, the HHH4 model 
 underperformed relative to KCDE in predictions for incidence in individual weeks
 and incidence in the peak week.  Similarly, the standard
-SARIMA model is formulated in terms of continuous distributions.  The
-resulting continuous predictive distributions can be discretized as we have
-done in this article, but without extra coding effort the method is not
+SARIMA model is formulated in terms of continuous distributions, which are not
 appropriate for use with case count data when small integer numbers of cases 
-are reported.  Furthermore, our approach consistently
+are reported.  The resulting continuous predictive distributions can be discretized as we have
+done in this article, but without extra coding effort this discretization is not
+accounted for during the estimation process so that different models are effectively
+used during estimation and prediction.  Furthermore, our approach consistently
 equalled or exceeded the performance SARIMA across the applications to dengue
 and influenza.
 
