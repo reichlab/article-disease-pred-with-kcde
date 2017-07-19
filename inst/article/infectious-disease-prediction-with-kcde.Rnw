@@ -847,6 +847,28 @@ we evaluated performance of predictions made before the peak actually occurred.
 Additionally, for predictions of incidence in individual weeks, we considered the
 coverage rate of predictive intervals obtained from each method.
 
+We considered two summaries of the log scores of these predictions for each target:
+1) the mean log score across all weeks (and across all prediction horizons, in the case of
+predictions of incidence in individual weeks); and 2) the minimum log score across
+all weeks and prediction horizons.  The mean log score is a strictly proper score,
+and its expected value is uniquely maximized by the true conditional distribution
+for $Y | \mathbf{X}$.  The minimum log score is not a proper score, and therefore relative
+performance of the different models according to this metric should be interpreted
+cautiously.  The minimum log score can be viewed as a measure of worst-case
+performance of a given method.  We contend that consideration of worst-case
+performance is important for predictions that may be used by public
+health officials as inputs to setting public policy.  For example,
+\cite{biggerstaff2016resultsCDC20132014InfluenzaChallenge} note that
+``[p]ublic health actions informed by forecasts that later prove to be inaccurate
+can have negative consequences, including the loss of credibility, wasted and
+misdirected resources, and, in the worst case, increases in morbidity or mortality.''
+It is therefore important that predictions for key times such as the season
+peak assign non-negligible probability to the outcome that eventually occurs,
+and this is what the minimum log score measures.  However, we emphasize that the
+minimum log score should only be considered as a secondary measure to characterize
+methods that have demonstrated good overall performance as measured by the mean
+log score.
+
 \subsection{Models}
 
 Our applications evaluate four variations on KCDE model specifications:
@@ -1904,6 +1926,23 @@ relative to the naive approach of assigning equal probability to each week of
 the year; KCDE and HHH4 were more consistently at or above the level of this
 naive approach.
 
+The lack of appropriate statistical methods to analyze model performance limits
+our ability to draw formal conclusions about relative model performance.
+Challenges arise when attempting to apply standard methods for formal model
+comparisons (such as the Diebold-Mariano test[cite]). For example, the standard
+Diebold-Mariano test assumes that the differences in model performance have a
+fixed mean and variance.  However, Figures 4 and 6 indicate that the mean and
+variance are different in different seasons, and are likely a function of
+variables such as the timing and severity of the season peak. Additionally, due
+to the limited amount of real data available, we have only a small number of
+testing seasons to evaluate; this makes fitting a more flexible linear mixed
+effects model with a realistic variance structure difficult. Therefore, many of
+the conclusions about relative model performance are based on exploratory and
+graphical summaries of performance metrics. Despite the lack of a formal
+statistical test, we believe that the graphical summaries in Figures 4 and 6
+show clear patterns of model performance, and in particular highlight the
+benefits of flexible methods for heterogeneous data.
+
 The goal of making predictions of infectious disease is to provide information to
 public health officials planning interventions several weeks or
 months before the disease season begins or peaks.
@@ -2479,11 +2518,11 @@ of the season separately for each season in the test phase.
 
 
 \begin{table}[hp]
-\begin{tabular}{lllllllll}
+\begin{tabular}{lllll}
 \toprule
-         &          &              &    \multicolumn{6}{c}{Summary of Log Scores} \\
-\cline{4-9}
- Disease & Subset & Model & Min & Q1 & Q2 & Mean & Q3 & Max \\
+         &          &              &    \multicolumn{2}{c}{Summary of Log Scores} \\
+\cline{4-5}
+ Disease & Subset & Model & Min & Mean \\
   \hline
 <<PerformanceSummaryTableIndividualWeeksAbsolute, echo = FALSE, results = "asis">>=
 ili_prediction_results <- ili_prediction_results %>%
@@ -2637,25 +2676,25 @@ for(row_num in 1:6) {
     row_close_string,
     " & ",
     min_open_string,
-    format(round(temp[row_num, "min"], 2), nsmall = 2),
+    format(round(temp[row_num, "min"], 3), nsmall = 3),
     min_close_string,
-    " & ",
-    format(round(temp[row_num, "Q1"], 2), nsmall = 2),
-    " & ",
-    format(round(temp[row_num, "median"], 2), nsmall = 2),
+#    " & ",
+#    format(round(temp[row_num, "Q1"], 3), nsmall = 3),
+#    " & ",
+#    format(round(temp[row_num, "median"], 3), nsmall = 3),
     " & ",
     max_open_string,
-    format(round(temp[row_num, "mean"], 2), nsmall = 2),
+    format(round(temp[row_num, "mean"], 3), nsmall = 3),
     max_close_string,
-    " & ",
-    format(round(temp[row_num, "Q3"], 2), nsmall = 2),
-    " & ",
-    format(round(temp[row_num, "max"], 2), nsmall = 2),
+#    " & ",
+#    format(round(temp[row_num, "Q3"], 3), nsmall = 3),
+#    " & ",
+#    format(round(temp[row_num, "max"], 3), nsmall = 3),
     "\\\\\n"
   ))
 }
 
-cat("\\cline{2-9}\n")
+cat("\\cline{2-5}\n")
 
 # max_row <- which.max(temp_nadir$mean)
 # min_row <- which.min(temp_nadir$min)
@@ -2690,25 +2729,25 @@ cat("\\cline{2-9}\n")
 #     row_close_string,
 #     " & ",
 #     min_open_string,
-#     format(round(temp_nadir[row_num, "min"], 2), nsmall = 2),
+#     format(round(temp_nadir[row_num, "min"], 3), nsmall = 3),
 #     min_close_string,
 #     " & ",
-#     format(round(temp_nadir[row_num, "Q1"], 2), nsmall = 2),
+#     format(round(temp_nadir[row_num, "Q1"], 3), nsmall = 3),
 #     " & ",
-#     format(round(temp_nadir[row_num, "median"], 2), nsmall = 2),
+#     format(round(temp_nadir[row_num, "median"], 3), nsmall = 3),
 #     " & ",
 #     max_open_string,
-#     format(round(temp_nadir[row_num, "mean"], 2), nsmall = 2),
+#     format(round(temp_nadir[row_num, "mean"], 3), nsmall = 3),
 #     max_close_string,
 #     " & ",
-#     format(round(temp_nadir[row_num, "Q3"], 2), nsmall = 2),
+#     format(round(temp_nadir[row_num, "Q3"], 3), nsmall = 3),
 #     " & ",
-#     format(round(temp_nadir[row_num, "max"], 2), nsmall = 2),
+#     format(round(temp_nadir[row_num, "max"], 3), nsmall = 3),
 #     "\\\\\n"
 #   ))
 # }
 
-cat("\\cline{2-9}\n")
+cat("\\cline{2-5}\n")
 
 max_row <- which.max(temp_peak$mean)
 min_row <- which.min(temp_peak$min)
@@ -2744,20 +2783,20 @@ for(row_num in 1:6) {
     row_close_string,
     " & ",
     min_open_string,
-    format(round(temp_peak[row_num, "min"], 2), nsmall = 2),
+    format(round(temp_peak[row_num, "min"], 3), nsmall = 3),
     min_close_string,
-    " & ",
-    format(round(temp_peak[row_num, "Q1"], 2), nsmall = 2),
-    " & ",
-    format(round(temp_peak[row_num, "median"], 2), nsmall = 2),
+#    " & ",
+#    format(round(temp_peak[row_num, "Q1"], 3), nsmall = 3),
+#    " & ",
+#    format(round(temp_peak[row_num, "median"], 3), nsmall = 3),
     " & ",
     max_open_string,
-    format(round(temp_peak[row_num, "mean"], 2), nsmall = 2),
+    format(round(temp_peak[row_num, "mean"], 3), nsmall = 3),
     max_close_string,
-    " & ",
-    format(round(temp_peak[row_num, "Q3"], 2), nsmall = 2),
-    " & ",
-    format(round(temp_peak[row_num, "max"], 2), nsmall = 2),
+#    " & ",
+#    format(round(temp_peak[row_num, "Q3"], 3), nsmall = 3),
+#    " & ",
+#    format(round(temp_peak[row_num, "max"], 3), nsmall = 3),
     "\\\\\n"
   ))
 }
@@ -2848,25 +2887,25 @@ for(row_num in 1:5) {
     row_close_string,
     " & ",
     min_open_string,
-    format(round(temp[row_num, "min"], 2), nsmall = 2),
+    format(round(temp[row_num, "min"], 3), nsmall = 3),
     min_close_string,
-    " & ",
-    format(round(temp[row_num, "Q1"], 2), nsmall = 2),
-    " & ",
-    format(round(temp[row_num, "median"], 2), nsmall = 2),
+#    " & ",
+#    format(round(temp[row_num, "Q1"], 3), nsmall = 3),
+#    " & ",
+#    format(round(temp[row_num, "median"], 3), nsmall = 3),
     " & ",
     max_open_string,
-    format(round(temp[row_num, "mean"], 2), nsmall = 2),
+    format(round(temp[row_num, "mean"], 3), nsmall = 3),
     max_close_string,
-    " & ",
-    format(round(temp[row_num, "Q3"], 2), nsmall = 2),
-    " & ",
-    format(round(temp[row_num, "max"], 2), nsmall = 2),
+#    " & ",
+#    format(round(temp[row_num, "Q3"], 3), nsmall = 3),
+#    " & ",
+#    format(round(temp[row_num, "max"], 3), nsmall = 3),
     "\\\\\n"
   ))
 }
 
-cat("\\cline{2-9}\n")
+cat("\\cline{2-5}\n")
 
 # max_row <- which.max(temp_nadir$mean)
 # min_row <- which.min(temp_nadir$min)
@@ -2901,25 +2940,25 @@ cat("\\cline{2-9}\n")
 #     row_close_string,
 #     " & ",
 #     min_open_string,
-#     format(round(temp_nadir[row_num, "min"], 2), nsmall = 2),
+#     format(round(temp_nadir[row_num, "min"], 3), nsmall = 3),
 #     min_close_string,
 #     " & ",
-#     format(round(temp_nadir[row_num, "Q1"], 2), nsmall = 2),
+#     format(round(temp_nadir[row_num, "Q1"], 3), nsmall = 3),
 #     " & ",
-#     format(round(temp_nadir[row_num, "median"], 2), nsmall = 2),
+#     format(round(temp_nadir[row_num, "median"], 3), nsmall = 3),
 #     " & ",
 #     max_open_string,
-#     format(round(temp_nadir[row_num, "mean"], 2), nsmall = 2),
+#     format(round(temp_nadir[row_num, "mean"], 3), nsmall = 3),
 #     max_close_string,
 #     " & ",
-#     format(round(temp_nadir[row_num, "Q3"], 2), nsmall = 2),
+#     format(round(temp_nadir[row_num, "Q3"], 3), nsmall = 3),
 #     " & ",
-#     format(round(temp_nadir[row_num, "max"], 2), nsmall = 2),
+#     format(round(temp_nadir[row_num, "max"], 3), nsmall = 3),
 #     "\\\\\n"
 #   ))
 # }
 
-cat("\\cline{2-9}\n")
+cat("\\cline{2-5}\n")
 
 max_row <- which.max(temp_peak$mean)
 min_row <- which.min(temp_peak$min)
@@ -2955,20 +2994,20 @@ for(row_num in 1:5) {
     row_close_string,
     " & ",
     min_open_string,
-    format(round(temp_peak[row_num, "min"], 2), nsmall = 2),
+    format(round(temp_peak[row_num, "min"], 3), nsmall = 3),
     min_close_string,
-    " & ",
-    format(round(temp_peak[row_num, "Q1"], 2), nsmall = 2),
-    " & ",
-    format(round(temp_peak[row_num, "median"], 2), nsmall = 2),
+#    " & ",
+#    format(round(temp_peak[row_num, "Q1"], 3), nsmall = 3),
+#    " & ",
+#    format(round(temp_peak[row_num, "median"], 3), nsmall = 3),
     " & ",
     max_open_string,
-    format(round(temp_peak[row_num, "mean"], 2), nsmall = 2),
+    format(round(temp_peak[row_num, "mean"], 3), nsmall = 3),
     max_close_string,
-    " & ",
-    format(round(temp_peak[row_num, "Q3"], 2), nsmall = 2),
-    " & ",
-    format(round(temp_peak[row_num, "max"], 2), nsmall = 2),
+#    " & ",
+#    format(round(temp_peak[row_num, "Q3"], 3), nsmall = 3),
+#    " & ",
+#    format(round(temp_peak[row_num, "max"], 3), nsmall = 3),
     "\\\\\n"
   ))
 }
@@ -3270,7 +3309,7 @@ for(row_num_group_ind in c(1L, 3L)) {
       ifelse(best_in_group == row_num,
         "\\textbf{",
         ""),
-      format(round(coverage_for_table[row_num, 4], 2), nsmall = 2),
+      format(round(coverage_for_table[row_num, 4], 3), nsmall = 3),
       ifelse(best_in_group == row_num,
         "}",
         ""),
@@ -3278,7 +3317,7 @@ for(row_num_group_ind in c(1L, 3L)) {
       ifelse(best_in_second_group == second_row_num,
         "\\textbf{",
         ""),
-      format(round(coverage_for_table[second_row_num, 4], 2), nsmall = 2),
+      format(round(coverage_for_table[second_row_num, 4], 3), nsmall = 3),
       ifelse(best_in_second_group == second_row_num,
         "}",
         ""),
@@ -3300,11 +3339,11 @@ for(row_num_group_ind in c(1L, 3L)) {
 
 \begin{table}[hp]
 \centering
-\begin{tabular}{lllllllll}
+\begin{tabular}{lllll}
 \toprule
-         &                    &          &              \multicolumn{6}{c}{Summary of Log Scores} \\
-\cline{4-9}
- Disease & Subset & Model & Min & Q1 & Q2 & Mean & Q3 & Max \\
+         &                    &          &              \multicolumn{2}{c}{Summary of Log Scores} \\
+\cline{4-5}
+ Disease & Subset & Model & Min & Mean \\
   \hline
 <<PerformanceSummaryTablePeakIncidence, echo = FALSE, results = "asis">>=
 #difference ~ N(mean_difference_model_pair, rho^(target time difference) * phi^(analysis time difference))???
@@ -3399,24 +3438,24 @@ for(row_num in 1:7) {
     row_close_string,
     " & ",
     min_open_string,
-    format(round(temp[row_num, "min"], 2), nsmall = 2),
+    format(round(temp[row_num, "min"], 3), nsmall = 3),
     min_close_string,
-    " & ",
-    format(round(temp[row_num, "Q1"], 2), nsmall = 2),
-    " & ",
-    format(round(temp[row_num, "median"], 2), nsmall = 2),
+#    " & ",
+#    format(round(temp[row_num, "Q1"], 3), nsmall = 3),
+#    " & ",
+#    format(round(temp[row_num, "median"], 3), nsmall = 3),
     " & ",
     max_open_string,
-    format(round(temp[row_num, "mean"], 2), nsmall = 2),
+    format(round(temp[row_num, "mean"], 3), nsmall = 3),
     max_close_string,
-    " & ",
-    format(round(temp[row_num, "Q3"], 2), nsmall = 2),
-    " & ",
-    format(round(temp[row_num, "max"], 2), nsmall = 2),
+#    " & ",
+#    format(round(temp[row_num, "Q3"], 3), nsmall = 3),
+#    " & ",
+#    format(round(temp[row_num, "max"], 3), nsmall = 3),
     "\\\\\n"
   ))
 }
-cat("\\cline{2-9}\n")
+cat("\\cline{2-5}\n")
 
 max_row <- which.max(temp_before_peak$mean)
 min_row <- which.min(temp_before_peak$min)
@@ -3451,20 +3490,20 @@ for(row_num in 1:7) {
     row_close_string,
     " & ",
     min_open_string,
-    format(round(temp_before_peak[row_num, "min"], 2), nsmall = 2),
+    format(round(temp_before_peak[row_num, "min"], 3), nsmall = 3),
     min_close_string,
-    " & ",
-    format(round(temp_before_peak[row_num, "Q1"], 2), nsmall = 2),
-    " & ",
-    format(round(temp_before_peak[row_num, "median"], 2), nsmall = 2),
+#    " & ",
+#    format(round(temp_before_peak[row_num, "Q1"], 3), nsmall = 3),
+#    " & ",
+#    format(round(temp_before_peak[row_num, "median"], 3), nsmall = 3),
     " & ",
     max_open_string,
-    format(round(temp_before_peak[row_num, "mean"], 2), nsmall = 2),
+    format(round(temp_before_peak[row_num, "mean"], 3), nsmall = 3),
     max_close_string,
-    " & ",
-    format(round(temp_before_peak[row_num, "Q3"], 2), nsmall = 2),
-    " & ",
-    format(round(temp_before_peak[row_num, "max"], 2), nsmall = 2),
+#    " & ",
+#    format(round(temp_before_peak[row_num, "Q3"], 3), nsmall = 3),
+#    " & ",
+#    format(round(temp_before_peak[row_num, "max"], 3), nsmall = 3),
     "\\\\\n"
   ))
 }
@@ -3562,25 +3601,25 @@ for(row_num in 1:6) {
     row_close_string,
     " & ",
     min_open_string,
-    format(round(temp[row_num, "min"], 2), nsmall = 2),
+    format(round(temp[row_num, "min"], 3), nsmall = 3),
     min_close_string,
-    " & ",
-    format(round(temp[row_num, "Q1"], 2), nsmall = 2),
-    " & ",
-    format(round(temp[row_num, "median"], 2), nsmall = 2),
+#    " & ",
+#    format(round(temp[row_num, "Q1"], 3), nsmall = 3),
+#    " & ",
+#    format(round(temp[row_num, "median"], 3), nsmall = 3),
     " & ",
     max_open_string,
-    format(round(temp[row_num, "mean"], 2), nsmall = 2),
+    format(round(temp[row_num, "mean"], 3), nsmall = 3),
     max_close_string,
-    " & ",
-    format(round(temp[row_num, "Q3"], 2), nsmall = 2),
-    " & ",
-    format(round(temp[row_num, "max"], 2), nsmall = 2),
+#    " & ",
+#    format(round(temp[row_num, "Q3"], 3), nsmall = 3),
+#    " & ",
+#    format(round(temp[row_num, "max"], 3), nsmall = 3),
     "\\\\\n"
   ))
 }
 
-cat("\\cline{2-9}\n")
+cat("\\cline{2-5}\n")
 
 max_row <- which.max(temp_before_peak$mean)
 min_row <- which.min(temp_before_peak$min)
@@ -3615,20 +3654,20 @@ for(row_num in 1:6) {
     row_close_string,
     " & ",
     min_open_string,
-    format(round(temp_before_peak[row_num, "min"], 2), nsmall = 2),
+    format(round(temp_before_peak[row_num, "min"], 3), nsmall = 3),
     min_close_string,
-    " & ",
-    format(round(temp_before_peak[row_num, "Q1"], 2), nsmall = 2),
-    " & ",
-    format(round(temp_before_peak[row_num, "median"], 2), nsmall = 2),
+#    " & ",
+#    format(round(temp_before_peak[row_num, "Q1"], 3), nsmall = 3),
+#    " & ",
+#    format(round(temp_before_peak[row_num, "median"], 3), nsmall = 3),
     " & ",
     max_open_string,
-    format(round(temp_before_peak[row_num, "mean"], 2), nsmall = 2),
+    format(round(temp_before_peak[row_num, "mean"], 3), nsmall = 3),
     max_close_string,
-    " & ",
-    format(round(temp_before_peak[row_num, "Q3"], 2), nsmall = 2),
-    " & ",
-    format(round(temp_before_peak[row_num, "max"], 2), nsmall = 2),
+#    " & ",
+#    format(round(temp_before_peak[row_num, "Q3"], 3), nsmall = 3),
+#    " & ",
+#    format(round(temp_before_peak[row_num, "max"], 3), nsmall = 3),
     "\\\\\n"
   ))
 }
@@ -3639,7 +3678,10 @@ for(row_num in 1:6) {
 The ``All Weeks'' group summarizes results for all combinations of
 target week in the test period and prediction horizon; the ``Before Peak" group summarizes results
 for predictions in weeks before the actual peak for the given season.  The model in \textbf{bold} font
-had the highest mean log score within each combination of disease and weeks subset.  The model in \underline{\emph{italicized and underlined}} font had the lowest minimum log score within each combination of disease and weeks subset.  In some cases, the same model had both the highest average log score and the lowest worst-case log score.}
+had the highest mean log score within each combination of disease and weeks subset.  The model in \underline{\emph{italicized and underlined}} font had the lowest minimum log score within each combination of disease and weeks subset.  In some cases, the same model had both the highest average log score and the lowest worst-case log score.
+There were 42 weeks before the peak in the 2009/2010 dengue season, 15 in the 2010/2011 dengue season,
+19 in the 2011/2012 dengue season, 31 in the 2012/2013 dengue season,
+23 in the 2011/2012 influenza season, and 12 in each of the 2012/2013 and 2013/2014 influenza seasons.}
 \label{tbl:PeakIncidenceResults}
 \end{table}
 
@@ -3647,11 +3689,11 @@ had the highest mean log score within each combination of disease and weeks subs
 
 \begin{table}[hp]
 \centering
-\begin{tabular}{lllllllll}
+\begin{tabular}{lllll}
 \toprule
-         &                    &          &              \multicolumn{6}{c}{Summary of Log Scores} \\
-\cline{4-9}
- Disease & Subset & Model & Min & Q1 & Q2 & Mean & Q3 & Max \\
+         &                    &          &              \multicolumn{2}{c}{Summary of Log Scores} \\
+\cline{4-5}
+ Disease & Subset & Model & Min & Mean \\
   \hline
 <<PerformanceSummaryTablePeakTiming, echo = FALSE, results = "asis">>=
 #difference ~ N(mean_difference_model_pair, rho^(target time difference) * phi^(analysis time difference))???
@@ -3748,24 +3790,24 @@ for(row_num in 1:7) {
     row_close_string,
     " & ",
     min_open_string,
-    format(round(temp[row_num, "min"], 2), nsmall = 2),
+    format(round(temp[row_num, "min"], 3), nsmall = 3),
     min_close_string,
-    " & ",
-    format(round(temp[row_num, "Q1"], 2), nsmall = 2),
-    " & ",
-    format(round(temp[row_num, "median"], 2), nsmall = 2),
+#    " & ",
+#    format(round(temp[row_num, "Q1"], 3), nsmall = 3),
+#    " & ",
+#    format(round(temp[row_num, "median"], 3), nsmall = 3),
     " & ",
     max_open_string,
-    format(round(temp[row_num, "mean"], 2), nsmall = 2),
+    format(round(temp[row_num, "mean"], 3), nsmall = 3),
     max_close_string,
-    " & ",
-    format(round(temp[row_num, "Q3"], 2), nsmall = 2),
-    " & ",
-    format(round(temp[row_num, "max"], 2), nsmall = 2),
+#    " & ",
+#    format(round(temp[row_num, "Q3"], 3), nsmall = 3),
+#    " & ",
+#    format(round(temp[row_num, "max"], 3), nsmall = 3),
     "\\\\\n"
   ))
 }
-cat("\\cline{2-9}\n")
+cat("\\cline{2-5}\n")
 
 max_row <- which.max(temp_before_peak$mean)
 min_row <- which.min(temp_before_peak$min)
@@ -3800,20 +3842,20 @@ for(row_num in 1:7) {
     row_close_string,
     " & ",
     min_open_string,
-    format(round(temp_before_peak[row_num, "min"], 2), nsmall = 2),
+    format(round(temp_before_peak[row_num, "min"], 3), nsmall = 3),
     min_close_string,
-    " & ",
-    format(round(temp_before_peak[row_num, "Q1"], 2), nsmall = 2),
-    " & ",
-    format(round(temp_before_peak[row_num, "median"], 2), nsmall = 2),
+#    " & ",
+#    format(round(temp_before_peak[row_num, "Q1"], 3), nsmall = 3),
+#    " & ",
+#    format(round(temp_before_peak[row_num, "median"], 3), nsmall = 3),
     " & ",
     max_open_string,
-    format(round(temp_before_peak[row_num, "mean"], 2), nsmall = 2),
+    format(round(temp_before_peak[row_num, "mean"], 3), nsmall = 3),
     max_close_string,
-    " & ",
-    format(round(temp_before_peak[row_num, "Q3"], 2), nsmall = 2),
-    " & ",
-    format(round(temp_before_peak[row_num, "max"], 2), nsmall = 2),
+#    " & ",
+#    format(round(temp_before_peak[row_num, "Q3"], 3), nsmall = 3),
+#    " & ",
+#    format(round(temp_before_peak[row_num, "max"], 3), nsmall = 3),
     "\\\\\n"
   ))
 }
@@ -3913,25 +3955,25 @@ for(row_num in 1:6) {
     row_close_string,
     " & ",
     min_open_string,
-    format(round(temp[row_num, "min"], 2), nsmall = 2),
+    format(round(temp[row_num, "min"], 3), nsmall = 3),
     min_close_string,
-    " & ",
-    format(round(temp[row_num, "Q1"], 2), nsmall = 2),
-    " & ",
-    format(round(temp[row_num, "median"], 2), nsmall = 2),
+#    " & ",
+#    format(round(temp[row_num, "Q1"], 3), nsmall = 3),
+#    " & ",
+#    format(round(temp[row_num, "median"], 3), nsmall = 3),
     " & ",
     max_open_string,
-    format(round(temp[row_num, "mean"], 2), nsmall = 2),
+    format(round(temp[row_num, "mean"], 3), nsmall = 3),
     max_close_string,
-    " & ",
-    format(round(temp[row_num, "Q3"], 2), nsmall = 2),
-    " & ",
-    format(round(temp[row_num, "max"], 2), nsmall = 2),
+#    " & ",
+#    format(round(temp[row_num, "Q3"], 3), nsmall = 3),
+#    " & ",
+#    format(round(temp[row_num, "max"], 3), nsmall = 3),
     "\\\\\n"
   ))
 }
 
-cat("\\cline{2-9}\n")
+cat("\\cline{2-5}\n")
 
 max_row <- which.max(temp_before_peak$mean)
 min_row <- which.min(temp_before_peak$min)
@@ -3966,20 +4008,20 @@ for(row_num in 1:6) {
     row_close_string,
     " & ",
     min_open_string,
-    format(round(temp_before_peak[row_num, "min"], 2), nsmall = 2),
+    format(round(temp_before_peak[row_num, "min"], 3), nsmall = 3),
     min_close_string,
-    " & ",
-    format(round(temp_before_peak[row_num, "Q1"], 2), nsmall = 2),
-    " & ",
-    format(round(temp_before_peak[row_num, "median"], 2), nsmall = 2),
+#    " & ",
+#    format(round(temp_before_peak[row_num, "Q1"], 3), nsmall = 3),
+#    " & ",
+#    format(round(temp_before_peak[row_num, "median"], 3), nsmall = 3),
     " & ",
     max_open_string,
-    format(round(temp_before_peak[row_num, "mean"], 2), nsmall = 2),
+    format(round(temp_before_peak[row_num, "mean"], 3), nsmall = 3),
     max_close_string,
-    " & ",
-    format(round(temp_before_peak[row_num, "Q3"], 2), nsmall = 2),
-    " & ",
-    format(round(temp_before_peak[row_num, "max"], 2), nsmall = 2),
+#    " & ",
+#    format(round(temp_before_peak[row_num, "Q3"], 3), nsmall = 3),
+#    " & ",
+#    format(round(temp_before_peak[row_num, "max"], 3), nsmall = 3),
     "\\\\\n"
   ))
 }
@@ -3990,7 +4032,10 @@ for(row_num in 1:6) {
 The ``All Weeks'' group summarizes results for all combinations of
 target week in the test period and prediction horizon; the ``Before Peak" group summarizes results
 for predictions in weeks before the actual peak for the given season.  The model in \textbf{bold} font
-had the highest mean log score within each combination of disease and weeks subset.  The model in \underline{\emph{italicized and underlined}} font had the lowest minimum log score within each combination of disease and weeks subset.  In some cases, the same model had both the highest average log score and the lowest worst-case log score.}
+had the highest mean log score within each combination of disease and weeks subset.  The model in \underline{\emph{italicized and underlined}} font had the lowest minimum log score within each combination of disease and weeks subset.  In some cases, the same model had both the highest average log score and the lowest worst-case log score.
+There were 42 weeks before the peak in the 2009/2010 dengue season, 15 in the 2010/2011 dengue season,
+19 in the 2011/2012 dengue season, 31 in the 2012/2013 dengue season,
+23 in the 2011/2012 influenza season, and 12 in each of the 2012/2013 and 2013/2014 influenza seasons.}
 \label{tbl:PeakTimingResults}
 \end{table}
 

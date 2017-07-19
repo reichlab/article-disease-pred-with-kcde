@@ -1,4 +1,3 @@
-setwd("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/article")
+setwd("~/Documents/research/epi/kcde/article-disease-pred-with-kcde/inst/article")
 library(knitr)
-knit2pdf("/media/evan/data/Reich/infectious-disease-prediction-with-kcde/inst/article/infectious-disease-prediction-with-kcde.Rnw")
-
+knit2pdf("~/Documents/research/epi/kcde/article-disease-pred-with-kcde/inst/article/infectious-disease-prediction-with-kcde.Rnw")
